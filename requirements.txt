@@ -1,3 +1,7 @@
 python-telegram-bot
 groq
 flask
+requests
+beautifulsoup4
+pytesseract
+Pillow
