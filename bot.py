@@ -218,6 +218,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
+async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    text = (
+        "💳 *Выберите тариф:*\n\n"
+        "🔹 /pay_3 — *3€* за 1 проверку\n"
+        "💎 /pay_9 — *9€* за 5 проверок \\(\\-40%\\)\n"
+        "👑 /pay_19 — *19€* за безлимит на месяц\n\n"
+        "📄 /pay_pdf — *5€* за PDF\\-заявление\n"
+        "⭐ /pay_vip — *15€/мес* ежедневные подборки"
+    )
+    await update.message.reply_text(text, reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
     await update.message.reply_text(get_msg(lang, "pay_3"), reply_markup=get_keyboard(), parse_mode="Markdown")
@@ -299,13 +312,9 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    if user["free_used"] == 0 and user["balance"] == 0:
-        await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
-        return
-
     user["balance"] += 1
     save_data(data)
-    remaining = user["balance"] + (3 - user["free_used"])
+    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
@@ -315,13 +324,9 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    if user["free_used"] == 0 and user["balance"] == 0:
-        await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
-        return
-
     user["balance"] += 5
     save_data(data)
-    remaining = user["balance"] + (3 - user["free_used"])
+    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
@@ -330,10 +335,6 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     data = load_data()
     user = get_user_data(data, user_id)
     lang = get_lang(update)
-
-    if user["free_used"] == 0 and user["balance"] == 0:
-        await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
-        return
 
     user["balance"] = -1
     save_data(data)
@@ -368,6 +369,7 @@ if __name__ == "__main__":
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("pay", pay_command))
     application.add_handler(CommandHandler("pay_3", pay_3))
     application.add_handler(CommandHandler("pay_9", pay_9))
     application.add_handler(CommandHandler("pay_19", pay_19))
