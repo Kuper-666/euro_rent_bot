@@ -362,9 +362,10 @@ def run_flask():
 
 
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    logging.info("Flask started in background")
+    if not WEBHOOK_URL:
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        logging.info("Flask started in background")
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
@@ -393,8 +394,9 @@ if __name__ == "__main__":
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 10000)),
             url_path=TELEGRAM_TOKEN,
-            webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}"
+            webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_TOKEN}",
+            drop_pending_updates=True
         )
     else:
         logging.info("Starting bot polling...")
-        application.run_polling()
+        application.run_polling(drop_pending_updates=True)
