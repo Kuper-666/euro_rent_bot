@@ -4,15 +4,15 @@ import threading
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from google import genai
+from groq import Groq
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if not TELEGRAM_TOKEN or not GOOGLE_API_KEY:
-    raise RuntimeError("Set TELEGRAM_TOKEN and GEMINI_API_KEY environment variables")
+if not TELEGRAM_TOKEN or not GROQ_API_KEY:
+    raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")
 
-client = genai.Client(api_key=GOOGLE_API_KEY)
+client = Groq(api_key=GROQ_API_KEY)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -36,15 +36,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Отправьте текст объявления.")
         return
 
-    await update.message.reply_text("Анализирую объявление через Gemini...")
+    await update.message.reply_text("Анализирую объявление через Groq...")
 
     try:
-        full_prompt = f"{SYSTEM_PROMPT}\n\nВот текст объявления: {user_text}"
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=full_prompt
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_text}
+            ]
         )
-        await update.message.reply_text(response.text)
+        await update.message.reply_text(response.choices[0].message.content)
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {e}")
 
