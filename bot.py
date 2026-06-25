@@ -1,19 +1,27 @@
 import os
 import logging
+import threading
+from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import google.generativeai as genai
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
+if not TELEGRAM_TOKEN or not GOOGLE_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GEMINI_API_KEY environment variables")
 
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running 24/7!", 200
 
 SYSTEM_PROMPT = """
 Ты — профессиональный помощник для экспатов по аренде жилья во всей Европе. 
@@ -29,7 +37,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Отправьте текст объявления.")
         return
 
-    await update.message.reply_text("Анализирую объявление...")
+    await update.message.reply_text("Анализирую объявление через Gemini...")
 
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nВот текст объявления: {user_text}"
@@ -47,12 +55,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Скопируй текст объявления и отправь его мне.")
 
-def main() -> None:
+if __name__ == "__main__":
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.run_polling()
 
-if __name__ == "__main__":
-    main()
+    def run_bot():
+        logging.info("Starting bot in background thread...")
+        application.run_polling()
+
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
