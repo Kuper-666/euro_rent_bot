@@ -4,15 +4,16 @@ import threading
 from flask import Flask
 from telegram import Update, ForceReply
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from openai import OpenAI
+import google.generativeai as genai
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
-    raise RuntimeError("Set TELEGRAM_TOKEN and OPENAI_API_KEY environment variables")
+if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
+    raise RuntimeError("Set TELEGRAM_TOKEN and GEMINI_API_KEY environment variables")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -48,15 +49,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("🕐 Анализирую объявление... Это займет 5-10 секунд.")
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Вот текст объявления: {user_text}"}
-            ]
+        response = model.generate_content(
+            SYSTEM_PROMPT + "\n\nВот текст объявления: " + user_text
         )
-        answer = response.choices[0].message.content
-        await update.message.reply_text(answer, parse_mode='Markdown')
+        answer = response.text
+        await update.message.reply_text(answer)
     except Exception as e:
         await update.message.reply_text(f"Произошла ошибка: {e}")
 
