@@ -1,5 +1,4 @@
 import os
-import json
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -8,20 +7,9 @@ from PIL import Image
 from io import BytesIO
 from telegram import Update
 
-from config import DATA_FILE, FREE_LIMIT
+from config import FREE_LIMIT
 from messages import DEFAULT_LANG, MESSAGES
-
-
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+from airtable_storage import load_data, save_data
 
 
 def get_lang(update: Update) -> str:
