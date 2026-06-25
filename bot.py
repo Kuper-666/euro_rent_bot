@@ -1,7 +1,7 @@
 import os
 import logging
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask
 from telegram import Update, ForceReply
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from openai import OpenAI
@@ -30,19 +30,14 @@ SYSTEM_PROMPT = """
 Используй жирный шрифт и маркированные списки.
 """
 
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b'Bot is running!')
+app = Flask(__name__)
 
-    def log_message(self, format, *args):
-        pass
+@app.route("/")
+def health():
+    return "Bot is running!"
 
-def start_health_server():
-    server = HTTPServer(('0.0.0.0', 10000), HealthHandler)
-    server.serve_forever()
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_text = update.message.text
@@ -80,7 +75,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 def main() -> None:
-    threading.Thread(target=start_health_server, daemon=True).start()
+    threading.Thread(target=run_flask, daemon=True).start()
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
