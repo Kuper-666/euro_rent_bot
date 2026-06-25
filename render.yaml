@@ -8,5 +8,5 @@ services:
     envVars:
       - key: TELEGRAM_TOKEN
         sync: false
-      - key: OPENAI_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
