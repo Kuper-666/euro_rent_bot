@@ -5,4 +5,4 @@ requests
 beautifulsoup4
 pytesseract
 Pillow
-weasyprint
+fpdf2
