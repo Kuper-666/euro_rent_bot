@@ -347,8 +347,8 @@ def parse_pdf_data(text: str) -> dict:
     for i, key in enumerate(keys):
         if i < len(lines):
             line = lines[i]
-            if "." in line and line[0].isdigit():
-                line = line.split(".", 1)[1].strip()
+            import re
+            line = re.sub(r'^[1-8]\.\s+', '', line)
             data[key] = line
     return data
 
