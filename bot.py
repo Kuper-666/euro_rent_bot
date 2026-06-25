@@ -1,10 +1,10 @@
 import os
 import logging
-import asyncio
+import threading
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import google.generativeai as genai
+from google import genai
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -12,11 +12,15 @@ GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 if not TELEGRAM_TOKEN or not GOOGLE_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GEMINI_API_KEY environment variables")
 
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client(api_key=GOOGLE_API_KEY)
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running 24/7!", 200
 
 SYSTEM_PROMPT = """
 Ты — профессиональный помощник для экспатов по аренде жилья во всей Европе. 
@@ -36,13 +40,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nВот текст объявления: {user_text}"
-        response = model.generate_content(full_prompt)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=full_prompt
+        )
         await update.message.reply_text(response.text)
     except Exception as e:
         await update.message.reply_text(f"Произошла ошибка: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("👋 Привет! Я бот для разбора объявлений по аренде в Европе.\nПросто пришли мне текст объявления.")
+    await update.message.reply_text(
+        "👋 Привет! Я бот для разбора объявлений по аренде в Европе.\n"
+        "Просто пришли мне текст объявления, и я сделаю детальный разбор."
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Скопируй текст объявления и отправь его мне.")
@@ -52,26 +62,13 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("help", help_command))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    if request.method == "POST":
-        json_data = request.get_json()
-        update = Update.de_json(json_data, application.bot)
-        asyncio.run(application.process_update(update))
-        return "OK", 200
-    return "OK", 200
-
-@app.route("/")
-def home():
-    return "Bot is running 24/7!", 200
-
 if __name__ == "__main__":
-    render_url = os.environ.get("RENDER_EXTERNAL_URL", "https://euro-rent-bot.onrender.com")
+    def run_bot():
+        logging.info("Starting bot in background thread...")
+        application.run_polling()
 
-    async def set_webhook():
-        await application.bot.set_webhook(url=f"{render_url}/webhook")
-        logging.info(f"Webhook set to {render_url}/webhook")
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
 
-    asyncio.run(set_webhook())
-
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
