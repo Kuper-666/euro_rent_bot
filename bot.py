@@ -1,14 +1,16 @@
 import os
 import logging
-import google.generativeai as genai
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from google import genai
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8603905857:AAFENhR1ChJ-inEO7u4umx35tKAaQTLjTAs")
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBAceN2YiNCO5yqJX-bqu14H9-BVFM3jSU")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+if not TELEGRAM_TOKEN or not GOOGLE_API_KEY:
+    raise RuntimeError("Set TELEGRAM_TOKEN and GEMINI_API_KEY environment variables")
+
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -30,7 +32,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         full_prompt = f"{SYSTEM_PROMPT}\n\nВот текст объявления: {user_text}"
-        response = model.generate_content(full_prompt)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=full_prompt
+        )
         await update.message.reply_text(response.text)
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {e}")
