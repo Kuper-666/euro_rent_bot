@@ -60,7 +60,7 @@ footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
 <div class="hero">
 <h1>AI-помощник по аренде<br>в Европе</h1>
 <p>Анализирую объявления, нахожу скрытые платежи, проверяю документы и выявляю мошенников за секунды</p>
-<a href="https://t.me/EuroRentAIBot" class="btn btn-primary">Открыть бота в Telegram</a>
+<a href="https://t.me/expat_rent_bot" class="btn btn-primary">Открыть бота в Telegram</a>
 <a href="/b2b" class="btn btn-secondary">Для агентств →</a>
 </div>
 <div class="features">
@@ -77,15 +77,15 @@ footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
 <div class="pricing">
 <h2>Тарифы для частных лиц</h2>
 <div class="price-cards">
-<div class="price-card"><h3>Разовый</h3><div class="price">3€</div><div class="period">1 проверка</div><ul><li>Анализ 1 объявления</li><li>Перевод + разбор</li><li>Оценка рисков</li></ul><a href="https://t.me/EuroRentAIBot" class="btn btn-secondary" style="width:100%;text-align:center">Попробовать</a></div>
-<div class="price-card featured"><h3>Эконом</h3><div class="price">9€</div><div class="period">5 проверок</div><ul><li>Все функции</li><li>Экономия 40%</li><li>Идеально для поиска</li></ul><a href="https://t.me/EuroRentAIBot" class="btn btn-primary" style="width:100%;text-align:center">Купить</a></div>
-<div class="price-card"><h3>Профи</h3><div class="price">19€</div><div class="period">Безлимит / месяц</div><ul><li>Безлимитные проверки</li><li>Приоритетная обработка</li><li>Все будущие фичи</li></ul><a href="https://t.me/EuroRentAIBot" class="btn btn-secondary" style="width:100%;text-align:center">Выбрать</a></div>
+<div class="price-card"><h3>Разовый</h3><div class="price">3€</div><div class="period">1 проверка</div><ul><li>Анализ 1 объявления</li><li>Перевод + разбор</li><li>Оценка рисков</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-secondary" style="width:100%;text-align:center">Попробовать</a></div>
+<div class="price-card featured"><h3>Эконом</h3><div class="price">9€</div><div class="period">5 проверок</div><ul><li>Все функции</li><li>Экономия 40%</li><li>Идеально для поиска</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-primary" style="width:100%;text-align:center">Купить</a></div>
+<div class="price-card"><h3>Профи</h3><div class="price">19€</div><div class="period">Безлимит / месяц</div><ul><li>Безлимитные проверки</li><li>Приоритетная обработка</li><li>Все будущие фичи</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-secondary" style="width:100%;text-align:center">Выбрать</a></div>
 </div>
 </div>
 <div class="cta">
 <h2>Начните искать жильё умнее</h2>
 <p>3 бесплатные проверки — без регистрации и карт</p>
-<a href="https://t.me/EuroRentAIBot" class="btn btn-primary">Открыть бота</a>
+<a href="https://t.me/expat_rent_bot" class="btn btn-primary">Открыть бота</a>
 </div>
 <footer>© 2026 ExpatRentBot · AI-powered rental analysis for expats in Europe</footer>
 </body>
