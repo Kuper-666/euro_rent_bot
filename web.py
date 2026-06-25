@@ -143,7 +143,7 @@ footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
 <div class="hero">
 <h1>AI-помощник для риелторов<br>и агентств недвижимости в Европе</h1>
 <p>Автоматический анализ 100+ объявлений в день. Поиск несоответствий в ценах, проверка документов арендаторов, выявление мошенников</p>
-<a href="https://t.me/Kuper6_6" class="btn btn-primary">Свяжитесь со мной</a>
+<a href="https://t.me/Kuper6_66" class="btn btn-primary">Свяжитесь со мной</a>
 <a href="/" class="btn btn-secondary">← Назад к боту</a>
 </div>
 <div class="section">
@@ -169,14 +169,14 @@ footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
 <h2>Подписка для агентств</h2>
 <p class="subtitle">Тестовый период — 2 недели бесплатно</p>
 <div class="price-cards">
-<div class="price-card"><h3>Старт</h3><div class="price">49€</div><div class="period">в месяц</div><ul><li>До 50 объявлений/день</li><li>Базовый анализ</li><li>EMAIL-поддержка</li><li>1 пользователь</li></ul><a href="https://t.me/Kuper6_6" class="btn btn-secondary" style="width:100%;text-align:center">Начать бесплатно</a></div>
-<div class="price-card featured"><h3>Профи</h3><div class="price">99€</div><div class="period">в месяц</div><ul><li>Безлимит объявлений</li><li>Глубокий анализ + антифрод</li><li>Приоритетная поддержка</li><li>До 5 пользователей</li><li>API-доступ (скоро)</li></ul><a href="https://t.me/Kuper6_6" class="btn btn-primary" style="width:100%;text-align:center">Попробовать 2 недели</a></div>
+<div class="price-card"><h3>Старт</h3><div class="price">49€</div><div class="period">в месяц</div><ul><li>До 50 объявлений/день</li><li>Базовый анализ</li><li>EMAIL-поддержка</li><li>1 пользователь</li></ul><a href="https://t.me/Kuper6_66" class="btn btn-secondary" style="width:100%;text-align:center">Начать бесплатно</a></div>
+<div class="price-card featured"><h3>Профи</h3><div class="price">99€</div><div class="period">в месяц</div><ul><li>Безлимит объявлений</li><li>Глубокий анализ + антифрод</li><li>Приоритетная поддержка</li><li>До 5 пользователей</li><li>API-доступ (скоро)</li></ul><a href="https://t.me/Kuper6_66" class="btn btn-primary" style="width:100%;text-align:center">Попробовать 2 недели</a></div>
 </div>
 </div>
 <div class="cta">
 <h2>Готовы автоматизировать проверку объявлений?</h2>
 <p>Напишите нам — настроим тестовый доступ за 15 минут</p>
-<a href="https://t.me/Kuper6_6" class="btn btn-primary">Написать в Telegram</a>
+<a href="https://t.me/Kuper6_66" class="btn btn-primary">Написать в Telegram</a>
 </div>
 <footer>© 2026 ExpatRentBot · AI-powered rental analysis for agencies in Europe</footer>
 </body>
