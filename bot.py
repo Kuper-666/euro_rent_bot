@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import threading
-from flask import Flask, request
+from flask import Flask
 import requests
 from bs4 import BeautifulSoup
 import pytesseract
@@ -11,7 +11,7 @@ from PIL import Image
 from io import BytesIO
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    InlineKeyboardButton, InlineKeyboardMarkup
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
@@ -20,6 +20,9 @@ from telegram.ext import (
 from groq import Groq
 
 DATA_FILE = "users_data.json"
+FREE_LIMIT = 3
+AFFILIATE_REVOLUT = "https://revolut.com/referral/?referral-code=radik5f35!JUL1-26-VR-EE&geo-redirect"
+AFFILIATE_WISE = "https://wise.com/invite/arhc/radikm15"
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -63,35 +66,63 @@ MESSAGES = {
             "Просто *скопируй ссылку* на объявление \\(например, с ImmoScout24, Rightmove, Idealista\\) или *вставь текст* объявления прямо сюда\\. Я сам всё проанализирую\\.\n\n"
             "🎁 *Бесплатный тест\\-драйв*\n"
             "Ты можешь протестировать меня на **3 объявлениях абсолютно бесплатно**, чтобы убедиться в моей полезности\\.\n\n"
-            "💳 *Цены и оплата*\n"
-            "После бесплатного лимита:\n"
-            "• Разовый анализ — *3€*\n"
-            "• Безлимитный доступ на месяц — *9€*\n\n"
+            "💳 *Пакеты и цены*\n\n"
+            "🔹 *Разовый* — 3€ за 1 проверку\n"
+            "▸ Оплатить: /pay_3\n\n"
+            "💎 *Эконом* — 9€ за 5 проверок \\(экономия 40%\\)\n"
+            "▸ Оплатить: /pay_9\n\n"
+            "👑 *Профи* — 19€ за безлимит на месяц\n"
+            "▸ Оплатить: /pay_19\n\n"
             "💸 *Как оплатить*\n"
-            "Оплата принимается через Revolut \\(ссылка будет отправлена после исчерпания бесплатного лимита\\)\\.\n"
-            "*После оплаты обязательно напиши команду* /pay_done, чтобы я разблокировал тебе доступ\\.\n\n"
+            "Нажми команду выше — получишь ссылку на оплату через Revolut\\. После оплаты напиши соответствующую команду /pay_done_\\*\\, чтобы разблокировать доступ\\.\n\n"
+            "🏦 *Нужен европейский счёт для оплаты депозита?*\n"
+            "Откройте [Revolut]({}) или [Wise]({}) по моей ссылке и получите бонус\\!\n\n"
             "✅ *Готов начать?*\n"
             "Просто пришли мне любое объявление прямо в этот чат\\!"
-        ),
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "analyzing": "⏳ Анализирую объявление...",
         "fetching_url": "🌐 Открываю ссылку...",
         "ocr_processing": "🔍 Распознаю текст со скриншота...",
         "limit_reached": (
             "⚠️ *Лимит бесплатных проверок*\n\n"
-            "Вы использовали 3 бесплатные проверки.\n\n"
-            "💳 *Варианты оплаты:*\n\n"
-            "🔹 *3€* — разовая проверка\n"
-            "🔹 *9€* — безлимит навсегда \\(\\*\\)\\*\n\n"
-            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=300\n"
-            "👉 Безлимит: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "После оплаты напишите */pay_done*\\."
+            "Вы использовали все 3 бесплатные проверки\\.\n\n"
+            "💳 *Выберите пакет:*\n\n"
+            "🔹 *Разовый* — 3€ за 1 проверку → /pay_3\n"
+            "💎 *Эконом* — 9€ за 5 проверок \\(\\-40%\\) → /pay_9\n"
+            "👑 *Профи* — 19€ за безлимит на месяц → /pay_19\n\n"
+            "После оплаты напишите команду */pay_done_\\**对应\\."
         ),
-        "pay_done": "✅ *Оплата подтверждена!*\n\nТеперь у вас безлимитный доступ\\. Пользуйтесь на здоровье 🎉",
+        "pay_3": (
+            "💳 *Пакет «Разовый» — 3€*\n\n"
+            "1 проверка объявления\n\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
+            "После оплаты напишите */pay_done_3*\\."
+        ),
+        "pay_9": (
+            "💎 *Пакет «Эконом» — 9€*\n\n"
+            "5 проверок объявлений \\(экономия 40%\\)\n\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
+            "После оплаты напишите */pay_done_9*\\."
+        ),
+        "pay_19": (
+            "👑 *Пакет «Профи» — 19€*\n\n"
+            "Безлимитные проверки на 1 месяц\n\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
+            "После оплаты напишите */pay_done_19*\\."
+        ),
+        "pay_done_3": "✅ *Оплата подтверждена!*\n\nВам добавлена 1 проверка\\. Осталось: *{}*\\.",
+        "pay_done_9": "✅ *Оплата подтверждена!*\n\nВам добавлено 5 проверок\\. Осталось: *{}*\\.",
+        "pay_done_19": "✅ *Оплата подтверждена!*\n\nБезлимитный доступ на месяц активирован 🎉",
         "pay_not_used": "Вы ещё не использовали бота\\. Сначала отправьте объявление, потом оплачивайте\\.",
+        "no_balance": "❌ У вас нет доступных проверок\\. Купите пакет: /help",
         "error": "❌ Ошибка: {}",
         "send_listing": "Отправь текст объявления или ссылку\\.",
         "share_text": "📋 *Поделиться с другом:*",
         "analysis_done": "✅ *Анализ готов!*",
+        "affiliate_footer": (
+            "\n\n🏦 *Нужен европейский счёт?*\n"
+            "Откройте [Revolut]({}) или [Wise]({}) — получите бонус\\!"
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "system_prompt": (
             "Ты — профессиональный помощник для экспатов по аренде жилья в Европе. "
             "Отвечай на русском языке.\n\n"
@@ -122,39 +153,67 @@ MESSAGES = {
             "Просто *скопіюйте посилання* на оголошення \\(наприклад, з ImmoScout24, Rightmove, Idealista\\) або *вставте текст* оголошення прямо сюди\\. Я сам все проаналізую\\.\n\n"
             "🎁 *Безкоштовний тест\\-драйв*\n"
             "Ви можете протестувати мене на **3 оголошеннях абсолютно безкоштовно**, щоб переконатися в моїй корисності\\.\n\n"
-            "💳 *Ціни та оплата*\n"
-            "Після безкоштовного ліміту:\n"
-            "• Разовий аналіз — *3€*\n"
-            "• Безлімітний доступ на місяць — *9€*\n\n"
+            "💳 *Пакети та ціни*\n\n"
+            "🔹 *Разовий* — 3€ за 1 перевірку\n"
+            "▸ Оплатити: /pay_3\n\n"
+            "💎 *Економ* — 9€ за 5 перевірок \\(економія 40%\\)\n"
+            "▸ Оплатити: /pay_9\n\n"
+            "👑 *Профі* — 19€ за безліміт на місяць\n"
+            "▸ Оплатити: /pay_19\n\n"
             "💸 *Як оплатити*\n"
-            "Оплата приймається через Revolut \\(посилання буде відправлено після вичерпання безкоштовного ліміту\\)\\.\n"
-            "*Після оплати обов'язково напишіть команду* /pay_done, щоб я розблокував вам доступ\\.\n\n"
+            "Натисніть команду вище — отримаєте посилання на оплату через Revolut\\. Після оплати напишіть відповідну команду /pay_done_\\*\\, щоб розблокувати доступ\\.\n\n"
+            "🏦 *Потрібен європейський рахунок для оплати депозиту?*\n"
+            "Відкрийте [Revolut]({}) або [Wise]({}) за моїм посиланням і отримайте бонус\\!\n\n"
             "✅ *Готові почати?*\n"
             "Просто пришліть мені будь\\-яке оголошення прямо в цей чат\\!"
-        ),
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "analyzing": "⏳ Аналізую оголошення...",
         "fetching_url": "🌐 Відкриваю посилання...",
         "ocr_processing": "🔍 Розпізнаю текст зі скріншота...",
         "limit_reached": (
             "⚠️ *Ліміт безкоштовних перевірок*\n\n"
-            "Ви використали 3 безкоштовні перевірки\\.\n\n"
-            "💳 *Варіанти оплати:*\n\n"
-            "🔹 *3€* — разова перевірка\n"
-            "🔹 *9€* — безліміт назавжди\\(\\*\\)\\*\n\n"
-            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=300\n"
-            "👉 Безліміт: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "Після оплати напишіть */pay_done*\\."
+            "Ви використали всі 3 безкоштовні перевірки\\.\n\n"
+            "💳 *Оберіть пакет:*\n\n"
+            "🔹 *Разовий* — 3€ за 1 перевірку → /pay_3\n"
+            "💎 *Економ* — 9€ за 5 перевірок \\(\\-40%\\) → /pay_9\n"
+            "👑 *Профі* — 19€ за безліміт на місяць → /pay_19\n\n"
+            "Після оплати напишіть команду */pay_done_\\**відповідну\\."
         ),
-        "pay_done": "✅ *Оплата підтверджена!*\n\nТепер у вас безлімітний доступ\\. Користуйтесь на здоров'я 🎉",
+        "pay_3": (
+            "💳 *Пакет «Разовий» — 3€*\n\n"
+            "1 перевірка оголошення\n\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
+            "Після оплати напишіть */pay_done_3*\\."
+        ),
+        "pay_9": (
+            "💎 *Пакет «Економ» — 9€*\n\n"
+            "5 перевірок оголошень \\(економія 40%\\)\n\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
+            "Після оплати напишіть */pay_done_9*\\."
+        ),
+        "pay_19": (
+            "👑 *Пакет «Профі» — 19€*\n\n"
+            "Безлімітні перевірки на 1 місяць\n\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
+            "Після оплати напишіть */pay_done_19*\\."
+        ),
+        "pay_done_3": "✅ *Оплата підтверджена!*\n\nВам додано 1 перевірку\\. Залишилось: *{}*\\.",
+        "pay_done_9": "✅ *Оплата підтверджена!*\n\nВам додано 5 перевірок\\. Залишилось: *{}*\\.",
+        "pay_done_19": "✅ *Оплата підтверджена!*\n\nБезлімітний доступ на місяць активовано 🎉",
         "pay_not_used": "Ви ще не користувались ботом\\. Спочатку надішліть оголошення, потім оплачуйте\\.",
+        "no_balance": "❌ У вас немає доступних перевірок\\. Купіть пакет: /help",
         "error": "❌ Помилка: {}",
         "send_listing": "Надішліть текст оголошення або посилання\\.",
         "share_text": "📋 *Поділитися з другом:*",
         "analysis_done": "✅ *Аналіз готовий!*",
+        "affiliate_footer": (
+            "\n\n🏦 *Потрібен європейський рахунок?*\n"
+            "Відкрийте [Revolut]({}) або [Wise]({}) — отримайте бонус\\!"
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "system_prompt": (
             "Ти — професійний помічник для експатів по оренді житла в Європі. "
             "Відповідай українською мовою.\n\n"
-            "Формат відповіДі ОБОВ'ЯЗКОВО в Telegram Markdown:\n"
+            "Формат відповіді ОБОВ'ЯЗКОВО в Telegram Markdown:\n"
             "- Використовуй *жирний* для заголовків\n"
             "- Додавай емодзи: 🏠 💰 ⚠️ ✅ 📋 🔍 💡\n"
             "- Розбивай текст на логічні блоки\n"
@@ -181,35 +240,63 @@ MESSAGES = {
             "Simply *copy a link* to a listing \\(e.g\\. from ImmoScout24, Rightmove, Idealista\\) or *paste the listing text* right here\\. I'll analyze everything for you\\.\n\n"
             "🎁 *Free test drive*\n"
             "You can test me on **3 listings completely free** to see how useful I am\\.\n\n"
-            "💳 *Pricing & Payment*\n"
-            "After the free limit:\n"
-            "• One\\-time analysis — *€3*\n"
-            "• Unlimited access for a month — *€9*\n\n"
+            "💳 *Packages & Pricing*\n\n"
+            "🔹 *One\\-time* — €3 for 1 check\n"
+            "▸ Pay: /pay_3\n\n"
+            "💎 *Economy* — €9 for 5 checks \\(save 40%\\)\n"
+            "▸ Pay: /pay_9\n\n"
+            "👑 *Pro* — €19 for unlimited access per month\n"
+            "▸ Pay: /pay_19\n\n"
             "💸 *How to pay*\n"
-            "Payment is accepted via Revolut \\(link will be sent after the free limit is reached\\)\\.\n"
-            "*After payment, make sure to send the command* /pay_done so I can unlock your access\\.\n\n"
+            "Tap the command above — you'll get a Revolut payment link\\. After paying, send the matching /pay_done_\\* command to unlock\\.\n\n"
+            "🏦 *Need a European bank account for the deposit?*\n"
+            "Open [Revolut]({}) or [Wise]({}) via my link and get a bonus\\!\n\n"
             "✅ *Ready to start?*\n"
             "Just send me any listing right in this chat\\!"
-        ),
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "analyzing": "⏳ Analyzing listing...",
         "fetching_url": "🌐 Opening link...",
         "ocr_processing": "🔍 Reading text from screenshot...",
         "limit_reached": (
             "⚠️ *Free Check Limit Reached*\n\n"
             "You've used all 3 free checks\\.\n\n"
-            "💳 *Payment options:*\n\n"
-            "🔹 *€3* — one\\-time check\n"
-            "🔹 *€9* — unlimited forever\\*\\*\n\n"
-            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=300\n"
-            "👉 Unlimited: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "After payment, send */pay_done*\\."
+            "💳 *Choose a package:*\n\n"
+            "🔹 *One\\-time* — €3 for 1 check → /pay_3\n"
+            "💎 *Economy* — €9 for 5 checks \\(\\-40%\\) → /pay_9\n"
+            "👑 *Pro* — €19 for unlimited/month → /pay_19\n\n"
+            "After payment, send the matching */pay_done_\\**command\\."
         ),
-        "pay_done": "✅ *Payment confirmed!*\n\nYou now have unlimited access\\. Enjoy 🎉",
+        "pay_3": (
+            "💳 *Package «One\\-time» — €3*\n\n"
+            "1 listing check\n\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
+            "After payment, send */pay_done_3*\\."
+        ),
+        "pay_9": (
+            "💎 *Package «Economy» — €9*\n\n"
+            "5 listing checks \\(save 40%\\)\n\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
+            "After payment, send */pay_done_9*\\."
+        ),
+        "pay_19": (
+            "👑 *Package «Pro» — €19*\n\n"
+            "Unlimited checks for 1 month\n\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
+            "After payment, send */pay_done_19*\\."
+        ),
+        "pay_done_3": "✅ *Payment confirmed!*\n\n1 check added\\. Remaining: *{}*\\.",
+        "pay_done_9": "✅ *Payment confirmed!*\n\n5 checks added\\. Remaining: *{}*\\.",
+        "pay_done_19": "✅ *Payment confirmed!*\n\nUnlimited access for 1 month activated 🎉",
         "pay_not_used": "You haven't used the bot yet\\. Send a listing first, then pay\\.",
+        "no_balance": "❌ No checks remaining\\. Buy a package: /help",
         "error": "❌ Error: {}",
         "send_listing": "Send a listing text or link\\.",
         "share_text": "📋 *Share with a friend:*",
         "analysis_done": "✅ *Analysis complete!*",
+        "affiliate_footer": (
+            "\n\n🏦 *Need a European bank account?*\n"
+            "Open [Revolut]({}) or [Wise]({}) — get a bonus\\!"
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "system_prompt": (
             "You are a professional rental assistant for expats across Europe. "
             "Respond in English.\n\n"
@@ -240,35 +327,63 @@ MESSAGES = {
             "Kopiere einfach einen *Link* zu einem Angebot \\(z\\.B\\. von ImmoScout24, Rightmove, Idealista\\) oder *füge den Angebotstext* direkt hier ein\\. Ich analysiere alles für dich\\.\n\n"
             "🎁 *Kostenloser Testlauf*\n"
             "Du kannst mich an **3 Angeboten komplett kostenlos testen**, um meine Nützlichkeit zu prüfen\\.\n\n"
-            "💳 *Preise & Zahlung*\n"
-            "Nach dem kostenlosen Limit:\n"
-            "• Einmalige Analyse — *3€*\n"
-            "• Unbegrenzter Zugang für einen Monat — *9€*\n\n"
+            "💳 *Pakete & Preise*\n\n"
+            "🔹 *Einmalig* — 3€ für 1 Prüfung\n"
+            "▸ Bezahlen: /pay_3\n\n"
+            "💎 *Economy* — 9€ für 5 Prüfungen \\(\\-40%\\)\n"
+            "▸ Bezahlen: /pay_9\n\n"
+            "👑 *Pro* — 19€ für unbegrenzten Zugang pro Monat\n"
+            "▸ Bezahlen: /pay_19\n\n"
             "💸 *Wie bezahlen?*\n"
-            "Zahlung erfolgt über Revolut \\(Link wird nach Erreichen des kostenlosen Limits gesendet\\)\\.\n"
-            "*Nach der Zahlung sende unbedingt den Befehl* /pay_done, damit ich dir den Zugang freischalte\\.\n\n"
+            "Drücke den Befehl oben — du erhältst einen Revolut\\-Zahlungslink\\. Nach der Zahlung sende den passenden /pay_done_\\* Befehl, um den Zugang freizuschalten\\.\n\n"
+            "🏦 *Benötigst du ein europäisches Bankkonto für die Kaution?*\n"
+            "Eröffne [Revolut]({}) oder [Wise]({}) über meinen Link und erhalte ein Bonus\\!\n\n"
             "✅ *Bereit loszulegen?*\n"
             "Schick mir einfach ein Angebot direkt in diesen Chat\\!"
-        ),
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "analyzing": "⏳ Analysiere Angebot...",
         "fetching_url": "🌐 Öffne Link...",
         "ocr_processing": "🔍 Erkenne Text vom Screenshot...",
         "limit_reached": (
             "⚠️ *Kostenlose Prüfungen aufgebraucht*\n\n"
             "Du hast alle 3 kostenlosen Prüfungen genutzt\\.\n\n"
-            "💳 *Zahlungsmöglichkeiten:*\n\n"
-            "🔹 *3€* — einmalige Prüfung\n"
-            "🔹 *9€* — unbegrenzt für immer\\*\\*\n\n"
-            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=300\n"
-            "👉 Unbegrenzt: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "Nach der Zahlung */pay_done* senden\\."
+            "💳 *Wähle ein Paket:*\n\n"
+            "🔹 *Einmalig* — 3€ für 1 Prüfung → /pay_3\n"
+            "💎 *Economy* — 9€ für 5 Prüfungen \\(\\-40%\\) → /pay_9\n"
+            "👑 *Pro* — 19€ für unbegrenzt/Monat → /pay_19\n\n"
+            "Nach der Zahlung sende den passenden */pay_done_\\**Befehl\\."
         ),
-        "pay_done": "✅ *Zahlung bestätigt!*\n\nDu hast jetzt unbegrenzten Zugang\\. Viel Spaß 🎉",
+        "pay_3": (
+            "💳 *Paket «Einmalig» — 3€*\n\n"
+            "1 Angebotsprüfung\n\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
+            "Nach der Zahlung */pay_done_3* senden\\."
+        ),
+        "pay_9": (
+            "💎 *Paket «Economy» — 9€*\n\n"
+            "5 Angebotsprüfungen \\(\\-40%\\)\n\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
+            "Nach der Zahlung */pay_done_9* senden\\."
+        ),
+        "pay_19": (
+            "👑 *Paket «Pro» — 19€*\n\n"
+            "Unbegrenzte Prüfungen für 1 Monat\n\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
+            "Nach der Zahlung */pay_done_19* senden\\."
+        ),
+        "pay_done_3": "✅ *Zahlung bestätigt!*\n\n1 Prüfung hinzugefügt\\. Verbleibend: *{}*\\.",
+        "pay_done_9": "✅ *Zahlung bestätigt!*\n\n5 Prüfungen hinzugefügt\\. Verbleibend: *{}*\\.",
+        "pay_done_19": "✅ *Zahlung bestätigt!*\n\nUnbegrenzter Zugang für 1 Monat aktiviert 🎉",
         "pay_not_used": "Du hast den Bot noch nicht benutzt\\. Schick zuerst ein Angebot\\.",
+        "no_balance": "❌ Keine Prüfungen übrig\\. Kaufe ein Paket: /help",
         "error": "❌ Fehler: {}",
         "send_listing": "Schick einen Angebotstext oder Link\\.",
         "share_text": "📋 *Mit einem Freund teilen:*",
         "analysis_done": "✅ *Analyse abgeschlossen!*",
+        "affiliate_footer": (
+            "\n\n🏦 *Benötigst du ein europäisches Bankkonto?*\n"
+            "Eröffne [Revolut]({}) oder [Wise]({}) — erhalte ein Bonus\\!"
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "system_prompt": (
             "Du bist ein professioneller Miet\\-Assistent für Expats in ganz Europa. "
             "Antworte auf Deutsch.\n\n"
@@ -299,35 +414,63 @@ MESSAGES = {
             "Po prostu *skopiuj link* do oferty \\(np\\. z ImmoScout24, Rightmove, Idealista\\) lub *wklej tekst oferty* tutaj\\. Ja wszystko przeanalizuję\\.\n\n"
             "🎁 *Bezpłatny test\\-jazda*\n"
             "Możesz przetestować mnie na **3 ofertach całkowicie za darmo**, żeby przekonać się o mojej przydatności\\.\n\n"
-            "💳 *Ceny i płatność*\n"
-            "Po wykorzystaniu darmowego limitu:\n"
-            "• Pojedyncza analiza — *3€*\n"
-            "• Nieograniczony dostęp na miesiąc — *9€*\n\n"
+            "💳 *Pakiety i ceny*\n\n"
+            "🔹 *Jednorazowy* — 3€ za 1 sprawdzenie\n"
+            "▸ Zapłać: /pay_3\n\n"
+            "💎 *Economy* — 9€ za 5 sprawdzeń \\(\\-40%\\)\n"
+            "▸ Zapłać: /pay_9\n\n"
+            "👑 *Pro* — 19€ za nieograniczony dostęp na miesiąc\n"
+            "▸ Zapłać: /pay_19\n\n"
             "💸 *Jak zapłacić?*\n"
-            "Płatność odbywa się przez Revolut \\(link zostanie wysłany po osiągnięciu darmowego limitu\\)\\.\n"
-            "*Po opłaceniu koniecznie wyślij komendę* /pay_done, żebym odblokował Ci dostęp\\.\n\n"
+            "Naciśnij komendę powyżej — otrzymasz link do płatności przez Revolut\\. Po opłaceniu wyślij odpowiednią komendę /pay_done_\\*, żeby odblokować dostęp\\.\n\n"
+            "🏦 *Potrzebujesz europejskiego konta bankowego do wpłaty kaucji?*\n"
+            "Otwórz [Revolut]({}) lub [Wise]({}) przez mój link i otrzymaj bonus\\!\n\n"
             "✅ *Gotowy, żeby zacząć?*\n"
             "Po prostu wyślij mi jakąkolwiek ofertęprosto na ten czat\\!"
-        ),
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "analyzing": "⏳ Analizuję ofertę...",
         "fetching_url": "🌐 Otwieram link...",
         "ocr_processing": "🔍 Rozpoznaję tekst ze zrzutu...",
         "limit_reached": (
             "⚠️ *Wyczerpane darmowe sprawdzenia*\n\n"
             "Wykorzystałeś wszystkie 3 darmowe sprawdzenia\\.\n\n"
-            "💳 *Opcje płatności:*\n\n"
-            "🔹 *3€* — jednorazowe sprawdzenie\n"
-            "🔹 *9€* — bez limitu na zawsze\\*\\*\n\n"
-            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=300\n"
-            "👉 Bez limitu: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "Po opłaceniu wyślij */pay_done*\\."
+            "💳 *Wybierz pakiet:*\n\n"
+            "🔹 *Jednorazowy* — 3€ za 1 sprawdzenie → /pay_3\n"
+            "💎 *Economy* — 9€ za 5 sprawdzeń \\(\\-40%\\) → /pay_9\n"
+            "👑 *Pro* — 19€ za nieograniczony/miesiąc → /pay_19\n\n"
+            "Po opłaceniu wyślij passującą komendę */pay_done_\\**\\."
         ),
-        "pay_done": "✅ *Płatność potwierdzona!*\n\nMasz teraz nieograniczony dostęp\\. Miłego korzystania 🎉",
+        "pay_3": (
+            "💳 *Pakiet «Jednorazowy» — 3€*\n\n"
+            "1 sprawdzenie oferty\n\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
+            "Po opłaceniu wyślij */pay_done_3*\\."
+        ),
+        "pay_9": (
+            "💎 *Pakiet «Economy» — 9€*\n\n"
+            "5 sprawdzeń ofert \\(\\-40%\\)\n\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
+            "Po opłaceniu wyślij */pay_done_9*\\."
+        ),
+        "pay_19": (
+            "👑 *Pakiet «Pro» — 19€*\n\n"
+            "Nieograniczone sprawdzenia na 1 miesiąc\n\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
+            "Po opłaceniu wyślij */pay_done_19*\\."
+        ),
+        "pay_done_3": "✅ *Płatność potwierdzona!*\n\nDodano 1 sprawdzenie\\. Pozostało: *{}*\\.",
+        "pay_done_9": "✅ *Płatność potwierdzona!*\n\nDodano 5 sprawdzeń\\. Pozostało: *{}*\\.",
+        "pay_done_19": "✅ *Płatność potwierdzona!*\n\nNieograniczony dostęp na miesiąc aktywowany 🎉",
         "pay_not_used": "Nie korzystałeś jeszcze z bota\\. Najpierw wyślij ofertę\\.",
+        "no_balance": "❌ Brak dostępnych sprawdzeń\\. Kup pakiet: /help",
         "error": "❌ Błąd: {}",
         "send_listing": "Wyślij tekst oferty lub link\\.",
         "share_text": "📋 *Podziel się z kolegą:*",
         "analysis_done": "✅ *Analiza gotowa!*",
+        "affiliate_footer": (
+            "\n\n🏦 *Potrzebujesz europejskiego konta bankowego?*\n"
+            "Otwórz [Revolut]({}) lub [Wise]({}) — otrzymaj bonus\\!"
+        ).format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
         "system_prompt": (
             "Jesteś profesjonalnym asystentem najmu dla ekspatów w Europie. "
             "Odpowiadaj po polsku.\n\n"
@@ -347,9 +490,6 @@ MESSAGES = {
 }
 
 DEFAULT_LANG = "en"
-FREE_LIMIT = 3
-PRICE_ONCE = 3
-PRICE_UNLIMITED = 9
 
 def get_lang(update: Update) -> str:
     lang_code = update.effective_user.language_code
@@ -362,9 +502,31 @@ def get_lang(update: Update) -> str:
 def get_msg(lang: str, key: str) -> str:
     return MESSAGES.get(lang, MESSAGES[DEFAULT_LANG]).get(key, MESSAGES[DEFAULT_LANG].get(key, ""))
 
+def get_user_data(data: dict, user_id: str) -> dict:
+    if user_id not in data:
+        data[user_id] = {"free_used": 0, "balance": 0}
+    return data[user_id]
+
+def can_use(user: dict) -> bool:
+    if user["balance"] == -1:
+        return True
+    if user["balance"] > 0:
+        return True
+    if user["free_used"] < FREE_LIMIT:
+        return True
+    return False
+
+def use_check(user: dict):
+    if user["balance"] == -1:
+        return
+    if user["balance"] > 0:
+        user["balance"] -= 1
+    else:
+        user["free_used"] += 1
+
 def get_keyboard():
     keyboard = [
-        [KeyboardButton("/start"), KeyboardButton("/help"), KeyboardButton("/pay_done")]
+        [KeyboardButton("/start"), KeyboardButton("/help"), KeyboardButton("/pay_done_3")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -411,11 +573,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = str(update.effective_user.id)
     lang = get_lang(update)
     data = load_data()
+    user = get_user_data(data, user_id)
 
-    if user_id not in data:
-        data[user_id] = {"count": 0, "paid": False, "tier": "free"}
-
-    if not data[user_id]["paid"] and data[user_id]["count"] >= FREE_LIMIT:
+    if not can_use(user):
         await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
         return
 
@@ -441,16 +601,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         result = response.choices[0].message.content
 
+        use_check(user)
+        remaining = "∞" if user["balance"] == -1 else str(user["balance"] + (FREE_LIMIT - user["free_used"]) if user["balance"] == 0 else user["balance"])
+        save_data(data)
+
+        footer = get_msg(lang, "affiliate_footer")
+        balance_note = f"\n\n📊 *Осталось проверок:* {remaining}" if user["balance"] != -1 else ""
         share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
 
         await update.message.reply_text(
-            result + share_invite,
+            result + footer + balance_note + share_invite,
             reply_markup=get_analysis_inline_buttons(),
             parse_mode="Markdown"
         )
-
-        data[user_id]["count"] += 1
-        save_data(data)
 
     except Exception as e:
         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
@@ -459,11 +622,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user_id = str(update.effective_user.id)
     lang = get_lang(update)
     data = load_data()
+    user = get_user_data(data, user_id)
 
-    if user_id not in data:
-        data[user_id] = {"count": 0, "paid": False, "tier": "free"}
-
-    if not data[user_id]["paid"] and data[user_id]["count"] >= FREE_LIMIT:
+    if not can_use(user):
         await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
         return
 
@@ -489,16 +650,19 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         result = response.choices[0].message.content
 
+        use_check(user)
+        remaining = "∞" if user["balance"] == -1 else str(user["balance"] + (FREE_LIMIT - user["free_used"]) if user["balance"] == 0 else user["balance"])
+        save_data(data)
+
+        footer = get_msg(lang, "affiliate_footer")
+        balance_note = f"\n\n📊 *Осталось проверок:* {remaining}" if user["balance"] != -1 else ""
         share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
 
         await update.message.reply_text(
-            result + share_invite,
+            result + footer + balance_note + share_invite,
             reply_markup=get_analysis_inline_buttons(),
             parse_mode="Markdown"
         )
-
-        data[user_id]["count"] += 1
-        save_data(data)
 
     except Exception as e:
         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
@@ -529,24 +693,63 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
-async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "pay_3"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
-async def pay_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    await update.message.reply_text(get_msg(lang, "pay_9"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    await update.message.reply_text(get_msg(lang, "pay_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     data = load_data()
+    user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    if user_id in data:
-        data[user_id]["paid"] = True
-        data[user_id]["tier"] = "unlimited"
-        save_data(data)
-        await update.message.reply_text(get_msg(lang, "pay_done"), reply_markup=get_keyboard())
-    else:
+    if user["free_used"] == 0 and user["balance"] == 0:
         await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
+        return
+
+    user["balance"] += 1
+    save_data(data)
+    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    if user["free_used"] == 0 and user["balance"] == 0:
+        await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
+        return
+
+    user["balance"] += 5
+    save_data(data)
+    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    if user["free_used"] == 0 and user["balance"] == 0:
+        await update.message.reply_text(get_msg(lang, "pay_not_used"), reply_markup=get_keyboard())
+        return
+
+    user["balance"] = -1
+    save_data(data)
+    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -561,8 +764,12 @@ if __name__ == "__main__":
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("buy", buy_command))
-    application.add_handler(CommandHandler("pay_done", pay_done))
+    application.add_handler(CommandHandler("pay_3", pay_3))
+    application.add_handler(CommandHandler("pay_9", pay_9))
+    application.add_handler(CommandHandler("pay_19", pay_19))
+    application.add_handler(CommandHandler("pay_done_3", pay_done_3))
+    application.add_handler(CommandHandler("pay_done_9", pay_done_9))
+    application.add_handler(CommandHandler("pay_done_19", pay_done_19))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
