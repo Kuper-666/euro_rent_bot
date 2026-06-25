@@ -10,5 +10,8 @@ FREE_LIMIT = 3
 AFFILIATE_REVOLUT = "https://revolut.com/referral/?referral-code=radik5f35!JUL1-26-VR-EE&geo-redirect"
 AFFILIATE_WISE = "https://wise.com/invite/arhc/radikm15"
 
+PDF_PRICE = 5
+VIP_PRICE = 15
+
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")

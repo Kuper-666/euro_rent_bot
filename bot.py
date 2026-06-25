@@ -1,5 +1,6 @@
 import logging
 import threading
+from io import BytesIO
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardButton, InlineKeyboardMarkup
@@ -17,6 +18,7 @@ from utils import (
     can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
     calc_remaining
 )
+from pdf_generator import generate_mieterprofil_pdf
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -38,7 +40,8 @@ def get_analysis_inline_buttons():
             InlineKeyboardButton("🔍 Ещё одно объявление", callback_data="new"),
         ],
         [
-            InlineKeyboardButton("🌐 Поделиться с другом", callback_data="share"),
+            InlineKeyboardButton("📄 Получить PDF", callback_data="pdf"),
+            InlineKeyboardButton("🌐 Поделиться", callback_data="share"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -49,6 +52,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = get_lang(update)
     data = load_data()
     user = get_user_data(data, user_id)
+
+    pdf_state = user.get("pdf_state")
+    if pdf_state == "awaiting_data":
+        user.pop("pdf_state", None)
+        pdf_data = parse_pdf_data(update.message.text)
+        if not pdf_data:
+            await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=get_keyboard())
+            return
+        await update.message.reply_text(get_msg(lang, "pdf_generating"), reply_markup=get_keyboard())
+        try:
+            pdf_bytes = generate_mieterprofil_pdf(pdf_data)
+            await update.message.reply_document(
+                document=BytesIO(pdf_bytes),
+                filename="Mieterprofil.pdf",
+                caption=get_msg(lang, "pdf_done"),
+                reply_markup=get_keyboard()
+            )
+        except Exception as e:
+            await update.message.reply_text(get_msg(lang, "pdf_error").format(e), reply_markup=get_keyboard())
+        return
+
+    vip_state = user.get("vip_state")
+    if vip_state == "awaiting_criteria":
+        user.pop("vip_state", None)
+        user["vip"] = True
+        user["vip_criteria"] = update.message.text
+        save_data(data)
+        await update.message.reply_text(
+            f"✅ *VIP активирован!*\n\nКритерии сохранены:\n{update.message.text}\n\nЯ буду присылать подборку каждый день!",
+            reply_markup=get_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
 
     if not can_use(user):
         await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
@@ -155,7 +191,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif query.data == "share":
         bot_username = context.bot.username
-        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+Европа+Аренда+AI+-+бесплатный+бот+для+разбора+объявлений+по+аренде!"
+        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+ExpatRentBot+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
         await query.message.reply_text(
             f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
             reply_markup=get_keyboard()
@@ -163,6 +199,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif query.data == "copy":
         await query.answer("Скопируйте текст выше 👆", show_alert=True)
+
+    elif query.data == "pdf":
+        user_id = str(update.effective_user.id)
+        data = load_data()
+        user = get_user_data(data, user_id)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -188,6 +231,66 @@ async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
     await update.message.reply_text(get_msg(lang, "pay_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def pay_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    await update.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    if user.get("pdf_paid"):
+        user["pdf_state"] = "awaiting_data"
+        save_data(data)
+        await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    else:
+        await update.message.reply_text(get_msg(lang, "pdf_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    user["pdf_paid"] = True
+    user["pdf_state"] = "awaiting_data"
+    save_data(data)
+    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    if user.get("vip"):
+        await update.message.reply_text("⭐ VIP уже активирован! Критерии: " + user.get("vip_criteria", "не заданы"), reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+
+
+async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    user["vip"] = True
+    user["vip_state"] = "awaiting_criteria"
+    save_data(data)
+    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -237,6 +340,19 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
 
 
+def parse_pdf_data(text: str) -> dict:
+    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
+    data = {}
+    keys = ["name", "dob", "phone", "email", "address", "employer", "income", "occupants"]
+    for i, key in enumerate(keys):
+        if i < len(lines):
+            line = lines[i]
+            if "." in line and line[0].isdigit():
+                line = line.split(".", 1)[1].strip()
+            data[key] = line
+    return data
+
+
 def run_flask():
     import os
     port = int(os.environ.get("PORT", 10000))
@@ -255,6 +371,12 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_3", pay_3))
     application.add_handler(CommandHandler("pay_9", pay_9))
     application.add_handler(CommandHandler("pay_19", pay_19))
+    application.add_handler(CommandHandler("pay_pdf", pay_pdf))
+    application.add_handler(CommandHandler("pdf", pdf_command))
+    application.add_handler(CommandHandler("pay_done_pdf", pay_done_pdf))
+    application.add_handler(CommandHandler("vip", vip_command))
+    application.add_handler(CommandHandler("pay_vip", pay_vip))
+    application.add_handler(CommandHandler("pay_done_vip", pay_done_vip))
     application.add_handler(CommandHandler("pay_done_3", pay_done_3))
     application.add_handler(CommandHandler("pay_done_9", pay_done_9))
     application.add_handler(CommandHandler("pay_done_19", pay_done_19))

@@ -64,6 +64,73 @@ MESSAGES = {
         "pay_done_19": "✅ *Оплата подтверждена!*\n\nБезлимитный доступ на месяц активирован 🎉",
         "pay_not_used": "Вы ещё не использовали бота\\. Сначала отправьте объявление, потом оплачивайте\\.",
         "no_balance": "❌ У вас нет доступных проверок\\. Купите пакет: /help",
+        "pdf_intro": (
+            "📄 *Готовое заявление на аренду \\(Mieterprofil\\)*\n\n"
+            "Я могу сформировать вам PDF с заполненным заявлением на аренду на немецком/английском языке\\.\n\n"
+            "💰 Стоимость: *5€*\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "После оплаты отправьте мне данные:\\.\n"
+            "Я попрошу вас заполнить:\n"
+            "• Имя и фамилия\n"
+            "• Дата рождения\n"
+            "• Телефон\n"
+            "• Email\n"
+            "• Текущий адрес\n"
+            "• Работодатель / ИП\n"
+            "• Доход (нетто)\n"
+            "• Количество жильцов\n\n"
+            "После заполнения я сгенерирую PDF и отправлю вам\\."
+        ),
+        "pdf_need_data": (
+            "📝 *Заполните данные для заявления:*\n\n"
+            "1\\. Имя и фамилия\n"
+            "2\\. Дата рождения\n"
+            "3\\. Телефон\n"
+            "4\\. Email\n"
+            "5\\. Текущий адрес\n"
+            "6\\. Работодатель / ИП\n"
+            "7\\. Доход \\(нетто/мес\\)\n"
+            "8\\. Количество жильцов\n\n"
+            "Отправьте все данные одним сообщением, каждый пункт с новой строки\\."
+        ),
+        "pdf_generating": "📄 Генерирую PDF\\.\\.\\.",
+        "pdf_done": "✅ *Готово!* PDF с заявлением на аренду отправлен 👇",
+        "pdf_error": "❌ Ошибка при генерации PDF: {}",
+        "pay_pdf": (
+            "📄 *Оплата PDF \\(Mieterprofil\\) — 5€*\n\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "После оплаты напишите */pay_done_pdf*\\."
+        ),
+        "pay_done_pdf": "✅ *Оплата подтверждена!*\n\nОтправьте данные для заявления:\\.",
+        "vip_intro": (
+            "⭐ *VIP-подписка — 15€/мес*\n\n"
+            "Ежедневная подборка «горячих» объявлений по вашим критериям\\.\n\n"
+            "Что входит:\n"
+            "• До 10 проверенных объявлений в день\n"
+            "• Фильтр по городу, цене, площади\n"
+            "• Предупреждения о мошенниках\n"
+            "• Безлимитные проверки\n\n"
+            "👉 Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
+            "После оплаты напишите */pay_done_vip*\\."
+        ),
+        "pay_done_vip": (
+            "✅ *VIP активирован!*\n\n"
+            "⭐ Теперь вы получаете ежедневную подборку\\.\n\n"
+            "Отправьте мне критерии поиска:\n"
+            "• Город\n"
+            "• Макс\\. цена\n"
+            "• Мин\\. площадь\n"
+            "• Кол\\-во комнат\n\n"
+            "Я буду присылать подходящие объявления каждый день!"
+        ),
+        "vip_ask_criteria": (
+            "📝 *Отправьте критерии поиска:*\n\n"
+            "• Город\n"
+            "• Макс\\. цена \\(€/мес\\)\n"
+            "• Мин\\. площадь \\(м²\\)\n"
+            "• Кол\\-во комнат\n\n"
+            "Пример: Берлин, 800€, 40м², 2 комнаты"
+        ),
         "error": "❌ Ошибка: {}",
         "send_listing": "Отправь текст объявления или ссылку\\.",
         "share_text": "📋 *Поделиться с другом:*",
@@ -151,6 +218,73 @@ MESSAGES = {
         "pay_done_19": "✅ *Оплата підтверджена!*\n\nБезлімітний доступ на місяць активовано 🎉",
         "pay_not_used": "Ви ще не користувались ботом\\. Спочатку надішліть оголошення, потім оплачуйте\\.",
         "no_balance": "❌ У вас немає доступних перевірок\\. Купіть пакет: /help",
+        "pdf_intro": (
+            "📄 *Готова заява на оренду \\(Mieterprofil\\)*\n\n"
+            "Я можу сформувати вам PDF із заповненою заявою на оренду німецькою/англійською мовою\\.\n\n"
+            "💰 Вартість: *5€*\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Після оплати надішліть мені дані\\.\n"
+            "Я попрошу вас заповнити:\n"
+            "• Ім'я та прізвище\n"
+            "• Дата народження\n"
+            "• Телефон\n"
+            "• Email\n"
+            "• Поточна адреса\n"
+            "• Роботодавець / ФОП\n"
+            "• Дохід \\(нетто\\)\n"
+            "• Кількість мешканців\n\n"
+            "Після заповнення я згенерую PDF і надішлю вам\\."
+        ),
+        "pdf_need_data": (
+            "📝 *Заповніть дані для заяви:*\n\n"
+            "1\\. Ім'я та прізвище\n"
+            "2\\. Дата народження\n"
+            "3\\. Телефон\n"
+            "4\\. Email\n"
+            "5\\. Поточна адреса\n"
+            "6\\. Роботодавець / ФОП\n"
+            "7\\. Дохід \\(нетто/міс\\)\n"
+            "8\\. Кількість мешканців\n\n"
+            "Надішліть всі дані одним повідомленням, кожен пункт з нового рядка\\."
+        ),
+        "pdf_generating": "📄 Генерую PDF\\.\\.\\.",
+        "pdf_done": "✅ *Готово!* PDF із заявою на оренду надіслано 👇",
+        "pdf_error": "❌ Помилка при генерації PDF: {}",
+        "pay_pdf": (
+            "📄 *Оплата PDF \\(Mieterprofil\\) — 5€*\n\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Після оплати напишіть */pay_done_pdf*\\."
+        ),
+        "pay_done_pdf": "✅ *Оплата підтверджена!*\n\nНадішліть дані для заяви\\.",
+        "vip_intro": (
+            "⭐ *VIP-підписка — 15€/міс*\n\n"
+            "Щоденна підбірка «гарячих» оголошень за вашими критеріями\\.\n\n"
+            "Що входить:\n"
+            "• До 10 перевірених оголошень на день\n"
+            "• Фільтр за містом, ціною, площею\n"
+            "• Попередження про шахраїв\n"
+            "• Безлімітні перевірки\n\n"
+            "👉 Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
+            "Після оплати напишіть */pay_done_vip*\\."
+        ),
+        "pay_done_vip": (
+            "✅ *VIP активовано!*\n\n"
+            "⭐ Тепер ви отримуєте щоденну підбірку\\.\n\n"
+            "Надішліть мені критерії пошуку:\n"
+            "• Місто\n"
+            "• Макс\\. ціна\n"
+            "• Мін\\. площа\n"
+            "• Кількість кімнат\n\n"
+            "Я буду надсилати відповідні оголошення щодня!"
+        ),
+        "vip_ask_criteria": (
+            "📝 *Надішліть критерії пошуку:*\n\n"
+            "• Місто\n"
+            "• Макс\\. ціна \\(€/міс\\)\n"
+            "• Мін\\. площа \\(м²\\)\n"
+            "• Кількість кімнат\n\n"
+            "Приклад: Берлін, 800€, 40м², 2 кімнати"
+        ),
         "error": "❌ Помилка: {}",
         "send_listing": "Надішліть текст оголошення або посилання\\.",
         "share_text": "📋 *Поділитися з другом:*",
@@ -238,6 +372,73 @@ MESSAGES = {
         "pay_done_19": "✅ *Payment confirmed!*\n\nUnlimited access for 1 month activated 🎉",
         "pay_not_used": "You haven't used the bot yet\\. Send a listing first, then pay\\.",
         "no_balance": "❌ No checks remaining\\. Buy a package: /help",
+        "pdf_intro": (
+            "📄 *Ready\\-made rental application \\(Mieterprofil\\)*\n\n"
+            "I can generate a PDF with a filled rental application in German/English\\.\n\n"
+            "💰 Price: *€5*\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "After payment, send me your data\\.\n"
+            "I'll ask you to fill in:\n"
+            "• Full name\n"
+            "• Date of birth\n"
+            "• Phone\n"
+            "• Email\n"
+            "• Current address\n"
+            "• Employer / Self\\-employed\n"
+            "• Income \\(net\\)\n"
+            "• Number of occupants\n\n"
+            "After filling in, I'll generate and send you the PDF\\."
+        ),
+        "pdf_need_data": (
+            "📝 *Fill in your application data:*\n\n"
+            "1\\. Full name\n"
+            "2\\. Date of birth\n"
+            "3\\. Phone\n"
+            "4\\. Email\n"
+            "5\\. Current address\n"
+            "6\\. Employer / Self\\-employed\n"
+            "7\\. Income \\(net/month\\)\n"
+            "8\\. Number of occupants\n\n"
+            "Send all data in one message, each item on a new line\\."
+        ),
+        "pdf_generating": "📄 Generating PDF\\.\\.\\.",
+        "pdf_done": "✅ *Done!* PDF rental application sent 👇",
+        "pdf_error": "❌ PDF generation error: {}",
+        "pay_pdf": (
+            "📄 *Pay for PDF \\(Mieterprofil\\) — €5*\n\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "After payment, send */pay_done_pdf*\\."
+        ),
+        "pay_done_pdf": "✅ *Payment confirmed!*\n\nSend your application data\\.",
+        "vip_intro": (
+            "⭐ *VIP Subscription — €15/month*\n\n"
+            "Daily curated list of hot listings matching your criteria\\.\n\n"
+            "What's included:\n"
+            "• Up to 10 verified listings per day\n"
+            "• Filter by city, price, area\n"
+            "• Scam alerts\n"
+            "• Unlimited checks\n\n"
+            "👉 Pay here: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
+            "After payment, send */pay_done_vip*\\."
+        ),
+        "pay_done_vip": (
+            "✅ *VIP activated!*\n\n"
+            "⭐ You'll now receive daily curated listings\\.\n\n"
+            "Send me your search criteria:\n"
+            "• City\n"
+            "• Max\\. price\n"
+            "• Min\\. area\n"
+            "• Number of rooms\n\n"
+            "I'll send matching listings every day!"
+        ),
+        "vip_ask_criteria": (
+            "📝 *Send your search criteria:*\n\n"
+            "• City\n"
+            "• Max\\. price \\(€/month\\)\n"
+            "• Min\\. area \\(m²\\)\n"
+            "• Number of rooms\n\n"
+            "Example: Berlin, €800, 40m², 2 rooms"
+        ),
         "error": "❌ Error: {}",
         "send_listing": "Send a listing text or link\\.",
         "share_text": "📋 *Share with a friend:*",
@@ -325,6 +526,73 @@ MESSAGES = {
         "pay_done_19": "✅ *Zahlung bestätigt!*\n\nUnbegrenzter Zugang für 1 Monat aktiviert 🎉",
         "pay_not_used": "Du hast den Bot noch nicht benutzt\\. Schick zuerst ein Angebot\\.",
         "no_balance": "❌ Keine Prüfungen übrig\\. Kaufe ein Paket: /help",
+        "pdf_intro": (
+            "📄 *Fertiger Mietantrag \\(Mieterprofil\\)*\n\n"
+            "Ich kann ein PDF mit einem ausgefüllten Mietantrag auf Deutsch/Englisch erstellen\\.\n\n"
+            "💰 Preis: *3€*\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Nach der Zahlung schick mir deine Daten\\.\n"
+            "Ich bitte dich um:\n"
+            "• Name\n"
+            "• Geburtsdatum\n"
+            "• Telefon\n"
+            "• Email\n"
+            "• Aktuelle Adresse\n"
+            "• Arbeitgeber / Selbstständig\n"
+            "• Einkommen \\(netto\\)\n"
+            "• Anzahl der Bewohner\n\n"
+            "Nach dem Ausfüllen erstelle ich dir das PDF\\."
+        ),
+        "pdf_need_data": (
+            "📝 *Fülle deine Daten aus:*\n\n"
+            "1\\. Name\n"
+            "2\\. Geburtsdatum\n"
+            "3\\. Telefon\n"
+            "4\\. Email\n"
+            "5\\. Aktuelle Adresse\n"
+            "6\\. Arbeitgeber / Selbstständig\n"
+            "7\\. Einkommen \\(netto/Monat\\)\n"
+            "8\\. Anzahl der Bewohner\n\n"
+            "Schick alle Daten in einer Nachricht, jeder Punkt in einer neuen Zeile\\."
+        ),
+        "pdf_generating": "📄 Erstelle PDF\\.\\.\\.",
+        "pdf_done": "✅ *Fertig!* PDF\\-Mietantrag gesendet 👇",
+        "pdf_error": "❌ PDF\\-Fehler: {}",
+        "pay_pdf": (
+            "📄 *PDF bezahlen \\(Mieterprofil\\) — 3€*\n\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Nach der Zahlung */pay_done_pdf* senden\\."
+        ),
+        "pay_done_pdf": "✅ *Zahlung bestätigt!*\n\nSchick deine Antragsdaten\\.",
+        "vip_intro": (
+            "⭐ *VIP\\-Abo — 15€/Monat*\n\n"
+            "Tägliche Auswahl heißer Angebote nach deinen Kriterien\\.\n\n"
+            "Enthalten:\n"
+            "• Bis zu 10 geprüfte Angebote pro Tag\n"
+            "• Filter nach Stadt, Preis, Fläche\n"
+            "• Betrugswarnungen\n"
+            "• Unbegrenzte Prüfungen\n\n"
+            "👉 Hier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
+            "Nach der Zahlung */pay_done_vip* senden\\."
+        ),
+        "pay_done_vip": (
+            "✅ *VIP aktiviert!*\n\n"
+            "⭐ Du erhältst jetzt tägliche Angebote\\.\n\n"
+            "Schick mir deine Suchkriterien:\n"
+            "• Stadt\n"
+            "• Max\\. Preis\n"
+            "• Min\\. Fläche\n"
+            "• Anzahl Zimmer\n\n"
+            "Ich schicke dir täglich passende Angebote!"
+        ),
+        "vip_ask_criteria": (
+            "📝 *Schick deine Suchkriterien:*\n\n"
+            "• Stadt\n"
+            "• Max\\. Preis \\(€/Monat\\)\n"
+            "• Min\\. Fläche \\(m²\\)\n"
+            "• Anzahl Zimmer\n\n"
+            "Beispiel: Berlin, 800€, 40m², 2 Zimmer"
+        ),
         "error": "❌ Fehler: {}",
         "send_listing": "Schick einen Angebotstext oder Link\\.",
         "share_text": "📋 *Mit einem Freund teilen:*",
@@ -412,6 +680,73 @@ MESSAGES = {
         "pay_done_19": "✅ *Płatność potwierdzona!*\n\nNieograniczony dostęp na miesiąc aktywowany 🎉",
         "pay_not_used": "Nie korzystałeś jeszcze z bota\\. Najpierw wyślij ofertę\\.",
         "no_balance": "❌ Brak dostępnych sprawdzeń\\. Kup pakiet: /help",
+        "pdf_intro": (
+            "📄 *Gotowy formularz najmu \\(Mieterprofil\\)*\n\n"
+            "Mogę wygenerować PDF z wypełnionym formularzem najmu po niemiecku/angielsku\\.\n\n"
+            "💰 Cena: *5€*\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Po opłaceniu wyślij mi dane\\.\n"
+            "Poproszę o wypełnienie:\n"
+            "• Imię i nazwisko\n"
+            "• Data urodzenia\n"
+            "• Telefon\n"
+            "• Email\n"
+            "• Aktualny adres\n"
+            "• Pracodawca / Samozatrudniony\n"
+            "• Dochód \\(netto\\)\n"
+            "• Liczba mieszkańców\n\n"
+            "Po wypełnieniu wygeneruję i prześlę PDF\\."
+        ),
+        "pdf_need_data": (
+            "📝 *Wypełnij dane do formularza:*\n\n"
+            "1\\. Imię i nazwisko\n"
+            "2\\. Data urodzenia\n"
+            "3\\. Telefon\n"
+            "4\\. Email\n"
+            "5\\. Aktualny adres\n"
+            "6\\. Pracodawca / Samozatrudniony\n"
+            "7\\. Dochód \\(netto/mies\\)\n"
+            "8\\. Liczba mieszkańców\n\n"
+            "Wyślij wszystkie dane w jednej wiadomości, każdy punkt w nowej linii\\."
+        ),
+        "pdf_generating": "📄 Generuję PDF\\.\\.\\.",
+        "pdf_done": "✅ *Gotowe!* PDF z formularzem najmu wysłany 👇",
+        "pdf_error": "❌ Błąd generowania PDF: {}",
+        "pay_pdf": (
+            "📄 *Zapłać za PDF \\(Mieterprofil\\) — 5€*\n\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
+            "Po opłaceniu wyślij */pay_done_pdf*\\."
+        ),
+        "pay_done_pdf": "✅ *Płatność potwierdzona!*\n\nWyślij dane do formularza\\.",
+        "vip_intro": (
+            "⭐ *Subskrypcja VIP — 15€/mies*\n\n"
+            "Codzienna lista gorących ofert dopasowanych do Twoich kryteriów\\.\n\n"
+            "Co zawiera:\n"
+            "• Do 10 sprawdzonych ofert dziennie\n"
+            "• Filtr po mieście, cenie, powierzchni\n"
+            "• Ostrzeżenia przed oszustwami\n"
+            "• Nieograniczone sprawdzenia\n\n"
+            "👉 Zapłać tutaj: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
+            "Po opłaceniu wyślij */pay_done_vip*\\."
+        ),
+        "pay_done_vip": (
+            "✅ *VIP aktywowany!*\n\n"
+            "⭐ Odtąd otrzymujesz codzienne listy ofert\\.\n\n"
+            "Wyślij mi kryteria wyszukiwania:\n"
+            "• Miasto\n"
+            "• Maks\\. cena\n"
+            "• Min\\. powierzchnia\n"
+            "• Liczba pokoi\n\n"
+            "Będę wysyłać pasujące oferty każdego dnia!"
+        ),
+        "vip_ask_criteria": (
+            "📝 *Wyślij kryteria wyszukiwania:*\n\n"
+            "• Miasto\n"
+            "• Maks\\. cena \\(€/mies\\)\n"
+            "• Min\\. powierzchnia \\(m²\\)\n"
+            "• Liczba pokoi\n\n"
+            "Przykład: Berlin, 800€, 40m², 2 pokoje"
+        ),
         "error": "❌ Błąd: {}",
         "send_listing": "Wyślij tekst oferty lub link\\.",
         "share_text": "📋 *Podziel się z kolegą:*",
