@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROUP_ID = int(os.environ.get("GROUP_ID", "-5340239192"))
+GROUP_ID = int(os.environ.get("GROUP_ID", "-1004303604754"))
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
