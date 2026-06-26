@@ -194,7 +194,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
         if "insufficient_quota" in str(e) or "429" in str(e):
             await update.message.reply_text(
-                "Сервис временно перегружен. Попробуйте через несколько минут.",
+                "Извините, анализатор сейчас перегружен.\n\n"
+                "Попробуйте отправить объявление через 5-10 минут — я обязательно отвечу!\n\n"
+                "А пока можете:\n"
+                "- Прочитать /help о тарифах\n"
+                "- Отправить ссылку позже",
                 reply_markup=get_keyboard()
             )
         else:
@@ -265,7 +269,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     except Exception as e:
         if "insufficient_quota" in str(e) or "429" in str(e):
             await update.message.reply_text(
-                "Сервис временно перегружен. Попробуйте через несколько минут.",
+                "Извините, анализатор сейчас перегружен.\n\n"
+                "Попробуйте отправить объявление через 5-10 минут — я обязательно отвечу!\n\n"
+                "А пока можете:\n"
+                "- Прочитать /help о тарифах\n"
+                "- Отправить ссылку позже",
                 reply_markup=get_keyboard()
             )
         else:
