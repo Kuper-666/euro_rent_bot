@@ -496,7 +496,8 @@ if __name__ == "__main__":
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity(filters.Entity.URL), handle_message))
 
     logging.info("Starting bot polling...")
     application.run_polling(drop_pending_updates=True)
