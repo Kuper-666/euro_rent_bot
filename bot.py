@@ -6,7 +6,7 @@ from io import BytesIO
 from telegram.helpers import escape_markdown
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardButton, InlineKeyboardMarkup
+    InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
@@ -491,6 +491,83 @@ def parse_pdf_data(text: str) -> dict:
     return data
 
 
+async def pay_stars_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="1 проверка объявления",
+        description="Доступ к 1 проверке объявления об аренде в Европе.",
+        payload="pay_stars_3",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="1 проверка", amount=100)],
+        need_name=False,
+        need_phone_number=False,
+        need_email=False,
+    )
+
+
+async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="5 проверок объявлений",
+        description="Доступ к 5 проверкам объявлений об аренде в Европе.",
+        payload="pay_stars_9",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="5 проверок", amount=250)],
+        need_name=False,
+        need_phone_number=False,
+        need_email=False,
+    )
+
+
+async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="Безлимит на месяц",
+        description="Безлимитные проверки объявлений на 1 месяц.",
+        payload="pay_stars_19",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="Безлимит/мес", amount=500)],
+        need_name=False,
+        need_phone_number=False,
+        need_email=False,
+    )
+
+
+async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+    payload = update.message.successful_payment.invoice_payload
+
+    if payload == "pay_stars_3":
+        user["balance"] += 1
+        user["last_paid_at"] = time.time()
+        save_data(data)
+        remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+        await update.message.reply_text(
+            f"Оплата через Stars подтверждена! Добавлена 1 проверка. Осталось: {remaining}",
+            reply_markup=get_keyboard()
+        )
+    elif payload == "pay_stars_9":
+        user["balance"] += 5
+        user["last_paid_at"] = time.time()
+        save_data(data)
+        remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+        await update.message.reply_text(
+            f"Оплата через Stars подтверждена! Добавлено 5 проверок. Осталось: {remaining}",
+            reply_markup=get_keyboard()
+        )
+    elif payload == "pay_stars_19":
+        user["balance"] = -1
+        user["last_paid_at"] = time.time()
+        save_data(data)
+        await update.message.reply_text(
+            "Оплата через Stars подтверждена! Безлимит на месяц активирован!",
+            reply_markup=get_keyboard()
+        )
+
+
 def run_flask():
     import os
     port = int(os.environ.get("PORT", 10000))
@@ -560,6 +637,10 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_done_3", pay_done_3))
     application.add_handler(CommandHandler("pay_done_9", pay_done_9))
     application.add_handler(CommandHandler("pay_done_19", pay_done_19))
+    application.add_handler(CommandHandler("pay_stars_3", pay_stars_3))
+    application.add_handler(CommandHandler("pay_stars_9", pay_stars_9))
+    application.add_handler(CommandHandler("pay_stars_19", pay_stars_19))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     application.add_handler(CommandHandler("pin", pin_message))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
