@@ -1,6 +1,7 @@
 import os
 import logging
 import threading
+import time
 from io import BytesIO
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
@@ -12,7 +13,7 @@ from telegram.ext import (
 )
 from groq import Groq
 
-from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL
+from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE
 from messages import get_msg
 from utils import (
     load_data, save_data, get_lang, get_user_data,
@@ -48,11 +49,41 @@ def get_analysis_inline_buttons():
     return InlineKeyboardMarkup(keyboard)
 
 
+def check_followups(user: dict, lang: str) -> str:
+    now = time.time()
+    last_paid = user.get("last_paid_at", 0)
+    if not last_paid:
+        return ""
+
+    balance = user.get("balance", 0)
+    days_since = (now - last_paid) / 86400
+
+    if balance == 1 and 2.5 <= days_since <= 4:
+        return (
+            "Вы использовали 1 проверку из пакета.\n"
+            "Хотите купить пакет на 5 проверок со скидкой 40%?\n"
+            "Отправьте /pay_9"
+        )
+
+    if balance == 0 and 6 <= days_since <= 8:
+        return (
+            "Ваш анализ всё ещё доступен.\n"
+            "Вы можете оформить подписку и получать подборки ежедневно!\n"
+            "Подробнее: /pay"
+        )
+
+    return ""
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     lang = get_lang(update)
     data = load_data()
     user = get_user_data(data, user_id)
+
+    followup = check_followups(user, lang)
+    if followup:
+        await update.message.reply_text(followup, reply_markup=get_keyboard())
 
     pdf_state = user.get("pdf_state")
     if pdf_state == "awaiting_data":
@@ -227,6 +258,21 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
 
 
+async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "Для оплаты депозита вам понадобится европейский счёт.\n\n"
+        "Откройте Revolut по моей ссылке и получите бонус:\n"
+        f"{AFFILIATE_REVOLUT}\n\n"
+        "Или Wise:\n"
+        f"{AFFILIATE_WISE}"
+    )
+    keyboard = [
+        [InlineKeyboardButton("Открыть Revolut", url=AFFILIATE_REVOLUT)],
+        [InlineKeyboardButton("Открыть Wise", url=AFFILIATE_WISE)],
+    ]
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton("🔹 3€ — 1 проверка", callback_data="show_pay_3")],
@@ -321,6 +367,7 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     lang = get_lang(update)
 
     user["balance"] += 1
+    user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard())
@@ -333,6 +380,7 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     lang = get_lang(update)
 
     user["balance"] += 5
+    user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard())
@@ -345,6 +393,7 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     lang = get_lang(update)
 
     user["balance"] = -1
+    user["last_paid_at"] = time.time()
     save_data(data)
     await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard())
 
@@ -377,6 +426,7 @@ if __name__ == "__main__":
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("revolut", revolut_command))
     application.add_handler(CommandHandler("pay", pay_command))
     application.add_handler(CommandHandler("pay_3", pay_3))
     application.add_handler(CommandHandler("pay_9", pay_9))
