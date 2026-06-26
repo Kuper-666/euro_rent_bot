@@ -206,7 +206,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         data = load_data()
         user = get_user_data(data, user_id)
         await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard(), parse_mode="Markdown")
+        await query.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard())
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -216,7 +216,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
 
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -229,27 +229,27 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         "📄 /pay_pdf — *5€* за PDF\\-заявление\n"
         "⭐ /pay_vip — *15€/мес* ежедневные подборки"
     )
-    await update.message.reply_text(text, reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_3"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_3"), reply_markup=get_keyboard())
 
 
 async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_9"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_9"), reply_markup=get_keyboard())
 
 
 async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_19"), reply_markup=get_keyboard())
 
 
 async def pay_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard())
 
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -261,9 +261,9 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if user.get("pdf_paid"):
         user["pdf_state"] = "awaiting_data"
         save_data(data)
-        await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard())
     else:
-        await update.message.reply_text(get_msg(lang, "pdf_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text(get_msg(lang, "pdf_intro"), reply_markup=get_keyboard())
 
 
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -275,7 +275,7 @@ async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["pdf_paid"] = True
     user["pdf_state"] = "awaiting_data"
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard())
 
 
 async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -287,12 +287,12 @@ async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if user.get("vip"):
         await update.message.reply_text("⭐ VIP уже активирован! Критерии: " + user.get("vip_criteria", "не заданы"), reply_markup=get_keyboard())
     else:
-        await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard())
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard())
 
 
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -304,7 +304,7 @@ async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["vip"] = True
     user["vip_state"] = "awaiting_criteria"
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=get_keyboard())
 
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -316,7 +316,7 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["balance"] += 1
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
-    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard())
 
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -328,7 +328,7 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["balance"] += 5
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
-    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard())
 
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -339,7 +339,7 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     user["balance"] = -1
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard(), parse_mode="Markdown")
+    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard())
 
 
 def parse_pdf_data(text: str) -> dict:
