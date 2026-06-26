@@ -15,5 +15,3 @@ VIP_PRICE = 15
 
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")
-if not AIRTABLE_API_KEY:
-    raise RuntimeError("Set AIRTABLE_API_KEY environment variable")
