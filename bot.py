@@ -31,7 +31,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def get_keyboard():
     keyboard = [
-        [KeyboardButton("/start"), KeyboardButton("/help"), KeyboardButton("/pay")]
+        [KeyboardButton("🏠 Старт"), KeyboardButton("❓ Помощь"), KeyboardButton("💳 Оплата")],
+        [KeyboardButton("📄 PDF"), KeyboardButton("⭐ VIP")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -364,7 +365,40 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
+async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="1 проверка объявления",
+        description="Доступ к 1 проверке объявления об аренде.",
+        payload="pay_stars_3",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="1 проверка", amount=100)],
+        need_name=False,
+    )
 
+
+async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="5 проверок объявлений",
+        description="Доступ к 5 проверкам объявлений об аренде.",
+        payload="pay_stars_9",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="5 проверок", amount=250)],
+        need_name=False,
+    )
+
+
+async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="Безлимит на месяц",
+        description="Безлимитные проверки объявлений на 1 месяц.",
+        payload="pay_stars_19",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="Безлимит/мес", amount=500)],
+        need_name=False,
+    )
 
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -646,6 +680,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_stars_9", pay_stars_9))
     application.add_handler(CommandHandler("pay_stars_19", pay_stars_19))
     application.add_handler(CommandHandler("pay_stars_pdf", pay_stars_pdf))
+    application.add_handler(CommandHandler("pay_3", pay_3))
+    application.add_handler(CommandHandler("pay_9", pay_9))
+    application.add_handler(CommandHandler("pay_19", pay_19))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     application.add_handler(CommandHandler("pin", pin_message))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
@@ -654,6 +691,21 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(
         filters.ChatType.GROUPS & filters.Regex(r'(?i)^(привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
         group_greeting
+    ))
+    application.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.Regex(r'^(🏠 Старт|Старт)$'), start
+    ))
+    application.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.Regex(r'^(❓ Помощь|Помощь)$'), help_command
+    ))
+    application.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.Regex(r'^(💳 Оплата|Оплата)$'), pay_command
+    ))
+    application.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.Regex(r'^(📄 PDF|PDF)$'), pdf_command
+    ))
+    application.add_handler(MessageHandler(
+        filters.ChatType.PRIVATE & filters.Regex(r'^(⭐ VIP|VIP)$'), vip_command
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity("url"), handle_message))
