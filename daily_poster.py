@@ -21,22 +21,26 @@ async def send_daily_post():
                 chat_id=GROUP_ID,
                 text="Доброе утро! Сегодня нет свежих объявлений. Загляните позже!"
             )
-            print("RSS пуста.")
             return
 
         random.shuffle(feed.entries)
-        chosen = feed.entries[:2]
+        entry = feed.entries[0]
 
-        post_text = "Доброе утро! Свежие объявления:\n\n"
-        for entry in chosen:
-            title = entry.title
-            link = entry.link
-            summary = entry.summary if hasattr(entry, "summary") else "Подробнее по ссылке"
-            post_text += f"{title}\n{summary[:250]}...\n{link}\n\n"
+        title = entry.title
+        link = entry.link
+        summary = entry.summary if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        post_text += "Отправьте ссылку боту в личку для анализа!"
+        post_text = (
+            f"Доброе утро! Свежее объявление:\n\n"
+            f"{title}\n"
+            f"{summary[:300]}\n\n"
+            f"Хотите полный разбор?"
+        )
 
-        keyboard = [[InlineKeyboardButton("Открыть бота", url="https://t.me/expat_rent_bot")]]
+        keyboard = [
+            [InlineKeyboardButton("Да, проанализировать", callback_data=f"analyze_rss")],
+            [InlineKeyboardButton("Нет, спасибо", callback_data="skip_rss")],
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await bot.send_message(chat_id=GROUP_ID, text=post_text, reply_markup=reply_markup)
@@ -45,9 +49,9 @@ async def send_daily_post():
     except Exception as e:
         await bot.send_message(
             chat_id=GROUP_ID,
-            text=f"Ошибка RSS: {e}\nЗагляните на сайты сами!"
+            text=f"Ошибка: {e}"
         )
-        print(f"Ошибка RSS: {e}")
+        print(f"Ошибка: {e}")
 
 
 if __name__ == "__main__":

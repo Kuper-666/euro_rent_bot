@@ -288,6 +288,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_reply_markup(reply_markup=None)
         await query.answer("Ок", show_alert=False)
 
+    elif query.data == "analyze_rss":
+        await query.edit_message_reply_markup(reply_markup=None)
+        bot_username = context.bot.username
+        keyboard = [[InlineKeyboardButton("Открыть бота", url=f"https://t.me/{bot_username}")]]
+        await query.message.reply_text(
+            "Отправьте ссылку или текст боту в личку для анализа!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif query.data == "skip_rss":
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.answer("Хорошо, как известите!", show_alert=False)
+
     elif query.data == "share":
         bot_username = context.bot.username
         share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+ExpatRentBot+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
