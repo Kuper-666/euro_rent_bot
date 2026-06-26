@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExpatRentBot — Умный помощник по аренде в Европе</title>
+<meta name="description" content="ExpatRentBot — бесплатный AI-бот для экспатов. Мгновенно переводит объявления, находит скрытые платежи (Nebenkosten) и проверяет мошенников в Германии, Франции, Испании и Нидерландах.">
+<meta name="keywords" content="AI аренда Европа, проверка объявлений, экспат бот, перевод объявлений, Immoscout анализ, Nebenkosten">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 50%,#16213e 100%)}
+.hero .badge{background:#dcfce7;color:#15803d;padding:8px 20px;border-radius:50px;font-size:.9rem;font-weight:600;display:inline-block;margin-bottom:24px}
+.hero h1{font-size:clamp(1.8rem,5vw,3.2rem);font-weight:800;margin-bottom:20px;color:#fff}
+.hero h1 span{background:linear-gradient(135deg,#00d2ff,#3a7bd5);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero .subtitle{font-size:clamp(.95rem,2.5vw,1.15rem);color:#a0a0a0;max-width:680px;margin-bottom:36px}
+.btn{display:inline-block;padding:16px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:1.05rem;transition:all .3s}
+.btn-primary{background:linear-gradient(135deg,#00d2ff,#3a7bd5);color:#fff}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,210,255,.3)}
+.btn-secondary{background:transparent;border:2px solid #3a7bd5;color:#3a7bd5;margin-top:14px}
+.btn-secondary:hover{background:#3a7bd5;color:#fff}
+
+.steps{padding:80px 20px;max-width:900px;margin:0 auto;text-align:center}
+.steps h2{font-size:2rem;margin-bottom:48px;color:#fff}
+.step-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:32px}
+.step{background:#1a1a2e;border-radius:16px;padding:32px;border:1px solid #2a2a4a}
+.step .num{font-size:2.5rem;font-weight:800;color:#00d2ff;margin-bottom:12px}
+.step h3{font-size:1.2rem;margin-bottom:8px;color:#fff}
+.step p{color:#a0a0a0;font-size:.95rem}
+
+.features{padding:80px 20px;max-width:1000px;margin:0 auto}
+.features h2{text-align:center;font-size:2rem;margin-bottom:48px;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+.card{background:#1a1a2e;border-radius:16px;padding:28px;border:1px solid #2a2a4a;transition:transform .3s}
+.card:hover{transform:translateY(-4px)}
+.card .icon{font-size:2.2rem;margin-bottom:12px}
+.card h3{font-size:1.15rem;margin-bottom:8px;color:#fff}
+.card p{color:#a0a0a0;font-size:.9rem}
+
+.reviews{padding:80px 20px;background:#111;text-align:center}
+.reviews h2{font-size:2rem;margin-bottom:48px;color:#fff}
+.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:800px;margin:0 auto}
+.review{background:#1a1a2e;border-radius:16px;padding:28px;border:1px solid #2a2a4a;text-align:left}
+.review .stars{color:#ffd200;font-size:1.1rem;margin-bottom:12px}
+.review p{color:#ccc;font-size:.95rem;font-style:italic;margin-bottom:16px}
+.review .author{color:#666;font-size:.85rem}
+
+.pricing{padding:80px 20px;text-align:center}
+.pricing h2{font-size:2rem;margin-bottom:48px;color:#fff}
+.price-cards{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;max-width:900px;margin:0 auto}
+.price-card{background:#1a1a2e;border-radius:16px;padding:32px;width:260px;border:1px solid #2a2a4a}
+.price-card.featured{border-color:#3a7bd5;position:relative}
+.price-card.featured::before{content:"HIT";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#3a7bd5;color:#fff;padding:4px 16px;border-radius:20px;font-size:.8rem;font-weight:700}
+.price-card h3{font-size:1.2rem;margin-bottom:8px;color:#fff}
+.price-card .price{font-size:2.5rem;font-weight:800;color:#00d2ff;margin-bottom:8px}
+.price-card .period{color:#666;font-size:.9rem;margin-bottom:20px}
+.price-card ul{list-style:none;text-align:left;margin-bottom:24px}
+.price-card ul li{padding:8px 0;border-bottom:1px solid #2a2a4a;color:#a0a0a0}
+.price-card ul li::before{content:"\2713 ";color:#00d2ff}
+
+.cta{padding:80px 20px;text-align:center;background:linear-gradient(135deg,#1a1a2e,#16213e)}
+.cta h2{font-size:2rem;margin-bottom:16px;color:#fff}
+.cta p{color:#a0a0a0;margin-bottom:32px;font-size:1.1rem}
+
+footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<div class="badge">3 бесплатные проверки</div>
+<h1>Ваш личный детектор<br>по аренде в <span>Европе</span></h1>
+<p class="subtitle">Перестаньте тратить часы на перевод немецких, французских, голландских объявлений. Наш AI за 5 секунд находит скрытые платежи, проверяет мошенников и подсказывает, какие документы нужны.</p>
+<a href="https://t.me/expat_rent_bot" class="btn btn-primary">Начать бесплатно</a>
+<a href="/b2b" class="btn btn-secondary">Для агентств</a>
+</div>
+
+<div class="steps">
+<h2>Просто, как 1-2-3</h2>
+<div class="step-grid">
+<div class="step"><div class="num">1</div><h3>Скопируйте</h3><p>Найдите любое объявление на ImmoScout, Rightmove или Idealista. Скопируйте ссылку или текст.</p></div>
+<div class="step"><div class="num">2</div><h3>Отправьте</h3><p>Отправьте ссылку нашему боту в Telegram. Не нужно регистрироваться.</p></div>
+<div class="step"><div class="num">3</div><h3>Получите</h3><p>За 5 секунд — полный разбор цены, рисков и требований к документам.</p></div>
+</div>
+</div>
+
+<div class="features">
+<h2>Что я умею</h2>
+<div class="grid">
+<div class="card"><div class="icon">🔗</div><h3>Анализ ссылок</h3><p>Отправьте ссылку с ImmoScout24, Rightmove, Idealista — я сам открою и проанализирую</p></div>
+<div class="card"><div class="icon">📸</div><h3>Распознавание фото</h3><p>Скиньте скриншот или фото объявления — я распознаю текст и проанализирую</p></div>
+<div class="card"><div class="icon">🔍</div><h3>Скрытые платежи</h3><p>Нахожу Nebenkosten, Service Charge, залог и другие скрытые расходы</p></div>
+<div class="card"><div class="icon">⚠️</div><h3>Проверка на мошенников</h3><p>Выявляю подозрительные объявления и типичные схемы обмана</p></div>
+<div class="card"><div class="icon">📋</div><h3>Документы</h3><p>Говорю, какие документы нужны именно в этой стране</p></div>
+<div class="card"><div class="icon">🌍</div><h3>5 языков</h3><p>Русский, украинский, английский, немецкий, польский — бот подстраивается под вас</p></div>
+</div>
+</div>
+
+<div class="reviews">
+<h2>Экспаты уже сэкономили тысячи евро</h2>
+<div class="review-grid">
+<div class="review"><div class="stars">★★★★★</div><p>«Я переехал в Берлин и за 3 дня обошёл 15 объявлений. Бот спас меня от квартиры с подвалом за 1200€, где требовали предоплату без просмотра. Настоящая находка!»</p><div class="author">— Алексей, Берлин</div></div>
+<div class="review"><div class="stars">★★★★★</div><p>«Сэкономил 30 минут на перевод каждого объявления. Немецкие термины больше не пугают. Рекомендую всем друзьям-экспатам.»</p><div class="author">— Maria, Мюнхен</div></div>
+</div>
+</div>
+
+<div class="pricing">
+<h2>Тарифы</h2>
+<div class="price-cards">
+<div class="price-card"><h3>Разовый</h3><div class="price">3€</div><div class="period">1 проверка</div><ul><li>Анализ 1 объявления</li><li>Перевод + разбор</li><li>Оценка рисков</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-secondary" style="width:100%;text-align:center">Попробовать</a></div>
+<div class="price-card featured"><h3>Эконом</h3><div class="price">9€</div><div class="period">5 проверок</div><ul><li>Все функции</li><li>Экономия 40%</li><li>Идеально для поиска</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-primary" style="width:100%;text-align:center">Купить</a></div>
+<div class="price-card"><h3>Профи</h3><div class="price">19€</div><div class="period">Безлимит / месяц</div><ul><li>Безлимитные проверки</li><li>Приоритетная обработка</li><li>Все будущие фичи</li></ul><a href="https://t.me/expat_rent_bot" class="btn btn-secondary" style="width:100%;text-align:center">Выбрать</a></div>
+</div>
+</div>
+
+<div class="cta">
+<h2>Начните искать жильё умнее</h2>
+<p>3 бесплатные проверки — без регистрации и карт</p>
+<a href="https://t.me/expat_rent_bot" class="btn btn-primary">Открыть бота</a>
+</div>
+
+<footer>2026 ExpatRentBot — AI-powered rental analysis for expats in Europe</footer>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B2B — AI-помощник для агентств недвижимости | ExpatRentBot</title>
+<meta name="description" content="AI-помощник для риелторов и агентств недвижимости в Европе. Массовая проверка объявлений, скоринг арендаторов, генерация документов.">
+<meta name="keywords" content="AI для агентств, проверка арендаторов, риелтор бот, автоматизация недвижимости">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 50%,#16213e 100%)}
+.hero .badge{background:#fef3c7;color:#92400e;padding:8px 20px;border-radius:50px;font-size:.9rem;font-weight:600;display:inline-block;margin-bottom:24px}
+.hero h1{font-size:clamp(1.6rem,4vw,2.8rem);font-weight:800;margin-bottom:20px;color:#fff}
+.hero h1 span{background:linear-gradient(135deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero .subtitle{font-size:clamp(.95rem,2.5vw,1.15rem);color:#a0a0a0;max-width:680px;margin-bottom:36px}
+.btn{display:inline-block;padding:16px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:1.05rem;transition:all .3s}
+.btn-primary{background:linear-gradient(135deg,#f7971e,#ffd200);color:#0a0a0a}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(247,151,30,.3)}
+.btn-secondary{background:transparent;border:2px solid #f7971e;color:#f7971e;margin-top:14px}
+.btn-secondary:hover{background:#f7971e;color:#0a0a0a}
+
+.pain{padding:80px 20px;max-width:900px;margin:0 auto;text-align:center}
+.pain h2{font-size:2rem;margin-bottom:32px;color:#fff}
+.pain-items{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;margin-bottom:40px}
+.pain-item{text-align:center;max-width:200px}
+.pain-item .num{font-size:3rem;font-weight:800;color:#ef4444}
+.pain-item p{color:#a0a0a0;font-size:.95rem}
+.solution{background:#1a1a2e;border-radius:16px;padding:32px;border:1px solid #2a2a4a;text-align:left}
+.solution h3{color:#ffd200;margin-bottom:12px;font-size:1.2rem}
+.solution p{color:#ccc}
+
+.features{padding:80px 20px;max-width:1000px;margin:0 auto}
+.features h2{text-align:center;font-size:2rem;margin-bottom:48px;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+.card{background:#1a1a2e;border-radius:16px;padding:28px;border:1px solid #2a2a4a;transition:transform .3s}
+.card:hover{transform:translateY(-4px)}
+.card .icon{font-size:2.2rem;margin-bottom:12px}
+.card h3{font-size:1.15rem;margin-bottom:8px;color:#fff}
+.card p{color:#a0a0a0;font-size:.9rem}
+
+.stats{padding:60px 20px;text-align:center;background:#111}
+.stats h2{font-size:2rem;margin-bottom:48px;color:#fff}
+.stat-grid{display:flex;justify-content:center;gap:48px;flex-wrap:wrap}
+.stat{text-align:center}
+.stat .number{font-size:3rem;font-weight:800;color:#ffd200}
+.stat .label{color:#a0a0a0;font-size:.95rem}
+
+.pricing{padding:80px 20px;text-align:center}
+.pricing h2{font-size:2rem;margin-bottom:16px;color:#fff}
+.pricing .subtitle{color:#a0a0a0;margin-bottom:48px;font-size:1.1rem}
+.price-cards{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;max-width:800px;margin:0 auto}
+.price-card{background:#1a1a2e;border-radius:16px;padding:32px;width:320px;border:1px solid #2a2a4a}
+.price-card.featured{border-color:#f7971e;position:relative}
+.price-card.featured::before{content:"RECOMMENDED";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#f7971e;color:#0a0a0a;padding:4px 16px;border-radius:20px;font-size:.8rem;font-weight:700}
+.price-card h3{font-size:1.2rem;margin-bottom:8px;color:#fff}
+.price-card .price{font-size:2.5rem;font-weight:800;color:#ffd200;margin-bottom:4px}
+.price-card .period{color:#666;font-size:.9rem;margin-bottom:20px}
+.price-card ul{list-style:none;text-align:left;margin-bottom:24px}
+.price-card ul li{padding:8px 0;border-bottom:1px solid #2a2a4a;color:#a0a0a0}
+.price-card ul li::before{content:"\2713 ";color:#ffd200}
+
+.cta{padding:80px 20px;text-align:center;background:linear-gradient(135deg,#1a1a2e,#16213e)}
+.cta h2{font-size:2rem;margin-bottom:16px;color:#fff}
+.cta p{color:#a0a0a0;margin-bottom:32px;font-size:1.1rem}
+
+footer{text-align:center;padding:32px;color:#444;font-size:.85rem}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<div class="badge">Тест-драйв бесплатно 14 дней</div>
+<h1>Помощник для агентств<br>недвижимости. Ускорьте проверку<br>арендаторов в <span>10 раз</span></h1>
+<p class="subtitle">Ваши риелторы тратят 30 минут на проверку каждого клиента. Наш AI обрабатывает заявки массово и выдает скоринг надежности арендатора за 3 секунды.</p>
+<a href="https://t.me/Kuper6_66" class="btn btn-primary">Свяжитесь для тест-драйва</a>
+<a href="/" class="btn btn-secondary">Назад к боту</a>
+</div>
+
+<div class="pain">
+<h2>Сколько времени тратят ваши риелторы?</h2>
+<div class="pain-items">
+<div class="pain-item"><div class="num">30</div><p>минут на проверку одного клиента</p></div>
+<div class="pain-item"><div class="num">15</div><p>часов в неделю на рутину</p></div>
+<div class="pain-item"><div class="num">3</div><p>ошибки в месяц из-за усталости</p></div>
+</div>
+<div class="solution">
+<h3>Наш AI решает это за вас</h3>
+<p>Автоматическая проверка документов, скоринг надежности, поиск красных флагов в анкетах. Вместо 30 минут — 3 секунды.</p>
+</div>
+</div>
+
+<div class="features">
+<h2>Что мы даем агентствам</h2>
+<div class="grid">
+<div class="card"><div class="icon">📈</div><h3>Проверка кредитной истории</h3><p>Аналог Schufa по открытым данным. Мгновенная оценка платежеспособности.</p></div>
+<div class="card"><div class="icon">🔍</div><h3>Поиск красных флагов</h3><p>Автоматическое выявление подозрительных данных в анкетах арендаторов.</p></div>
+<div class="card"><div class="icon">📑</div><h3>Генерация документов</h3><p>Готовый пакет документов для отправки арендодателю. Заявление, справки, договоры.</p></div>
+<div class="card"><div class="icon">⚡</div><h3>Массовый анализ</h3><p>Обрабатывайте десятки объявлений одновременно. Проверка соответствия рыночным ценам.</p></div>
+<div class="card"><div class="icon">🌍</div><h3>Мультиязычность</h3><p>Анализ объявлений на любом европейском языке с переводом на язык вашего агентства.</p></div>
+<div class="card"><div class="icon">🔌</div><h3>API для интеграции</h3><p>Интеграция с вашими CRM и системами через API. Автоматизация процессов.</p></div>
+</div>
+</div>
+
+<div class="stats">
+<h2>Цифры говорят сами за себя</h2>
+<div class="stat-grid">
+<div class="stat"><div class="number">100+</div><div class="label">объявлений в день</div></div>
+<div class="stat"><div class="number">3 сек</div><div class="label">скоринг одного клиента</div></div>
+<div class="stat"><div class="number">5</div><div class="label">языков</div></div>
+<div class="stat"><div class="number">24/7</div><div class="label">без перерывов</div></div>
+</div>
+</div>
+
+<div class="pricing">
+<h2>Подписка для агентств</h2>
+<p class="subtitle">Тестовый период — 2 недели бесплатно</p>
+<div class="price-cards">
+<div class="price-card"><h3>Старт</h3><div class="price">49€</div><div class="period">в месяц</div><ul><li>До 50 объявлений/день</li><li>Базовый анализ</li><li>EMAIL-поддержка</li><li>1 пользователь</li></ul><a href="https://t.me/Kuper6_66" class="btn btn-secondary" style="width:100%;text-align:center">Начать бесплатно</a></div>
+<div class="price-card featured"><h3>Профи</h3><div class="price">99€</div><div class="period">в месяц</div><ul><li>Безлимит объявлений</li><li>Глубокий анализ + антифрод</li><li>Приоритетная поддержка</li><li>До 5 пользователей</li><li>API-доступ (скоро)</li></ul><a href="https://t.me/Kuper6_66" class="btn btn-primary" style="width:100%;text-align:center">Попробовать 2 недели</a></div>
+</div>
+</div>
+
+<div class="cta">
+<h2>Готовы автоматизировать проверку объявлений?</h2>
+<p>Напишите нам — настроим тестовый доступ за 15 минут</p>
+<a href="https://t.me/Kuper6_66" class="btn btn-primary">Написать в Telegram</a>
+</div>
+
+<footer>2026 ExpatRentBot — AI-powered rental analysis for agencies in Europe</footer>
+</body>
+</html>
