@@ -469,6 +469,15 @@ async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("Чтобы закрепить пост, ответьте на него и напишите /pin")
 
 
+async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_chat.type in ["group", "supergroup"]:
+        first_name = update.effective_user.first_name
+        await update.message.reply_text(
+            f"Привет, {first_name}! Рад тебя видеть в чате.\n"
+            "Кидай ссылку на любое объявление об аренде, я разберу его за 5 секунд!"
+        )
+
+
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -496,6 +505,10 @@ if __name__ == "__main__":
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(
+        filters.ChatType.GROUPS & filters.Regex(r'^(?i)(привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
+        group_greeting
+    ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity("url"), handle_message))
 
