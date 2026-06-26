@@ -18,7 +18,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install python-telegram-bot requests beautifulsoup4
+        run: pip install python-telegram-bot feedparser
 
       - name: Send daily post
         env:
