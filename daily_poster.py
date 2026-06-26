@@ -1,7 +1,9 @@
 import os
 import asyncio
 import random
+import hashlib
 import requests
+from datetime import datetime
 from bs4 import BeautifulSoup
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -11,6 +13,22 @@ GROUP_ID = int(os.environ.get("GROUP_ID", "-1004303604754"))
 bot = Bot(token=TELEGRAM_TOKEN)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+GREETINGS = [
+    "Доброе утро! Вот свежие объявления:",
+    "Новый день — новые варианты!",
+    "Свежие объявления с немецких площадок:",
+    "Подборка квартир на сегодня:",
+    "Горячие предложения дня:",
+]
+
+TIPS = [
+    "Совет: проверьте Nebenkosten перед оплатой!",
+    "Не забудьте спросить про Kaution!",
+    "Проверьте Mindestmietdauer!",
+    "Уточните, включены ли коммунальные услуги!",
+    "Попросите фото при заселении!",
+]
 
 
 def parse_kleinanzeigen():
@@ -22,7 +40,7 @@ def parse_kleinanzeigen():
         soup = BeautifulSoup(resp.text, "html.parser")
         items = soup.find_all("article", class_="aditem")
         results = []
-        for item in items[:5]:
+        for item in items[:8]:
             try:
                 title = item.find("h2", class_="text-module-begin")
                 price = item.find("div", class_="aditem-main--middle--price-shipping")
@@ -49,7 +67,7 @@ def parse_immowelt():
         soup = BeautifulSoup(resp.text, "html.parser")
         items = soup.find_all("div", class_="list-entry")
         results = []
-        for item in items[:5]:
+        for item in items[:8]:
             try:
                 title = item.find("h2", class_="list-entry-title")
                 price = item.find("div", class_="list-entry-price")
@@ -76,7 +94,7 @@ def parse_immoscout():
         soup = BeautifulSoup(resp.text, "html.parser")
         items = soup.find_all("div", class_="result-list-entry")
         results = []
-        for item in items[:5]:
+        for item in items[:8]:
             try:
                 title = item.find("h2", class_="result-list-entry-title")
                 price = item.find("div", class_="result-list-entry-price")
@@ -95,6 +113,10 @@ def parse_immoscout():
 
 
 async def send_daily_post():
+    today = datetime.now().strftime("%d.%m.%Y")
+    day_seed = int(hashlib.md5(today.encode()).hexdigest()[:8], 16)
+    random.seed(day_seed)
+
     all_results = []
     all_results.extend(parse_kleinanzeigen())
     all_results.extend(parse_immowelt())
@@ -103,28 +125,32 @@ async def send_daily_post():
     if not all_results:
         await bot.send_message(
             chat_id=GROUP_ID,
-            text="Доброе утро! Сегодня нет свежих объявлений. Загляните позже!"
+            text=f"Доброе утро! ({today})\nСегодня нет свежих объявлений. Загляните позже!"
         )
         return
 
     random.shuffle(all_results)
-    chosen = all_results[:2]
+    chosen = all_results[:3]
 
-    post_text = "Доброе утро! Вот свежие объявления:\n\n"
+    greeting = random.choice(GREETINGS)
+    tip = random.choice(TIPS)
+
+    post_text = f"🏠 {greeting}\n\n"
     for entry in chosen:
         post_text += (
-            f"{entry['title']} ({entry['source']})\n"
-            f"{entry['price']}\n"
-            f"{entry['link']}\n\n"
+            f"📍 {entry['title']}\n"
+            f"💰 {entry['price']}\n"
+            f"🔗 {entry['link']}\n\n"
         )
 
-    post_text += "Хотите анализ? Отправьте ссылку боту в личку!"
+    post_text += f"💡 {tip}\n\n"
+    post_text += "Отправьте ссылку боту в личку для полного анализа!"
 
-    keyboard = [[InlineKeyboardButton("Открыть бота", url="https://t.me/expat_rent_bot")]]
+    keyboard = [[InlineKeyboardButton("🚀 Открыть бота", url="https://t.me/expat_rent_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await bot.send_message(chat_id=GROUP_ID, text=post_text, reply_markup=reply_markup)
-    print("Digest sent!")
+    print(f"Digest sent for {today}!")
 
 
 if __name__ == "__main__":
