@@ -95,11 +95,20 @@ def check_followups(user: dict, lang: str) -> str:
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text.strip().lower()
-    if text in ["старт", "start", "помощь", "help", "оплата", "pay", "оплатить", "pdf", "пдф", "vip", "вип"]:
+    lang = get_lang(update)
+
+    btn_map = {
+        "старт": start, "start": start,
+        "помощь": help_command, "help": help_command,
+        "оплата": pay_command, "pay": pay_command, "оплатить": pay_command,
+        "pdf": pdf_command, "пдф": pdf_command,
+        "vip": vip_command, "вип": vip_command,
+    }
+    if text in btn_map:
+        await btn_map[text](update, context)
         return
 
     user_id = str(update.effective_user.id)
-    lang = get_lang(update)
     data = load_data()
     user = get_user_data(data, user_id)
 
@@ -766,21 +775,6 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(
         filters.ChatType.GROUPS & filters.Regex(r'(?i)^(привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
         group_greeting
-    ))
-    application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(старт|start)$'), start
-    ))
-    application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(помощь|help)$'), help_command
-    ))
-    application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(оплата|pay|оплатить)$'), pay_command
-    ))
-    application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(pdf|пдф)$'), pdf_command
-    ))
-    application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(vip|вип)$'), vip_command
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity("url"), handle_message))
