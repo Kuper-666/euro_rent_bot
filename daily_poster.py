@@ -3,7 +3,7 @@ import asyncio
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROUP_ID = os.environ.get("GROUP_ID", "-1001234567890")
+GROUP_ID = os.environ.get("GROUP_ID", "-5340239192")
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
