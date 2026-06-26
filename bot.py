@@ -94,6 +94,10 @@ def check_followups(user: dict, lang: str) -> str:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = update.message.text.strip().lower()
+    if text in ["старт", "start", "помощь", "help", "оплата", "pay", "оплатить", "pdf", "пдф", "vip", "вип"]:
+        return
+
     user_id = str(update.effective_user.id)
     lang = get_lang(update)
     data = load_data()
