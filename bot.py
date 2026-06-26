@@ -151,12 +151,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         safe_result = escape_markdown(result, version=2)
         safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "∞" if user["balance"] == -1 else str(remaining)
-        balance_note = f"\n\n📊 Осталось проверок: {remaining_text}"
-        share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
+        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
+        safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
+        safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
         await update.message.reply_text(
-            safe_result + safe_footer + balance_note + share_invite,
+            safe_result + safe_footer + safe_balance + safe_share,
             reply_markup=get_analysis_inline_buttons(),
             parse_mode="MarkdownV2"
         )
@@ -203,12 +203,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         safe_result = escape_markdown(result, version=2)
         safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "∞" if user["balance"] == -1 else str(remaining)
-        balance_note = f"\n\n📊 Осталось проверок: {remaining_text}"
-        share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
+        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
+        safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
+        safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
         await update.message.reply_text(
-            safe_result + safe_footer + balance_note + share_invite,
+            safe_result + safe_footer + safe_balance + safe_share,
             reply_markup=get_analysis_inline_buttons(),
             parse_mode="MarkdownV2"
         )
