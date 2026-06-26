@@ -6,4 +6,4 @@ beautifulsoup4
 pytesseract
 Pillow
 fpdf2
-pyairtable
+supabase

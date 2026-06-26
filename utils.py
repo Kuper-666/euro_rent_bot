@@ -1,4 +1,3 @@
-import os
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -9,7 +8,7 @@ from telegram import Update
 
 from config import FREE_LIMIT
 from messages import DEFAULT_LANG, MESSAGES
-from airtable_storage import load_data, save_data
+from storage import load_data, save_data
 
 
 def get_lang(update: Update) -> str:
