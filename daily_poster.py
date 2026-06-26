@@ -1,7 +1,6 @@
 import os
 import asyncio
 import random
-import hashlib
 import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -114,8 +113,6 @@ def parse_immoscout():
 
 async def send_daily_post():
     today = datetime.now().strftime("%d.%m.%Y")
-    day_seed = int(hashlib.md5(today.encode()).hexdigest()[:8], 16)
-    random.seed(day_seed)
 
     all_results = []
     all_results.extend(parse_kleinanzeigen())
