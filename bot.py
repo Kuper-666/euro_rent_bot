@@ -50,6 +50,22 @@ def get_analysis_inline_buttons():
     return InlineKeyboardMarkup(keyboard)
 
 
+def split_message(text: str, max_len: int = 4000) -> list:
+    if len(text) <= max_len:
+        return [text]
+    parts = []
+    while text:
+        if len(text) <= max_len:
+            parts.append(text)
+            break
+        cut = text.rfind("\n", 0, max_len)
+        if cut == -1:
+            cut = max_len
+        parts.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    return parts
+
+
 def check_followups(user: dict, lang: str) -> str:
     now = time.time()
     last_paid = user.get("last_paid_at", 0)
@@ -155,11 +171,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
         safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
-        await update.message.reply_text(
-            safe_result + safe_footer + safe_balance + safe_share,
-            reply_markup=get_analysis_inline_buttons(),
-            parse_mode="MarkdownV2"
-        )
+        full_text = safe_result + safe_footer + safe_balance + safe_share
+        parts = split_message(full_text)
+        for i, part in enumerate(parts):
+            markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
+            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
 
     except Exception as e:
         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
@@ -207,11 +223,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
         safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
-        await update.message.reply_text(
-            safe_result + safe_footer + safe_balance + safe_share,
-            reply_markup=get_analysis_inline_buttons(),
-            parse_mode="MarkdownV2"
-        )
+        full_text = safe_result + safe_footer + safe_balance + safe_share
+        parts = split_message(full_text)
+        for i, part in enumerate(parts):
+            markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
+            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
 
     except Exception as e:
         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
