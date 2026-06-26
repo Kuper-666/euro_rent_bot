@@ -10,7 +10,7 @@ from telegram import (
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    filters, ContextTypes
+    ChatMemberHandler, filters, ContextTypes
 )
 from groq import Groq
 
@@ -438,6 +438,37 @@ def run_flask():
     app.run(host="0.0.0.0", port=port)
 
 
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    new_member = update.chat_member.new_chat_member
+    old_member = update.chat_member.old_chat_member
+
+    if old_member.status != "member" and new_member.status == "member":
+        if new_member.user.id != context.bot.id:
+            welcome_text = (
+                f"Добро пожаловать, {new_member.user.full_name}!\n\n"
+                f"Этот чат создан для экспатов в Европе. "
+                f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n"
+                f"Бот EuroRent AI всегда поможет с анализом объявлений.\n\n"
+                f"Начните с /start"
+            )
+            msg = await update.effective_chat.send_message(welcome_text)
+            try:
+                await msg.pin()
+            except Exception:
+                pass
+
+
+async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message.reply_to_message:
+        try:
+            await update.message.reply_to_message.pin()
+            await update.message.reply_text("Сообщение закреплено!")
+        except Exception:
+            await update.message.reply_text("Не удалось закрепить. Проверьте права бота в чате.")
+    else:
+        await update.message.reply_text("Чтобы закрепить пост, ответьте на него и напишите /pin")
+
+
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -461,6 +492,8 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_done_3", pay_done_3))
     application.add_handler(CommandHandler("pay_done_9", pay_done_9))
     application.add_handler(CommandHandler("pay_done_19", pay_done_19))
+    application.add_handler(CommandHandler("pin", pin_message))
+    application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
