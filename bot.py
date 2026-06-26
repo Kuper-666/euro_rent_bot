@@ -29,7 +29,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def get_keyboard():
     keyboard = [
-        [KeyboardButton("/start"), KeyboardButton("/help"), KeyboardButton("/pay_done_3")]
+        [KeyboardButton("/start"), KeyboardButton("/help"), KeyboardButton("/pay")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -208,6 +208,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_reply_markup(reply_markup=None)
         await query.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard())
 
+    elif query.data.startswith("show_pay_"):
+        await query.edit_message_reply_markup(reply_markup=None)
+        plan = query.data.replace("show_pay_", "")
+        msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
+        if plan == "vip":
+            msg_key = "vip_intro"
+        await query.message.reply_text(get_msg(lang, msg_key), reply_markup=get_keyboard())
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
@@ -220,16 +228,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    text = (
-        "💳 *Выберите тариф:*\n\n"
-        "🔹 /pay_3 — *3€* за 1 проверку\n"
-        "💎 /pay_9 — *9€* за 5 проверок \\(\\-40%\\)\n"
-        "👑 /pay_19 — *19€* за безлимит на месяц\n\n"
-        "📄 /pay_pdf — *5€* за PDF\\-заявление\n"
-        "⭐ /pay_vip — *15€/мес* ежедневные подборки"
-    )
-    await update.message.reply_text(text, reply_markup=get_keyboard())
+    keyboard = [
+        [InlineKeyboardButton("🔹 3€ — 1 проверка", callback_data="show_pay_3")],
+        [InlineKeyboardButton("💎 9€ — 5 проверок (−40%)", callback_data="show_pay_9")],
+        [InlineKeyboardButton("👑 19€ — безлимит/мес", callback_data="show_pay_19")],
+        [InlineKeyboardButton("📄 5€ — PDF заявление", callback_data="show_pay_pdf")],
+        [InlineKeyboardButton("⭐ 15€/мес — VIP подборки", callback_data="show_pay_vip")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Выберите тариф:", reply_markup=reply_markup)
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
