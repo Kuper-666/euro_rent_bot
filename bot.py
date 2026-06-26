@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from io import BytesIO
+from telegram.helpers import escape_markdown
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardButton, InlineKeyboardMarkup
@@ -148,14 +149,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         remaining = calc_remaining(user)
         save_data(data)
 
-        footer = get_msg(lang, "affiliate_footer")
-        balance_note = f"\n\n📊 *Осталось проверок:* {remaining}" if user["balance"] != -1 else ""
+        safe_result = escape_markdown(result, version=2)
+        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
+        remaining_text = "∞" if user["balance"] == -1 else str(remaining)
+        balance_note = f"\n\n📊 Осталось проверок: {remaining_text}"
         share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
 
         await update.message.reply_text(
-            result + footer + balance_note + share_invite,
+            safe_result + safe_footer + balance_note + share_invite,
             reply_markup=get_analysis_inline_buttons(),
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
 
     except Exception as e:
@@ -198,14 +201,16 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         remaining = calc_remaining(user)
         save_data(data)
 
-        footer = get_msg(lang, "affiliate_footer")
-        balance_note = f"\n\n📊 *Осталось проверок:* {remaining}" if user["balance"] != -1 else ""
+        safe_result = escape_markdown(result, version=2)
+        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
+        remaining_text = "∞" if user["balance"] == -1 else str(remaining)
+        balance_note = f"\n\n📊 Осталось проверок: {remaining_text}"
         share_invite = f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}"
 
         await update.message.reply_text(
-            result + footer + balance_note + share_invite,
+            safe_result + safe_footer + balance_note + share_invite,
             reply_markup=get_analysis_inline_buttons(),
-            parse_mode="Markdown"
+            parse_mode="MarkdownV2"
         )
 
     except Exception as e:
