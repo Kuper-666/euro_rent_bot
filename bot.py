@@ -354,35 +354,17 @@ async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    keyboard = [
-        [InlineKeyboardButton("🔹 3€ — 1 проверка", callback_data="show_pay_3")],
-        [InlineKeyboardButton("💎 9€ — 5 проверок (−40%)", callback_data="show_pay_9")],
-        [InlineKeyboardButton("👑 19€ — безлимит/мес", callback_data="show_pay_19")],
-        [InlineKeyboardButton("📄 5€ — PDF заявление", callback_data="show_pay_pdf")],
-        [InlineKeyboardButton("⭐ 15€/мес — VIP подборки", callback_data="show_pay_vip")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Выберите тариф:", reply_markup=reply_markup)
+    text = (
+        "Оплата через Telegram Stars:\n\n"
+        "1 проверка — 100 Stars -> /pay_stars_3\n"
+        "5 проверок — 250 Stars -> /pay_stars_9\n"
+        "Безлимит/мес — 500 Stars -> /pay_stars_19\n\n"
+        "Нажми команду выше для оплаты."
+    )
+    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
-async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_3"), reply_markup=get_keyboard())
 
-
-async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_9"), reply_markup=get_keyboard())
-
-
-async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_19"), reply_markup=get_keyboard())
-
-
-async def pay_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard())
 
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -625,10 +607,6 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("revolut", revolut_command))
     application.add_handler(CommandHandler("pay", pay_command))
-    application.add_handler(CommandHandler("pay_3", pay_3))
-    application.add_handler(CommandHandler("pay_9", pay_9))
-    application.add_handler(CommandHandler("pay_19", pay_19))
-    application.add_handler(CommandHandler("pay_pdf", pay_pdf))
     application.add_handler(CommandHandler("pdf", pdf_command))
     application.add_handler(CommandHandler("pay_done_pdf", pay_done_pdf))
     application.add_handler(CommandHandler("vip", vip_command))

@@ -10,8 +10,7 @@ MESSAGES = {
             "- Показываю скрытые платежи (Nebenkosten, Service Charge)\n"
             "- Подсказываю, какие документы нужны\n"
             "- Проверяю на мошенников и скам\n\n"
-            "Бесплатный тест: 3 проверки без оплаты.\n"
-            "После лимита: 3EUR за раз или 9EUR за месяц.\n\n"
+            "Бесплатный тест: 3 проверки без оплаты.\n\n"
             "Подробнее — нажми /help"
         ),
         "help": (
@@ -22,16 +21,10 @@ MESSAGES = {
             "Просто скопируй ссылку с любого сайта (ImmoScout, Rightmove, Idealista) или вставь текст объявления прямо сюда.\n\n"
             "Бесплатный тест-драйв\n"
             "Ты можешь проверить 3 объявления абсолютно бесплатно.\n\n"
-            "Пакеты и цены:\n"
-            "Разовый — 3EUR за 1 проверку -> /pay_3\n"
-            "Эконом — 9EUR за 5 проверок (экономия 40%) -> /pay_9\n"
-            "Профи — 19EUR за безлимит на месяц -> /pay_19\n"
-            "PDF-заявление (Mieterprofil) — 5EUR -> /pdf\n"
-            "VIP-подписка — 15EUR/мес (ежедневные подборки) -> /vip\n\n"
-            "Как оплатить?\n"
-            "Нажми команду выше — получишь ссылку на оплату через Revolut. После оплаты напиши команду /pay_done_3 (или _9, _19).\n\n"
-            "Нужен европейский счет для депозита?\n"
-            f"Откройте Revolut ({AFFILIATE_REVOLUT}) или Wise ({AFFILIATE_WISE}) по моей ссылке и получите бонус!\n\n"
+            "Оплата через Telegram Stars:\n"
+            "1 проверка — 100 Stars -> /pay_stars_3\n"
+            "5 проверок — 250 Stars -> /pay_stars_9\n"
+            "Безлимит/мес — 500 Stars -> /pay_stars_19\n\n"
             "Официальная страница: euro-rent-bot.onrender.com\n\n"
             "Готов начать? Просто пришли мне любое объявление прямо сейчас!"
         ),
@@ -41,120 +34,40 @@ MESSAGES = {
         "limit_reached": (
             "Лимит бесплатных проверок\n\n"
             "Вы использовали все 3 бесплатные проверки.\n\n"
-            "Выберите пакет:\n"
-            "Разовый — 3EUR за 1 проверку -> /pay_3\n"
-            "Эконом — 9EUR за 5 проверок (-40%) -> /pay_9\n"
-            "Профи — 19EUR за безлимит на месяц -> /pay_19\n\n"
-            "После оплаты напишите /pay_done_3 (или _9, _19)."
+            "Оплата через Telegram Stars:\n"
+            "1 проверка — 100 Stars -> /pay_stars_3\n"
+            "5 проверок — 250 Stars -> /pay_stars_9\n"
+            "Безлимит/мес — 500 Stars -> /pay_stars_19"
         ),
-        "pay_3": (
-            "Пакет Разовый — 3EUR\n\n"
-            "1 проверка объявления\n\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
-            "После оплаты напишите /pay_done_3."
-        ),
-        "pay_9": (
-            "Пакет Эконом — 9EUR\n\n"
-            "5 проверок объявлений (экономия 40%)\n\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "После оплаты напишите /pay_done_9."
-        ),
-        "pay_19": (
-            "Пакет Профи — 19EUR\n\n"
-            "Безлимитные проверки на 1 месяц\n\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
-            "После оплаты напишите /pay_done_19."
-        ),
-        "pay_done_3": "Оплата подтверждена! Вам добавлена 1 проверка. Осталось: {}.",
-        "pay_done_9": "Оплата подтверждена! Вам добавлено 5 проверок. Осталось: {}.",
+        "pay_done_3": "Оплата подтверждена! Добавлена 1 проверка. Осталось: {}.",
+        "pay_done_9": "Оплата подтверждена! Добавлено 5 проверок. Осталось: {}.",
         "pay_done_19": "Оплата подтверждена! Безлимитный доступ на месяц активирован!",
-        "pay_not_used": "Вы ещё не использовали бота. Сначала отправьте объявление, потом оплачивайте.",
+        "pay_not_used": "Вы ещё не использовали бота. Сначала отправьте объявление.",
         "no_balance": "У вас нет доступных проверок. Купите пакет: /help",
         "error": "Ошибка: {}",
         "send_listing": "Отправь текст объявления или ссылку.",
         "share_text": "Поделиться с другом:",
         "analysis_done": "Анализ готов!",
-        "affiliate_footer": (
-            "\n\nНужен европейский счет?\n"
-            f"Откройте Revolut ({AFFILIATE_REVOLUT}) или Wise ({AFFILIATE_WISE}) — получите бонус!"
-        ),
-        "pdf_intro": (
-            "Готовое заявление на аренду (Mieterprofil)\n\n"
-            "Я могу сформировать PDF с заполненным заявлением на аренду.\n\n"
-            "Стоимость: 5EUR\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
-            "После оплаты отправьте мне данные:\n"
-            "- Имя и фамилия\n"
-            "- Дата рождения\n"
-            "- Телефон\n"
-            "- Email\n"
-            "- Текущий адрес\n"
-            "- Работодатель\n"
-            "- Доход (нетто)\n"
-            "- Количество жильцов\n\n"
-            "Отправьте все данные одним сообщением."
-        ),
-        "pdf_need_data": (
-            "Заполните данные для заявления:\n\n"
-            "1. Имя и фамилия\n"
-            "2. Дата рождения\n"
-            "3. Телефон\n"
-            "4. Email\n"
-            "5. Текущий адрес\n"
-            "6. Работодатель\n"
-            "7. Доход (нетто/мес)\n"
-            "8. Количество жильцов\n\n"
-            "Отправьте все данные одним сообщением, каждый пункт с новой строки."
-        ),
+        "affiliate_footer": "",
+        "pdf_intro": "PDF-заявление (Mieterprofil) — 5€\n\nОтправьте данные для заявления:\n- Имя и фамилия\n- Дата рождения\n- Телефон\n- Email\n- Текущий адрес\n- Работодатель\n- Доход (нетто)\n- Количество жильцов",
+        "pdf_need_data": "Заполните данные для заявления:\n\n1. Имя и фамилия\n2. Дата рождения\n3. Телефон\n4. Email\n5. Текущий адрес\n6. Работодатель\n7. Доход (нетто/мес)\n8. Количество жильцов\n\nОтправьте все данные одним сообщением.",
         "pdf_generating": "Генерирую PDF...",
         "pdf_done": "Готово! PDF с заявлением на аренду отправлен.",
         "pdf_error": "Ошибка при генерации PDF: {}",
-        "pay_pdf": (
-            "Оплата PDF (Mieterprofil) — 5EUR\n\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=500\n\n"
-            "После оплаты напишите /pay_done_pdf."
-        ),
-        "pay_done_pdf": "Оплата подтверждена! Отправьте данные для заявления.",
-        "vip_intro": (
-            "VIP-подписка — 15EUR/мес\n\n"
-            "Ежедневная подборка горячих объявлений по вашим критериям.\n\n"
-            "Что входит:\n"
-            "- До 10 проверенных объявлений в день\n"
-            "- Фильтр по городу, цене, площади\n"
-            "- Предупреждения о мошенниках\n"
-            "- Безлимитные проверки\n\n"
-            "Оплатите: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\n"
-            "После оплаты напишите /pay_done_vip."
-        ),
-        "pay_done_vip": (
-            "VIP активирован!\n\n"
-            "Теперь вы получаете ежедневную подборку.\n\n"
-            "Отправьте мне критерии поиска:\n"
-            "- Город\n"
-            "- Макс. цена\n"
-            "- Мин. площадь\n"
-            "- Количество комнат\n\n"
-            "Я буду присылать подходящие объявления каждый день!"
-        ),
-        "vip_ask_criteria": (
-            "Отправьте критерии поиска:\n\n"
-            "- Город\n"
-            "- Макс. цена (EUR/мес)\n"
-            "- Мин. площадь (м2)\n"
-            "- Количество комнат\n\n"
-            "Пример: Берлин, 800EUR, 40м2, 2 комнаты"
-        ),
+        "vip_intro": "VIP-подписка — 15EUR/мес\n\nЕжедневная подборка объявлений по вашим критериям.\n\nЧто входит:\n- До 10 проверенных объявлений в день\n- Фильтр по городу, цене, площади\n- Предупреждения о мошенниках\n- Безлимитные проверки",
+        "pay_done_vip": "VIP активирован!\n\nОтправьте мне критерии поиска:\n- Город\n- Макс. цена\n- Мин. площадь\n- Количество комнат",
+        "vip_ask_criteria": "Отправьте критерии поиска:\n\n- Город\n- Макс. цена (EUR/мес)\n- Мин. площадь (м2)\n- Количество комнат\n\nПример: Берлин, 800EUR, 40м2, 2 комнаты",
         "system_prompt": (
             "Ты — профессиональный консультант по недвижимости с 10-летним опытом в Европе. "
             "Отвечай на русском языке.\n\n"
             "Раздели ответ на 5 блоков:\n\n"
             "1. Краткий пересказ — суть объявления за 1 предложение (метраж, комнаты, цена, этаж).\n\n"
             "2. Реальная цена и сравнение с рынком — посчитай полную стоимость с учётом коммуналки, депозита и парковки. "
-            "Сравни со средней рыночной ценой в районе. Напиши: выше рынка на X%, отличная цена, или рыночная.\n\n"
+            "Сравни со средней рыночной ценой в районе.\n\n"
             "3. Анализ района и инфраструктуры — есть ли рядом магазины (Aldi, Lidl, Rewe), транспорт (U-Bahn, S-Bahn), "
             "шумный ли район. Если район не указан — порекомендуй проверить в Google Maps.\n\n"
-            "4. Документы и риски — перечисли документы для этой страны (Schufa, Gehaltsnachweise, Garant и т.д.). "
-            "Отметь красные флаги: подозрительно низкая цена, предоплата до просмотра, нет контактов.\n\n"
+            "4. Документы и риски — перечисли документы для этой страны (Schufa, Gehaltsnachweise и т.д.). "
+            "Отметь красные флаги.\n\n"
             "5. Совет от эксперта — 2-3 вопроса владельцу перед подписанием. Оценка от 1 до 10.\n\n"
             "Заверши фразой: Аренда — это марафон, а не спринт. Проверяй каждый пункт перед подписанием!"
         ),
@@ -168,8 +81,7 @@ MESSAGES = {
             "- Показую приховані платежі (Nebenkosten, Service Charge)\n"
             "- Підказую, які документи потрібні\n"
             "- Перевіряю шахраїв та скам\n\n"
-            "Безкоштовний тест: 3 перевірки без оплати.\n"
-            "Після ліміту: 3EUR за раз або 9EUR за місяць.\n\n"
+            "Безкоштовний тест: 3 перевірки без оплати.\n\n"
             "Детальніше — натисніть /help"
         ),
         "help": (
@@ -180,16 +92,10 @@ MESSAGES = {
             "Просто скопіюйте посилання з будь-якого сайту (ImmoScout, Rightmove, Idealista) або вставте текст оголошення прямо сюди.\n\n"
             "Безкоштовний тест-драйв\n"
             "Ви можете перевірити 3 оголошення абсолютно безкоштовно.\n\n"
-            "Пакети та ціни:\n"
-            "Разовий — 3EUR за 1 перевірку -> /pay_3\n"
-            "Економ — 9EUR за 5 перевірок (економія 40%) -> /pay_9\n"
-            "Профі — 19EUR за безліміт на місяць -> /pay_19\n"
-            "PDF-заява (Mieterprofil) — 5EUR -> /pdf\n"
-            "VIP-підписка — 15EUR/міс (щоденні підбірки) -> /vip\n\n"
-            "Як оплатити?\n"
-            "Натисніть команду вище — отримаєте посилання на оплату через Revolut. Після оплати напишіть /pay_done_3.\n\n"
-            f"Відкрийте Revolut ({AFFILIATE_REVOLUT}) або Wise ({AFFILIATE_WISE}) за моїм посиланням і отримайте бонус!\n\n"
-            "Офіційна сторінка: euro-rent-bot.onrender.com\n\n"
+            "Оплата через Telegram Stars:\n"
+            "1 перевірка — 100 Stars -> /pay_stars_3\n"
+            "5 перевірок — 250 Stars -> /pay_stars_9\n"
+            "Безліміт/міс — 500 Stars -> /pay_stars_19\n\n"
             "Готові почати? Просто пришліть мені будь-яке оголошення прямо зараз!"
         ),
         "analyzing": "Аналізую оголошення...",
@@ -198,66 +104,39 @@ MESSAGES = {
         "limit_reached": (
             "Ліміт безкоштовних перевірок\n\n"
             "Ви використали всі 3 безкоштовні перевірки.\n\n"
-            "Оберіть пакет:\n"
-            "Разовий — 3EUR за 1 перевірку -> /pay_3\n"
-            "Економ — 9EUR за 5 перевірок (-40%) -> /pay_9\n"
-            "Профі — 19EUR за безліміт на місяць -> /pay_19\n\n"
-            "Після оплати напишіть /pay_done_3."
+            "Оплата через Telegram Stars:\n"
+            "1 перевірка — 100 Stars -> /pay_stars_3\n"
+            "5 перевірок — 250 Stars -> /pay_stars_9\n"
+            "Безліміт/міс — 500 Stars -> /pay_stars_19"
         ),
-        "pay_3": (
-            "Пакет Разовий — 3EUR\n\n"
-            "1 перевірка оголошення\n\n"
-            "Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=300\n\n"
-            "Після оплати напишіть /pay_done_3."
-        ),
-        "pay_9": (
-            "Пакет Економ — 9EUR\n\n"
-            "5 перевірок оголошень (економія 40%)\n\n"
-            "Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=900\n\n"
-            "Після оплати напишіть /pay_done_9."
-        ),
-        "pay_19": (
-            "Пакет Профі — 19EUR\n\n"
-            "Безлімітні перевірки на 1 місяць\n\n"
-            "Оплатіть: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\n"
-            "Після оплати напишіть /pay_done_19."
-        ),
-        "pay_done_3": "Оплата підтверджена! Вам додано 1 перевірку. Залишилось: {}.",
-        "pay_done_9": "Оплата підтверджена! Вам додано 5 перевірок. Залишилось: {}.",
+        "pay_done_3": "Оплата підтверджена! Додано 1 перевірку. Залишилось: {}.",
+        "pay_done_9": "Оплата підтверджена! Додано 5 перевірок. Залишилось: {}.",
         "pay_done_19": "Оплата підтверджена! Безлімітний доступ на місяць активовано!",
-        "pay_not_used": "Ви ще не користувались ботом. Спочатку надішліть оголошення, потім оплачуйте.",
+        "pay_not_used": "Ви ще не користувались ботом. Спочатку надішліть оголошення.",
         "no_balance": "У вас немає доступних перевірок. Купіть пакет: /help",
         "error": "Помилка: {}",
         "send_listing": "Надішліть текст оголошення або посилання.",
         "share_text": "Поділитися з другом:",
         "analysis_done": "Аналіз готовий!",
-        "affiliate_footer": (
-            "\n\nПотрібен європейський рахунок?\n"
-            f"Відкрийте Revolut ({AFFILIATE_REVOLUT}) або Wise ({AFFILIATE_WISE}) — отримайте бонус!"
-        ),
-        "pdf_intro": "Готова заява на оренду (Mieterprofil)\n\nЯ можу сформувати PDF із заповненою заявою.\n\nВартість: 5EUR\nОплатіть: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nПісля оплати надішліть дані:\n- Ім'я та прізвище\n- Дата народження\n- Телефон\n- Email\n- Поточна адреса\n- Роботодавець\n- Дохід (нетто)\n- Кількість мешканців",
-        "pdf_need_data": "Заповніть дані для заяви:\n\n1. Ім'я та прізвище\n2. Дата народження\n3. Телефон\n4. Email\n5. Поточна адреса\n6. Роботодавець\n7. Дохід (нетто/міс)\n8. Кількість мешканців\n\nНадішліть всі дані одним повідомленням.",
+        "affiliate_footer": "",
+        "pdf_intro": "PDF-заява (Mieterprofil) — 5€\n\nНадішліть дані для заяви:\n- Ім'я та прізвище\n- Дата народження\n- Телефон\n- Email\n- Поточна адреса\n- Роботодавець\n- Дохід (нетто)\n- Кількість мешканців",
+        "pdf_need_data": "Заповніть дані для заяви:\n\n1. Ім'я та прізвище\n2. Дата народження\n3. Телефон\n4. Email\n5. Поточна адреса\n6. Роботодавець\n7. Дохід (нетто/міс)\n8. Кількість мешканців",
         "pdf_generating": "Генерую PDF...",
         "pdf_done": "Готово! PDF із заявою на оренду надіслано.",
         "pdf_error": "Помилка при генерації PDF: {}",
-        "pay_pdf": "Оплата PDF (Mieterprofil) — 5EUR\n\nОплатіть: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nПісля оплати напишіть /pay_done_pdf.",
-        "pay_done_pdf": "Оплата підтверджена! Надішліть дані для заяви.",
-        "vip_intro": "VIP-підписка — 15EUR/міс\n\nЩоденна підбірка гарячих оголошень за вашими критеріями.\n\nЩо входить:\n- До 10 перевірених оголошень на день\n- Фільтр за містом, ціною, площею\n- Попередження про шахраїв\n- Безлімітні перевірки\n\nОплатіть: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\nПісля оплати напишіть /pay_done_vip.",
-        "pay_done_vip": "VIP активовано!\n\nТепер ви отримуєте щоденну підбірку.\n\nНадішліть мені критерії пошуку:\n- Місто\n- Макс. ціна\n- Мін. площа\n- Кількість кімнат",
+        "vip_intro": "VIP-підписка — 15EUR/міс\n\nЩоденна підбірка оголошень за вашими критеріями.\n\nЩо входить:\n- До 10 перевірених оголошень на день\n- Фільтр за містом, ціною, площею\n- Попередження про шахраїв\n- Безлімітні перевірки",
+        "pay_done_vip": "VIP активовано!\n\nНадішліть мені критерії пошуку:\n- Місто\n- Макс. ціна\n- Мін. площа\n- Кількість кімнат",
         "vip_ask_criteria": "Надішліть критерії пошуку:\n\n- Місто\n- Макс. ціна (EUR/міс)\n- Мін. площа (м2)\n- Кількість кімнат\n\nПриклад: Берлін, 800EUR, 40м2, 2 кімнати",
         "system_prompt": (
             "Ти — професійний консультант з нерухомості з 10-річним досвідом в Європі. "
             "Відповідай українською мовою.\n\n"
             "Розділи відповідь на 5 блоків:\n\n"
-            "1. Короткий переказ — суть оголошення за 1 речення (метраж, кімнати, ціна, поверх).\n\n"
-            "2. Реальна ціна та порівняння з ринком — підрахуй повну вартість з комуналкою, депозитом та парковкою. "
-            "Порівнянь з середньою ринковою ціною в районі. Напиши: вище ринку на X%, відмінна ціна, або ринкова.\n\n"
-            "3. Аналіз району та інфраструктури — чи поруч магазини (Aldi, Lidl, Rewe), транспорт (U-Bahn, S-Bahn), "
-            "наскільки шумний район. Якщо район не вказаний — порадь перевірити в Google Maps.\n\n"
-            "4. Документи та ризики — перелічи документи для цієї країни (Schufa, Gehaltsnachweise, Garant тощо). "
-            "Відзнач червоні прапорці: підозріло низька ціна, передоплата до перегляду, немає контактів.\n\n"
-            "5. Порада від експерта — 2-3 питання власнику перед підписанням. Оцінка від 1 до 10.\n\n"
-            "Заверши фразою: Оренда — це марафон, а не спринт. Перевіряй кожен пункт перед підписанням!"
+            "1. Короткий переказ — суть оголошення за 1 речення.\n\n"
+            "2. Реальна ціна та порівняння з ринком — підрахуй повну вартість з комуналкою, депозитом та парковкою.\n\n"
+            "3. Аналіз району та інфраструктури — магазини, транспорт, шум.\n\n"
+            "4. Документи та ризики — документи для країни + червоні прапорці.\n\n"
+            "5. Порада від експерта — 2-3 питання власнику + оцінка від 1 до 10.\n\n"
+            "Заверши фразою: Оренда — це марафон, а не спринт!"
         ),
     },
     "en": {
@@ -269,28 +148,21 @@ MESSAGES = {
             "- Show hidden fees (Nebenkosten, Service Charge)\n"
             "- Tell you which documents are needed\n"
             "- Check for scams and fraud\n\n"
-            "Free trial: 3 checks no payment.\n"
-            "After the limit: 3EUR per check or 9EUR per month.\n\n"
+            "Free trial: 3 checks no payment.\n\n"
             "Learn more — tap /help"
         ),
         "help": (
             "EuroRent AI — smart rental assistant in Europe\n\n"
             "What do I do?\n"
-            "I analyze rental listings: translate text, find hidden commissions, check what documents landlords require, and warn you about scam schemes.\n\n"
+            "I analyze rental listings: translate text, find hidden commissions, check documents and warn about scams.\n\n"
             "How to use me?\n"
-            "Simply copy a link from any site (ImmoScout, Rightmove, Idealista, etc.) or paste the listing text right here.\n\n"
+            "Simply copy a link from any site (ImmoScout, Rightmove, Idealista) or paste the listing text right here.\n\n"
             "Free test drive\n"
-            "You can check 3 listings completely free to see how useful I am.\n\n"
-            "Packages & Pricing:\n"
-            "One-time — 3EUR for 1 check -> /pay_3\n"
-            "Economy — 9EUR for 5 checks (save 40%) -> /pay_9\n"
-            "Pro — 19EUR for unlimited access per month -> /pay_19\n"
-            "PDF Application (Mieterprofil) — 5EUR -> /pdf\n"
-            "VIP Subscription — 15EUR/mo (daily curated listings) -> /vip\n\n"
-            "How to pay?\n"
-            "Tap the command above — you'll get a Revolut payment link. After paying, send /pay_done_3.\n\n"
-            f"Open Revolut ({AFFILIATE_REVOLUT}) or Wise ({AFFILIATE_WISE}) via my link and get a bonus!\n\n"
-            "Official website: euro-rent-bot.onrender.com\n\n"
+            "You can check 3 listings completely free.\n\n"
+            "Pay with Telegram Stars:\n"
+            "1 check — 100 Stars -> /pay_stars_3\n"
+            "5 checks — 250 Stars -> /pay_stars_9\n"
+            "Unlimited/month — 500 Stars -> /pay_stars_19\n\n"
             "Ready to start? Just send me any listing right now!"
         ),
         "analyzing": "Analyzing listing...",
@@ -299,198 +171,163 @@ MESSAGES = {
         "limit_reached": (
             "Free Check Limit Reached\n\n"
             "You've used all 3 free checks.\n\n"
-            "Choose a package:\n"
-            "One-time — 3EUR for 1 check -> /pay_3\n"
-            "Economy — 9EUR for 5 checks (-40%) -> /pay_9\n"
-            "Pro — 19EUR for unlimited/month -> /pay_19\n\n"
-            "After payment, send /pay_done_3."
+            "Pay with Telegram Stars:\n"
+            "1 check — 100 Stars -> /pay_stars_3\n"
+            "5 checks — 250 Stars -> /pay_stars_9\n"
+            "Unlimited/month — 500 Stars -> /pay_stars_19"
         ),
-        "pay_3": "Package One-time — 3EUR\n\n1 listing check\n\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=300\n\nAfter payment, send /pay_done_3.",
-        "pay_9": "Package Economy — 9EUR\n\n5 listing checks (save 40%)\n\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=900\n\nAfter payment, send /pay_done_9.",
-        "pay_19": "Package Pro — 19EUR\n\nUnlimited checks for 1 month\n\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\nAfter payment, send /pay_done_19.",
         "pay_done_3": "Payment confirmed! 1 check added. Remaining: {}.",
         "pay_done_9": "Payment confirmed! 5 checks added. Remaining: {}.",
         "pay_done_19": "Payment confirmed! Unlimited access for 1 month activated!",
-        "pay_not_used": "You haven't used the bot yet. Send a listing first, then pay.",
+        "pay_not_used": "You haven't used the bot yet. Send a listing first.",
         "no_balance": "No checks remaining. Buy a package: /help",
         "error": "Error: {}",
         "send_listing": "Send a listing text or link.",
         "share_text": "Share with a friend:",
         "analysis_done": "Analysis complete!",
-        "affiliate_footer": "\n\nNeed a European bank account?\nOpen Revolut ({}) or Wise ({}) — get a bonus!".format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
-        "pdf_intro": "Ready-made rental application (Mieterprofil)\n\nI can generate a PDF with a filled rental application.\n\nPrice: 5EUR\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nAfter payment, send me your data:\n- Full name\n- Date of birth\n- Phone\n- Email\n- Current address\n- Employer\n- Income (net)\n- Number of occupants\n\nSend all data in one message.",
-        "pdf_need_data": "Fill in your application data:\n\n1. Full name\n2. Date of birth\n3. Phone\n4. Email\n5. Current address\n6. Employer\n7. Income (net/month)\n8. Number of occupants\n\nSend all data in one message, each item on a new line.",
+        "affiliate_footer": "",
+        "pdf_intro": "PDF Application (Mieterprofil) — 5EUR\n\nSend your data:\n- Full name\n- Date of birth\n- Phone\n- Email\n- Current address\n- Employer\n- Income (net)\n- Number of occupants",
+        "pdf_need_data": "Fill in your application data:\n\n1. Full name\n2. Date of birth\n3. Phone\n4. Email\n5. Current address\n6. Employer\n7. Income (net/month)\n8. Number of occupants",
         "pdf_generating": "Generating PDF...",
         "pdf_done": "Done! PDF rental application sent.",
         "pdf_error": "PDF generation error: {}",
-        "pay_pdf": "Pay for PDF (Mieterprofil) — 5EUR\n\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nAfter payment, send /pay_done_pdf.",
-        "pay_done_pdf": "Payment confirmed! Send your application data.",
-        "vip_intro": "VIP Subscription — 15EUR/month\n\nDaily curated list of hot listings matching your criteria.\n\nWhat's included:\n- Up to 10 verified listings per day\n- Filter by city, price, area\n- Scam alerts\n- Unlimited checks\n\nPay here: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\nAfter payment, send /pay_done_vip.",
-        "pay_done_vip": "VIP activated!\n\nYou'll now receive daily curated listings.\n\nSend me your search criteria:\n- City\n- Max. price\n- Min. area\n- Number of rooms",
+        "vip_intro": "VIP Subscription — 15EUR/month\n\nDaily curated list of listings matching your criteria.\n\nWhat's included:\n- Up to 10 verified listings per day\n- Filter by city, price, area\n- Scam alerts\n- Unlimited checks",
+        "pay_done_vip": "VIP activated!\n\nSend me your search criteria:\n- City\n- Max. price\n- Min. area\n- Number of rooms",
         "vip_ask_criteria": "Send your search criteria:\n\n- City\n- Max. price (EUR/month)\n- Min. area (m2)\n- Number of rooms\n\nExample: Berlin, 800EUR, 40m2, 2 rooms",
         "system_prompt": (
             "You are a professional real estate consultant with 10 years of experience in Europe. "
             "Respond in English.\n\n"
             "Divide the response into 5 blocks:\n\n"
-            "1. Brief summary — the essence of the listing in 1 sentence (size, rooms, price, floor).\n\n"
-            "2. Real price and market comparison — calculate total cost including utilities, deposit, parking. "
-            "Compare with average market price in the area. Write: above market by X%, great price, or market price.\n\n"
-            "3. Neighborhood and infrastructure — nearby shops (Aldi, Lidl, Rewe), transport (U-Bahn, S-Bahn), "
-            "noise level. If location is missing — recommend checking Google Maps.\n\n"
-            "4. Documents and risks — list documents needed for this country (Schufa, payslips, guarantor, etc.). "
-            "Flag red signs: suspiciously low price, prepayment before viewing, no contact info.\n\n"
-            "5. Expert advice — 2-3 questions to ask the landlord before signing. Score from 1 to 10.\n\n"
-            "End with: Renting is a marathon, not a sprint. Check every item before signing!"
+            "1. Brief summary — the essence in 1 sentence.\n\n"
+            "2. Real price and market comparison — calculate total cost including utilities, deposit, parking.\n\n"
+            "3. Neighborhood and infrastructure — shops, transport, noise level.\n\n"
+            "4. Documents and risks — list documents needed + red flags.\n\n"
+            "5. Expert advice — 2-3 questions to landlord + score from 1 to 10.\n\n"
+            "End with: Renting is a marathon, not a sprint!"
         ),
     },
     "de": {
         "start": (
             "Hallo! Ich bin EuroRent AI — dein persoenlicher Miet-Detector in Europa.\n\n"
-            "Schick mir einfach einen Link zu einem Angebot oder kopiere den Text — ich mache in 5 Sekunden eine vollstaendige Analyse.\n\n"
+            "Schick mir einfach einen Link zu einem Angebot oder kopiere den Text — ich mache in 5 Sekunden eine Analyse.\n\n"
             "Was ich kann:\n"
-            "- Uebersetze Angebote ins Russische/Englische\n"
-            "- Zeige versteckte Gebuehren (Nebenkosten, Service Charge)\n"
+            "- Uebersetze Angebote\n"
+            "- Zeige versteckte Gebuehren\n"
             "- Sage dir, welche Dokumente noetig sind\n"
-            "- Warne vor Betrug und Scams\n\n"
-            "Kostenloser Test: 3 Pruefungen ohne Zahlung.\n"
-            "Nach dem Limit: 3EUR pro Pruefung oder 9EUR pro Monat.\n\n"
+            "- Warne vor Betrug\n\n"
+            "Kostenloser Test: 3 Pruefungen ohne Zahlung.\n\n"
             "Mehr dazu — druecke /help"
         ),
         "help": (
             "EuroRent AI — smarter Miet-Assistent in Europa\n\n"
-            "Was mache ich?\n"
-            "Ich analysiere Mietangebote: uebersetze Texte, finde versteckte Provisionen, pruefe Dokumente und warne vor Betrugs-Maschen.\n\n"
-            "So funktioniert's:\n"
-            "Kopiere einfach einen Link von einer beliebigen Seite (ImmoScout, Rightmove, Idealista) oder fuege den Angebotstext direkt hier ein.\n\n"
-            "Kostenloser Testlauf\n"
-            "Du kannst 3 Angebote komplett kostenlos pruefen.\n\n"
-            "Pakete & Preise:\n"
-            "Einmalig — 3EUR fuer 1 Pruefung -> /pay_3\n"
-            "Economy — 9EUR fuer 5 Pruefungen (-40%) -> /pay_9\n"
-            "Pro — 19EUR fuer unbegrenzten Zugang pro Monat -> /pay_19\n"
-            "PDF-Antrag (Mieterprofil) — 5EUR -> /pdf\n"
-            "VIP-Abo — 15EUR/Monat (taegliche Angebote) -> /vip\n\n"
-            "Wie bezahlen?\n"
-            "Druecke den Befehl oben — du erhaeltst einen Revolut-Zahlungslink. Nach der Zahlung sende /pay_done_3.\n\n"
-            f"Eroeffne Revolut ({AFFILIATE_REVOLUT}) oder Wise ({AFFILIATE_WISE}) ueber meinen Link und erhalte ein Bonus!\n\n"
-            "Offizielle Webseite: euro-rent-bot.onrender.com\n\n"
-            "Bereit loszulegen? Schick mir einfach ein Angebot direkt jetzt!"
+            "Analysiere Mietangebote, finde versteckte Provisionen, pruefe Dokumente.\n\n"
+            "Kostenloser Testlauf — 3 Angebote komplett kostenlos.\n\n"
+            "Bezahlen mit Telegram Stars:\n"
+            "1 Pruefung — 100 Stars -> /pay_stars_3\n"
+            "5 Pruefungen — 250 Stars -> /pay_stars_9\n"
+            "Unbegrenzt/Monat — 500 Stars -> /pay_stars_19\n\n"
+            "Bereit? Schick mir ein Angebot!"
         ),
         "analyzing": "Analysiere Angebot...",
         "fetching_url": "Oeffne Link...",
         "ocr_processing": "Erkenne Text vom Screenshot...",
-        "limit_reached": "Kostenlose Pruefungen aufgebraucht\n\nDu hast alle 3 kostenlosen Pruefungen genutzt.\n\nWaehle ein Paket:\nEinmalig — 3EUR fuer 1 Pruefung -> /pay_3\nEconomy — 9EUR fuer 5 Pruefungen (-40%) -> /pay_9\nPro — 19EUR fuer unbegrenzt/Monat -> /pay_19\n\nNach der Zahlung sende /pay_done_3.",
-        "pay_3": "Paket Einmalig — 3EUR\n\n1 Angebotspruefung\n\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=300\n\nNach der Zahlung /pay_done_3 senden.",
-        "pay_9": "Paket Economy — 9EUR\n\n5 Angebotspruefungen (-40%)\n\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=900\n\nNach der Zahlung /pay_done_9 senden.",
-        "pay_19": "Paket Pro — 19EUR\n\nUnbegrenzte Pruefungen fuer 1 Monat\n\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\nNach der Zahlung /pay_done_19 senden.",
+        "limit_reached": (
+            "Kostenlose Pruefungen aufgebraucht\n\n"
+            "Bezahlen mit Telegram Stars:\n"
+            "1 Pruefung — 100 Stars -> /pay_stars_3\n"
+            "5 Pruefungen — 250 Stars -> /pay_stars_9\n"
+            "Unbegrenzt/Monat — 500 Stars -> /pay_stars_19"
+        ),
         "pay_done_3": "Zahlung bestaetigt! 1 Pruefung hinzugefuegt. Verbleibend: {}.",
         "pay_done_9": "Zahlung bestaetigt! 5 Pruefungen hinzugefuegt. Verbleibend: {}.",
-        "pay_done_19": "Zahlung bestaetigt! Unbegrenzter Zugang fuer 1 Monat aktiviert!",
-        "pay_not_used": "Du hast den Bot noch nicht benutzt. Schick zuerst ein Angebot.",
-        "no_balance": "Keine Pruefungen uebrig. Kaufe ein Paket: /help",
+        "pay_done_19": "Zahlung bestaetigt! Unbegrenzter Zugang aktiviert!",
+        "pay_not_used": "Du hast den Bot noch nicht benutzt.",
+        "no_balance": "Keine Pruefungen uebrig: /help",
         "error": "Fehler: {}",
         "send_listing": "Schick einen Angebotstext oder Link.",
         "share_text": "Mit einem Freund teilen:",
         "analysis_done": "Analyse abgeschlossen!",
-        "affiliate_footer": "\n\nBenötigst du ein europaeisches Bankkonto?\nEröffne Revolut ({}) oder Wise ({}) — erhalte ein Bonus!".format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
-        "pdf_intro": "Fertiger Mietantrag (Mieterprofil)\n\nIch kann ein PDF mit einem ausgefuellten Mietantrag erstellen.\n\nPreis: 5EUR\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nNach der Zahlung schick mir deine Daten:\n- Name\n- Geburtsdatum\n- Telefon\n- Email\n- Aktuelle Adresse\n- Arbeitgeber\n- Einkommen (netto)\n- Anzahl der Bewohner",
-        "pdf_need_data": "Fuelle deine Daten aus:\n\n1. Name\n2. Geburtsdatum\n3. Telefon\n4. Email\n5. Aktuelle Adresse\n6. Arbeitgeber\n7. Einkommen (netto/Monat)\n8. Anzahl der Bewohner\n\nSchick alle Daten in einer Nachricht.",
+        "affiliate_footer": "",
+        "pdf_intro": "PDF-Antrag (Mieterprofil) — 5EUR\n\nSchick deine Daten:\n- Name\n- Geburtsdatum\n- Telefon\n- Email\n- Adresse\n- Arbeitgeber\n- Einkommen\n- Bewohner",
+        "pdf_need_data": "Fuelle deine Daten aus:\n\n1. Name\n2. Geburtsdatum\n3. Telefon\n4. Email\n5. Adresse\n6. Arbeitgeber\n7. Einkommen\n8. Bewohner",
         "pdf_generating": "Erstelle PDF...",
         "pdf_done": "Fertig! PDF-Mietantrag gesendet.",
         "pdf_error": "PDF-Fehler: {}",
-        "pay_pdf": "PDF bezahlen (Mieterprofil) — 5EUR\n\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nNach der Zahlung /pay_done_pdf senden.",
-        "pay_done_pdf": "Zahlung bestaetigt! Schick deine Antragsdaten.",
-        "vip_intro": "VIP-Abo — 15EUR/Monat\n\nTaeglichste Auswahl heisser Angebote nach deinen Kriterien.\n\nEnthalten:\n- Bis zu 10 gepruefte Angebote pro Tag\n- Filter nach Stadt, Preis, Flaeche\n- Betrugswarnungen\n- Unbegrenzte Pruefungen\n\nHier bezahlen: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\nNach der Zahlung /pay_done_vip senden.",
-        "pay_done_vip": "VIP aktiviert!\n\nDu erhaeltst jetzt taegliche Angebote.\n\nSchick mir deine Suchkriterien:\n- Stadt\n- Max. Preis\n- Min. Flaeche\n- Anzahl Zimmer",
-        "vip_ask_criteria": "Schick deine Suchkriterien:\n\n- Stadt\n- Max. Preis (EUR/Monat)\n- Min. Flaeche (m2)\n- Anzahl Zimmer\n\nBeispiel: Berlin, 800EUR, 40m2, 2 Zimmer",
+        "vip_intro": "VIP-Abo — 15EUR/Monat\n\nTaegliche Auswahl heisser Angebote.\n\nEnthalten:\n- Bis zu 10 gepruefte Angebote pro Tag\n- Filter nach Stadt, Preis, Flaeche\n- Betrugswarnungen\n- Unbegrenzte Pruefungen",
+        "pay_done_vip": "VIP aktiviert!\n\nSchick mir deine Suchkriterien:\n- Stadt\n- Max. Preis\n- Min. Flaeche\n- Zimmer",
+        "vip_ask_criteria": "Suchkriterien:\n\n- Stadt\n- Max. Preis (EUR/Monat)\n- Min. Flaeche (m2)\n- Zimmer",
         "system_prompt": (
             "Du bist ein professioneller Immobilienberater mit 10 Jahren Erfahrung in Europa. "
             "Antworte auf Deutsch.\n\n"
-            "Teile die Antwort in 5 Bloecke:\n\n"
-            "1. Kurze Zusammenfassung — den Kern des Angebots in 1 Satz (Quadratmeter, Zimmer, Preis, Etage).\n\n"
-            "2. Realer Preis und Marktvergleich — berechne die Gesamtkosten inkl. Nebenkosten, Kaution, Parkplatz. "
-            "Vergleiche mit dem Durchschnittspreis im Gebiet. Schreibe: ueber Markt um X%, toller Preis, oder Marktpreis.\n\n"
-            "3. Analyse des Stadtteils — naechste Laeden (Aldi, Lidl, Rewe), Verkehr (U-Bahn, S-Bahn), "
-            "Laermpegel. Bei fehlender Adresse — empfehle Google Maps.\n\n"
-            "4. Dokumente und Risiken — fuehre benoetigte Dokumente fuer dieses Land auf (Schufa, Gehaltsnachweise, Buergschaft etc.). "
-            "Markiere rote Flaggen: verdachtig niedriger Preis, Vorauszahlung vor Besichtigung, keine Kontaktdaten.\n\n"
-            "5. Expertenrat — 2-3 Fragen an den Vermieter vor Vertragsunterschrift. Bewertung von 1 bis 10.\n\n"
-            "Beende mit: Mieten ist ein Marathon, kein Sprint. Pruefe jeden Punkt vor der Unterschrift!"
+            "5 Bloecke:\n\n"
+            "1. Kurze Zusammenfassung.\n\n"
+            "2. Realer Preis und Marktvergleich.\n\n"
+            "3. Stadtteil-Analyse.\n\n"
+            "4. Dokumente und Risiken.\n\n"
+            "5. Expertenrat + Bewertung 1-10.\n\n"
+            "Beende mit: Mieten ist ein Marathon, kein Sprint!"
         ),
     },
     "pl": {
         "start": (
-            "Czesc! Jestem EuroRent AI — twoj osobisty detektor wynajmu w Europie.\n\n"
-            "Wyslij mi po prostu link do oferty lub skopiuj tekst — cale analize w 5 sekund.\n\n"
+            "Czesc! Jestem EuroRent AI — twoj detektor najmu w Europie.\n\n"
+            "Wyslij mi link lub tekst — cale analize w 5 sekund.\n\n"
             "Co umiem:\n"
-            "- Tlumacze oferty na polski/angielski\n"
-            "- Pokazuje ukryte oplaty (Nebenkosten, Service Charge)\n"
-            "- Podpowiadam, jakie dokumenty sa potrzebne\n"
-            "- Sprawdzam oszustwa i skamy\n\n"
-            "Darmowy test: 3 sprawdzenia bez oplaty.\n"
-            "Po limicie: 3EUR za sprawdzenie lub 9EUR za miesiac.\n\n"
-            "Wiecej — nacisnij /help"
+            "- Tlumacze oferty\n"
+            "- Pokazuje ukryte oplaty\n"
+            "- Podpowiadam dokumenty\n"
+            "- Sprawdzam oszustwa\n\n"
+            "Darmowy test: 3 sprawdzenia.\n\n"
+            "Wiecej — /help"
         ),
         "help": (
             "EuroRent AI — inteligentny asystent najmu w Europie\n\n"
-            "Co robie?\n"
-            "Analizuje oferty wynajmu: tlumacze tekst, znajduje ukryte prowizje, sprawdzam dokumenty i ostrzegam przed oszustwami.\n\n"
-            "Jak ze mna wspolpracowac?\n"
-            "Po prostu skopiuj link z dowolnej strony (ImmoScout, Rightmove, Idealista) lub wklej tekst oferty tutaj.\n\n"
-            "Bezplatny test-jazda\n"
-            "Mozesz sprawdzic 3 oferty calekowicie za darmo.\n\n"
-            "Pakiety i ceny:\n"
-            "Jednorazowy — 3EUR za 1 sprawdzenie -> /pay_3\n"
-            "Economy — 9EUR za 5 sprawdzen (-40%) -> /pay_9\n"
-            "Pro — 19EUR za nieograniczony dostep na miesiac -> /pay_19\n"
-            "PDF-wniosek (Mieterprofil) — 5EUR -> /pdf\n"
-            "Subskrypcja VIP — 15EUR/mies (codzienne listy) -> /vip\n\n"
-            "Jak zaplacic?\n"
-            "Nacisnij komende powyzej — otrzymasz link do platnosci przez Revolut. Po oplaceniu wyslij /pay_done_3.\n\n"
-            f"Otworz Revolut ({AFFILIATE_REVOLUT}) lub Wise ({AFFILIATE_WISE}) przez moj link i otrzymaj bonus!\n\n"
-            "Oficjalna strona: euro-rent-bot.onrender.com\n\n"
-            "Gotowy, żeby zaczac? Wyslij mi jakakolwiek oferte prosto teraz!"
+            "Analizuje oferty, znajduje ukryte prowizje, sprawdza dokumenty.\n\n"
+            "Bezplatny test — 3 oferty calekowicie za darmo.\n\n"
+            "Platnosc przez Telegram Stars:\n"
+            "1 sprawdzenie — 100 Stars -> /pay_stars_3\n"
+            "5 sprawdzen — 250 Stars -> /pay_stars_9\n"
+            "Nieograniczony/mies — 500 Stars -> /pay_stars_19\n\n"
+            "Gotowy? Wyslij mi oferte!"
         ),
         "analyzing": "Analizuje oferte...",
         "fetching_url": "Otwieram link...",
         "ocr_processing": "Rozpoznaje tekst ze zrzutu...",
-        "limit_reached": "Wyczerpane darmowe sprawdzenia\n\nWykorzystales wszystkie 3 darmowe sprawdzenia.\n\nWybierz pakiet:\nJednorazowy — 3EUR za 1 sprawdzenie -> /pay_3\nEconomy — 9EUR za 5 sprawdzen (-40%) -> /pay_9\nPro — 19EUR za nieograniczony/miesiac -> /pay_19\n\nPo oplaceniu wyslij /pay_done_3.",
-        "pay_3": "Pakiet Jednorazowy — 3EUR\n\n1 sprawdzenie oferty\n\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=300\n\nPo oplaceniu wyslij /pay_done_3.",
-        "pay_9": "Pakiet Economy — 9EUR\n\n5 sprawdzen ofert (-40%)\n\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=900\n\nPo oplaceniu wyslij /pay_done_9.",
-        "pay_19": "Pakiet Pro — 19EUR\n\nNieograniczone sprawdzenia na 1 miesiac\n\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=1900\n\nPo oplaceniu wyslij /pay_done_19.",
+        "limit_reached": (
+            "Wyczerpane darmowe sprawdzenia\n\n"
+            "Platnosc przez Telegram Stars:\n"
+            "1 sprawdzenie — 100 Stars -> /pay_stars_3\n"
+            "5 sprawdzen — 250 Stars -> /pay_stars_9\n"
+            "Nieograniczony/mies — 500 Stars -> /pay_stars_19"
+        ),
         "pay_done_3": "Platnosc potwierdzona! Dodano 1 sprawdzenie. Pozostalo: {}.",
         "pay_done_9": "Platnosc potwierdzona! Dodano 5 sprawdzen. Pozostalo: {}.",
-        "pay_done_19": "Platnosc potwierdzona! Nieograniczony dostep na miesiac aktywowany!",
-        "pay_not_used": "Nie korzystales jeszcze z bota. Najpierw wyslij oferte.",
-        "no_balance": "Brak dostepnych sprawdzen. Kup pakiet: /help",
+        "pay_done_19": "Platnosc potwierdzona! Nieograniczony dostep aktywowany!",
+        "pay_not_used": "Nie korzystales jeszcze z bota.",
+        "no_balance": "Brak sprawdzen: /help",
         "error": "Blad: {}",
         "send_listing": "Wyslij tekst oferty lub link.",
         "share_text": "Podziel sie z kolega:",
         "analysis_done": "Analiza gotowa!",
-        "affiliate_footer": "\n\nPotrzebujesz europejskiego konta bankowego?\nOtworz Revolut ({}) lub Wise ({}) — otrzymaj bonus!".format(AFFILIATE_REVOLUT, AFFILIATE_WISE),
-        "pdf_intro": "Gotowy formularz najmu (Mieterprofil)\n\nMoge wygenerowac PDF z wypelnionym formularzem najmu.\n\nCena: 5EUR\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nPo oplaceniu wyslij mi dane:\n- Imie i nazwisko\n- Data urodzenia\n- Telefon\n- Email\n- Aktualny adres\n- Pracodawca\n- Dochod (netto)\n- Liczba mieszkancow",
-        "pdf_need_data": "Wypelnij dane do formularza:\n\n1. Imie i nazwisko\n2. Data urodzenia\n3. Telefon\n4. Email\n5. Aktualny adres\n6. Pracodawca\n7. Dochod (netto/mies)\n8. Liczba mieszkancow\n\nWyslij wszystkie dane w jednej wiadomosci.",
+        "affiliate_footer": "",
+        "pdf_intro": "PDF-wniosek (Mieterprofil) — 5EUR\n\nWyslij dane:\n- Imie i nazwisko\n- Data urodzenia\n- Telefon\n- Email\n- Adres\n- Pracodawca\n- Dochod\n- Liczba mieszkancow",
+        "pdf_need_data": "Wypelnij dane:\n\n1. Imie i nazwisko\n2. Data urodzenia\n3. Telefon\n4. Email\n5. Adres\n6. Pracodawca\n7. Dochod\n8. Liczba mieszkancow",
         "pdf_generating": "Generuje PDF...",
-        "pdf_done": "Gotowe! PDF z formularzem najmu wyslany.",
-        "pdf_error": "Blad generowania PDF: {}",
-        "pay_pdf": "Zaplac za PDF (Mieterprofil) — 5EUR\n\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=500\n\nPo oplaceniu wyslij /pay_done_pdf.",
-        "pay_done_pdf": "Platnosc potwierdzona! Wyslij dane do formularza.",
-        "vip_intro": "Subskrypcja VIP — 15EUR/mies\n\nCodzienna lista goracych ofert dopasowanych do Twoich kryteriow.\n\nCo zawiera:\n- Do 10 sprawdzonych ofert dziennie\n- Filtr po miescie, cenie, powierzchni\n- Ostrzezenia przed oszustwami\n- Nieograniczone sprawdzenia\n\nZaplac tutaj: https://revolut.me/radik5f35?currency=EUR&amount=1500\n\nPo oplaceniu wyslij /pay_done_vip.",
-        "pay_done_vip": "VIP aktywowany!\n\nOdtad otrzymujesz codzienne listy ofert.\n\nWyslij mi kryteria wyszukiwania:\n- Miasto\n- Maks. cena\n- Min. powierzchnia\n- Liczba pokoi",
-        "vip_ask_criteria": "Wyslij kryteria wyszukiwania:\n\n- Miasto\n- Maks. cena (EUR/mies)\n- Min. powierzchnia (m2)\n- Liczba pokoi\n\nPrzyklad: Berlin, 800EUR, 40m2, 2 pokoje",
+        "pdf_done": "Gotowe! PDF wyslany.",
+        "pdf_error": "Blad PDF: {}",
+        "vip_intro": "VIP — 15EUR/mies\n\nCodzienne listy ofert.\n\nCo zawiera:\n- Do 10 sprawdzonych ofert dziennie\n- Filtr po miescie, cenie\n- Ostrzezenia\n- Nieograniczone sprawdzenia",
+        "pay_done_vip": "VIP aktywowany!\n\nWyslij kryteria:\n- Miasto\n- Maks. cena\n- Min. powierzchnia\n- Pokoje",
+        "vip_ask_criteria": "Kryteria:\n\n- Miasto\n- Maks. cena (EUR/mies)\n- Min. powierzchnia (m2)\n- Pokoje",
         "system_prompt": (
             "Jestes profesjonalnym konsultantem ds. nieruchomosci z 10-letnim doswiadczeniem w Europie. "
             "Odpowiadaj po polsku.\n\n"
-            "Podziel odpowiedz na 5 blokow:\n\n"
-            "1. Krotkie podsumowanie — sedno oferty w 1 zdaniu (metraz, pokoje, cena, pietro).\n\n"
-            "2. Realna cena i porownanie z rynkiem — oblicz calkowity koszt z mediami, kaucja i parkingiem. "
-            "Porownaj ze srednia cena w okolicy. Napisz: powyzej rynku o X%, swietna cena, lub cena rynkowa.\n\n"
-            "3. Analiza okolicy i infrastruktury — pobliskie sklepy (Aldi, Lidl, Rewe), transport (U-Bahn, S-Bahn), "
-            "poziom halasu. Gdy brak lokalizacji — polecam Google Maps.\n\n"
-            "4. Dokumenty i ryzyka — wymien dokumenty potrzebne w tym kraju (Schufa, zaswiadczenia o dochodach, poręczyciel itp.). "
-            "Zaznacz czerwone flagi: podejrzanie niska cena, przedplata przed oględzinami, brak danych kontaktowych.\n\n"
-            "5. Rada eksperta — 2-3 pytania do wlasciciela przed podpisaniem umowy. Ocena od 1 do 10.\n\n"
-            "Zakoncz fraza: Najem to maraton, a nie sprint. Sprawdz kazdy punkt przed podpisaniem!"
+            "5 blokow:\n\n"
+            "1. Krotkie podsumowanie.\n\n"
+            "2. Realna cena i porownanie z rynkiem.\n\n"
+            "3. Analiza okolicy.\n\n"
+            "4. Dokumenty i ryzyka.\n\n"
+            "5. Rada eksperta + ocena 1-10.\n\n"
+            "Zakoncz: Najem to maraton, a nie sprint!"
         ),
     },
 }
