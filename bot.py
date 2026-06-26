@@ -31,8 +31,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def get_keyboard():
     keyboard = [
-        [KeyboardButton("🏠 Старт"), KeyboardButton("❓ Помощь"), KeyboardButton("💳 Оплата")],
-        [KeyboardButton("📄 PDF"), KeyboardButton("⭐ VIP")],
+        [KeyboardButton("Старт"), KeyboardButton("Помощь"), KeyboardButton("Оплата")],
+        [KeyboardButton("PDF"), KeyboardButton("VIP")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -739,19 +739,19 @@ if __name__ == "__main__":
         group_greeting
     ))
     application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'^(🏠 Старт|Старт)$'), start
+        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(старт|start)$'), start
     ))
     application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'^(❓ Помощь|Помощь)$'), help_command
+        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(помощь|help)$'), help_command
     ))
     application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'^(💳 Оплата|Оплата)$'), pay_command
+        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(оплата|pay|оплатить)$'), pay_command
     ))
     application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'^(📄 PDF|PDF)$'), pdf_command
+        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(pdf|пдф)$'), pdf_command
     ))
     application.add_handler(MessageHandler(
-        filters.ChatType.PRIVATE & filters.Regex(r'^(⭐ VIP|VIP)$'), vip_command
+        filters.ChatType.PRIVATE & filters.Regex(r'(?i)^(vip|вип)$'), vip_command
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity("url"), handle_message))
