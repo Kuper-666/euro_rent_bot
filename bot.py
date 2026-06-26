@@ -191,7 +191,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
 
     except Exception as e:
-        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+        if "insufficient_quota" in str(e) or "429" in str(e):
+            await update.message.reply_text(
+                "Сервис временно перегружен. Попробуйте через несколько минут.",
+                reply_markup=get_keyboard()
+            )
+        else:
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -256,7 +262,13 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
 
     except Exception as e:
-        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+        if "insufficient_quota" in str(e) or "429" in str(e):
+            await update.message.reply_text(
+                "Сервис временно перегружен. Попробуйте через несколько минут.",
+                reply_markup=get_keyboard()
+            )
+        else:
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
