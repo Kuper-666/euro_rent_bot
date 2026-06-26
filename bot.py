@@ -366,39 +366,48 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="1 проверка объявления",
-        description="Доступ к 1 проверке объявления об аренде.",
-        payload="pay_stars_3",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="1 проверка", amount=100)],
-        need_name=False,
-    )
+    try:
+        await update.message.reply_invoice(
+            title="3 проверки объявлений",
+            description="Доступ к 3 проверкам объявлений об аренде.",
+            payload="pay_stars_3",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="3 проверки", amount=300)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
 
 
 async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="5 проверок объявлений",
-        description="Доступ к 5 проверкам объявлений об аренде.",
-        payload="pay_stars_9",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="5 проверок", amount=250)],
-        need_name=False,
-    )
+    try:
+        await update.message.reply_invoice(
+            title="10 проверок объявлений",
+            description="Доступ к 10 проверкам объявлений об аренде.",
+            payload="pay_stars_9",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="10 проверок", amount=900)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
 
 
 async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="Безлимит на месяц",
-        description="Безлимитные проверки объявлений на 1 месяц.",
-        payload="pay_stars_19",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="Безлимит/мес", amount=500)],
-        need_name=False,
-    )
+    try:
+        await update.message.reply_invoice(
+            title="Безлимит на месяц",
+            description="Безлимитные проверки объявлений на 1 месяц.",
+            payload="pay_stars_19",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="Безлимит/мес", amount=1900)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
 
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -427,7 +436,7 @@ async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         payload="pay_stars_pdf",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="PDF заявление", amount=100)],
+        prices=[LabeledPrice(label="PDF заявление", amount=500)],
         need_name=False,
         need_phone_number=False,
         need_email=False,
@@ -527,30 +536,59 @@ def parse_pdf_data(text: str) -> dict:
 
 
 async def pay_stars_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="1 проверка объявления",
-        description="Доступ к 1 проверке объявления об аренде в Европе.",
-        payload="pay_stars_3",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="1 проверка", amount=100)],
-        need_name=False,
-        need_phone_number=False,
-        need_email=False,
-    )
+    try:
+        await update.message.reply_invoice(
+            title="3 проверки объявлений",
+            description="Доступ к 3 проверкам объявлений об аренде.",
+            payload="pay_stars_3",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="3 проверки", amount=300)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+
+
+async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await update.message.reply_invoice(
+            title="10 проверок объявлений",
+            description="Доступ к 10 проверкам объявлений об аренде.",
+            payload="pay_stars_9",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="10 проверок", amount=900)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+
+
+async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await update.message.reply_invoice(
+            title="Безлимит на месяц",
+            description="Безлимитные проверки объявлений на 1 месяц.",
+            payload="pay_stars_19",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="Безлимит/мес", amount=1900)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
 
 
 async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_invoice(
-        title="5 проверок объявлений",
-        description="Доступ к 5 проверкам объявлений об аренде в Европе.",
+        title="10 проверок объявлений",
+        description="Доступ к 10 проверкам объявлений об аренде.",
         payload="pay_stars_9",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="5 проверок", amount=250)],
+        prices=[LabeledPrice(label="10 проверок", amount=900)],
         need_name=False,
-        need_phone_number=False,
-        need_email=False,
     )
 
 
@@ -561,7 +599,7 @@ async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         payload="pay_stars_19",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="Безлимит/мес", amount=500)],
+        prices=[LabeledPrice(label="Безлимит/мес", amount=1900)],
         need_name=False,
         need_phone_number=False,
         need_email=False,
@@ -576,21 +614,21 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     payload = update.message.successful_payment.invoice_payload
 
     if payload == "pay_stars_3":
-        user["balance"] += 1
+        user["balance"] += 3
         user["last_paid_at"] = time.time()
         save_data(data)
         remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
-            f"Оплата через Stars подтверждена! Добавлена 1 проверка. Осталось: {remaining}",
+            f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
             reply_markup=get_keyboard()
         )
     elif payload == "pay_stars_9":
-        user["balance"] += 5
+        user["balance"] += 10
         user["last_paid_at"] = time.time()
         save_data(data)
         remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
-            f"Оплата через Stars подтверждена! Добавлено 5 проверок. Осталось: {remaining}",
+            f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
             reply_markup=get_keyboard()
         )
     elif payload == "pay_stars_19":
@@ -598,7 +636,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         user["last_paid_at"] = time.time()
         save_data(data)
         await update.message.reply_text(
-            "Оплата через Stars подтверждена! Безлимит на месяц активирован!",
+            "Оплата подтверждена! Безлимит на месяц активирован!",
             reply_markup=get_keyboard()
         )
     elif payload == "pay_stars_pdf":
