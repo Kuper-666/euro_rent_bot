@@ -152,6 +152,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
 
+    is_admin = False
+    if update.effective_chat.type in ["group", "supergroup"]:
+        try:
+            member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+            if member.status in ["administrator", "creator"]:
+                is_admin = True
+        except Exception:
+            pass
+
     try:
         system_prompt = get_msg(lang, "system_prompt")
         full_prompt = f"{system_prompt}\n\nListing text:\n{listing_text}"
@@ -161,17 +170,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         result = response.choices[0].message.content
 
-        use_check(user)
-        remaining = calc_remaining(user)
-        save_data(data)
+        if is_admin:
+            save_data(data)
+        else:
+            use_check(user)
+            save_data(data)
 
+        remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
         safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
         remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
-        safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
-        safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
+        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
+        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
+        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
-        full_text = safe_result + safe_footer + safe_balance + safe_share
+        full_text = safe_result + safe_footer + admin_note + safe_balance + safe_share
         parts = split_message(full_text)
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
@@ -205,6 +218,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
 
+        is_admin = False
+        if update.effective_chat.type in ["group", "supergroup"]:
+            try:
+                member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+                if member.status in ["administrator", "creator"]:
+                    is_admin = True
+            except Exception:
+                pass
+
         system_prompt = get_msg(lang, "system_prompt")
         full_prompt = f"{system_prompt}\n\nListing text (from OCR):\n{listing_text}"
         response = client.chat.completions.create(
@@ -213,15 +235,19 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         result = response.choices[0].message.content
 
-        use_check(user)
-        remaining = calc_remaining(user)
-        save_data(data)
+        if is_admin:
+            save_data(data)
+        else:
+            use_check(user)
+            save_data(data)
 
+        remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
         safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
         remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
-        safe_balance = escape_markdown(f"\n\n📊 Осталось проверок: ", version=2) + remaining_text
-        safe_share = escape_markdown(f"\n\n💬 {get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
+        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
+        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
+        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
         full_text = safe_result + safe_footer + safe_balance + safe_share
         parts = split_message(full_text)
