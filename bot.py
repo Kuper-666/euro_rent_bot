@@ -399,7 +399,6 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
     else:
         await update.message.reply_text(text, reply_markup=get_keyboard())
-    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
