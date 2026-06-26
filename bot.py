@@ -378,7 +378,26 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         save_data(data)
         await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard())
     else:
-        await update.message.reply_text(get_msg(lang, "pdf_intro"), reply_markup=get_keyboard())
+        await update.message.reply_text(
+            "PDF-заявление (Mieterprofil) — 100 Stars\n\n"
+            "Оплатите через: /pay_stars_pdf\n\n"
+            "После оплаты отправьте данные.",
+            reply_markup=get_keyboard()
+        )
+
+
+async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_invoice(
+        title="PDF заявление (Mieterprofil)",
+        description="Готовое PDF-заявление на аренду для房东.",
+        payload="pay_stars_pdf",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="PDF заявление", amount=100)],
+        need_name=False,
+        need_phone_number=False,
+        need_email=False,
+    )
 
 
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -548,6 +567,14 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "Оплата через Stars подтверждена! Безлимит на месяц активирован!",
             reply_markup=get_keyboard()
         )
+    elif payload == "pay_stars_pdf":
+        user["pdf_paid"] = True
+        user["pdf_state"] = "awaiting_data"
+        save_data(data)
+        await update.message.reply_text(
+            "Оплата PDF подтверждена! Отправьте данные для заявления.",
+            reply_markup=get_keyboard()
+        )
 
 
 def run_flask():
@@ -618,6 +645,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_stars_3", pay_stars_3))
     application.add_handler(CommandHandler("pay_stars_9", pay_stars_9))
     application.add_handler(CommandHandler("pay_stars_19", pay_stars_19))
+    application.add_handler(CommandHandler("pay_stars_pdf", pay_stars_pdf))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     application.add_handler(CommandHandler("pin", pin_message))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
