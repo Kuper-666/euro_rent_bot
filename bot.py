@@ -339,12 +339,22 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "start"), reply_markup=get_keyboard())
+    logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
+    if os.path.exists(logo_path):
+        with open(logo_path, "rb") as photo:
+            await update.message.reply_photo(photo=photo, caption=get_msg(lang, "start"), reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(get_msg(lang, "start"), reply_markup=get_keyboard())
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
+    icon_path = os.path.join(os.path.dirname(__file__), "icons", "help.png")
+    if os.path.exists(icon_path):
+        with open(icon_path, "rb") as photo:
+            await update.message.reply_photo(photo=photo, caption=get_msg(lang, "help"), reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
 
 
 async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -365,11 +375,17 @@ async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
         "Оплата через Telegram Stars:\n\n"
-        "1 проверка — 100 Stars -> /pay_stars_3\n"
-        "5 проверок — 250 Stars -> /pay_stars_9\n"
-        "Безлимит/мес — 500 Stars -> /pay_stars_19\n\n"
+        "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+        "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+        "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19\n\n"
         "Нажми команду выше для оплаты."
     )
+    icon_path = os.path.join(os.path.dirname(__file__), "icons", "pay.png")
+    if os.path.exists(icon_path):
+        with open(icon_path, "rb") as photo:
+            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(text, reply_markup=get_keyboard())
     await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
@@ -424,17 +440,19 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
+    icon_path = os.path.join(os.path.dirname(__file__), "icons", "pdf.png")
     if user.get("pdf_paid"):
         user["pdf_state"] = "awaiting_data"
         save_data(data)
-        await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard())
+        text = get_msg(lang, "pdf_need_data")
     else:
-        await update.message.reply_text(
-            "PDF-заявление (Mieterprofil) — 100 Stars\n\n"
-            "Оплатите через: /pay_stars_pdf\n\n"
-            "После оплаты отправьте данные.",
-            reply_markup=get_keyboard()
-        )
+        text = "PDF-заявление (Mieterprofil) — 500 Stars (~5EUR)\n\nОплатите: /pay_stars_pdf\n\nПосле оплаты отправьте данные."
+
+    if os.path.exists(icon_path):
+        with open(icon_path, "rb") as photo:
+            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -469,10 +487,17 @@ async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
+    icon_path = os.path.join(os.path.dirname(__file__), "icons", "vip.png")
     if user.get("vip"):
-        await update.message.reply_text("⭐ VIP уже активирован! Критерии: " + user.get("vip_criteria", "не заданы"), reply_markup=get_keyboard())
+        text = "VIP уже активирован! Критерии: " + user.get("vip_criteria", "не заданы")
     else:
-        await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard())
+        text = get_msg(lang, "vip_intro")
+
+    if os.path.exists(icon_path):
+        with open(icon_path, "rb") as photo:
+            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
+    else:
+        await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
