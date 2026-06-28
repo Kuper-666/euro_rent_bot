@@ -1,6 +1,7 @@
 import os
 import asyncio
 import random
+import re
 import feedparser
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -10,6 +11,11 @@ GROUP_ID = int(os.environ.get("GROUP_ID", "-1004303604754"))
 bot = Bot(token=TELEGRAM_TOKEN)
 
 RSS_FEED_URL = "https://www.google.com/alerts/feeds/15276190721492704538/14744967623754419043"
+
+
+def strip_html(text: str) -> str:
+    clean = re.sub(r'<[^>]+>', '', text)
+    return clean.strip()
 
 
 async def send_daily_post():
@@ -28,12 +34,13 @@ async def send_daily_post():
 
         title = entry.title
         link = entry.link
-        summary = entry.summary if hasattr(entry, "summary") else "Подробнее по ссылке"
+        summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
         post_text = (
             f"Доброе утро! Свежее объявление:\n\n"
             f"{title}\n"
             f"{summary[:300]}\n\n"
+            f"Ссылка: {link}\n\n"
             f"Хотите полный разбор?"
         )
 
