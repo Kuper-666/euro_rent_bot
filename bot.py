@@ -94,7 +94,7 @@ def check_followups(user: dict, lang: str) -> str:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    text = update.message.text.strip().lower()
+    text = update.message.text.replace('\xa0', ' ').strip().lower()
     lang = get_lang(update)
 
     btn_map = {
