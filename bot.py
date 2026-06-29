@@ -162,6 +162,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if user_text and is_url(user_text):
         await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=get_keyboard())
         listing_text = fetch_url_text(user_text)
+        if listing_text.startswith("ERROR"):
+            await update.message.reply_text(
+                "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
+                "Скопируйте текст объявления и отправьте его сюда.",
+                reply_markup=get_keyboard()
+            )
+            return
     elif user_text:
         listing_text = user_text
     else:
