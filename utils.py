@@ -56,7 +56,18 @@ def is_url(text: str) -> bool:
     return bool(re.match(r'https?://', text.strip()))
 
 
+def resolve_redirect_url(url: str) -> str:
+    from urllib.parse import urlparse, parse_qs
+    parsed = urlparse(url)
+    if "google" in parsed.hostname and "/url" in parsed.path:
+        params = parse_qs(parsed.query)
+        if "url" in params:
+            return params["url"][0]
+    return url
+
+
 def fetch_url_text(url: str) -> str:
+    url = resolve_redirect_url(url)
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
