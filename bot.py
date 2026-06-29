@@ -343,11 +343,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif query.data == "analyze_rss":
         await query.edit_message_reply_markup(reply_markup=None)
-        bot_username = context.bot.username
-        keyboard = [[InlineKeyboardButton("Открыть бота", url=f"https://t.me/{bot_username}")]]
         await query.message.reply_text(
-            "Отправьте ссылку или текст боту в личку для анализа!",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "Отправьте ссылку на объявление сюда, и я сделаю разбор!",
+            reply_markup=get_keyboard()
         )
 
     elif query.data == "skip_rss":

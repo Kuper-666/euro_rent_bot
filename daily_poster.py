@@ -20,6 +20,9 @@ def strip_html(text: str) -> str:
 
 async def send_daily_post():
     try:
+        me = await bot.get_me()
+        bot_username = me.username
+
         feed = feedparser.parse(RSS_FEED_URL)
 
         if not feed.entries:
@@ -36,6 +39,8 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
+        analyze_url = f"https://t.me/{bot_username}?text={link}"
+
         post_text = (
             f"Доброе утро! Свежее объявление:\n\n"
             f"{title}\n"
@@ -45,7 +50,7 @@ async def send_daily_post():
         )
 
         keyboard = [
-            [InlineKeyboardButton("Да, проанализировать", callback_data=f"analyze_rss")],
+            [InlineKeyboardButton("Да, проанализировать", url=analyze_url)],
             [InlineKeyboardButton("Нет, спасибо", callback_data="skip_rss")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
