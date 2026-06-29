@@ -10,7 +10,7 @@ from telegram import (
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ChatMemberHandler, filters, ContextTypes
+    ChatMemberHandler, PreCheckoutQueryHandler, filters, ContextTypes
 )
 from groq import Groq
 
@@ -19,7 +19,7 @@ from messages import get_msg
 from utils import (
     load_data, save_data, get_lang, get_user_data,
     can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
-    calc_remaining
+    calc_remaining, check_rate_limit, sanitize_pdf_input
 )
 from pdf_generator import generate_mieterprofil_pdf
 from web import app
@@ -70,23 +70,27 @@ def split_message(text: str, max_len: int = 4000) -> list:
 def check_followups(user: dict, lang: str) -> str:
     now = time.time()
     last_paid = user.get("last_paid_at", 0)
-    if not last_paid:
+    free_used = user.get("free_used", 0)
+    balance = user.get("balance", 0)
+
+    if balance == -1:
         return ""
 
-    balance = user.get("balance", 0)
-    days_since = (now - last_paid) / 86400
+    if balance > 0 and last_paid:
+        days_since = (now - last_paid) / 86400
+        if 2.5 <= days_since <= 4:
+            return (
+                "Вы использовали часть проверок из пакета.\n"
+                "Хотите докупить? /pay\n"
+            )
 
-    if balance == 1 and 2.5 <= days_since <= 4:
+    if free_used >= FREE_LIMIT and balance == 0:
         return (
-            "Вы использовали 1 проверку из пакета.\n"
-            "Хотите купить пакет на 5 проверок со скидкой 40%?\n"
-            "Отправьте /pay_9"
-        )
-
-    if balance == 0 and 6 <= days_since <= 8:
-        return (
-            "Ваш анализ всё ещё доступен.\n"
-            "Вы можете оформить подписку и получать подборки ежедневно!\n"
+            "Все бесплатные проверки использованы.\n\n"
+            "Пакеты и цены:\n"
+            "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+            "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19\n\n"
             "Подробнее: /pay"
         )
 
@@ -164,6 +168,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(get_msg(lang, "send_listing"), reply_markup=get_keyboard())
         return
 
+    if len(listing_text) < 10:
+        await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=get_keyboard())
+        return
+
+    allowed, wait = check_rate_limit(user_id)
+    if not allowed:
+        await update.message.reply_text(
+            f"⏳ Подождите {int(wait)} сек. перед следующим анализом.",
+            reply_markup=get_keyboard()
+        )
+        return
+
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
 
     is_admin = False
@@ -226,6 +242,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if not can_use(user):
         await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
+        return
+
+    allowed, wait = check_rate_limit(user_id)
+    if not allowed:
+        await update.message.reply_text(
+            f"⏳ Подождите {int(wait)} сек. перед следующим анализом.",
+            reply_markup=get_keyboard()
+        )
         return
 
     await update.message.reply_text(get_msg(lang, "ocr_processing"), reply_markup=get_keyboard())
@@ -535,7 +559,7 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    user["balance"] += 1
+    user["balance"] += 3
     user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
@@ -548,7 +572,7 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    user["balance"] += 5
+    user["balance"] += 10
     user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
@@ -568,6 +592,7 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 def parse_pdf_data(text: str) -> dict:
+    text = sanitize_pdf_input(text)
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     data = {}
     keys = ["name", "dob", "phone", "email", "address", "employer", "income", "occupants"]
@@ -623,6 +648,15 @@ async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
     except Exception:
         await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.pre_checkout_query
+    valid_payloads = {"pay_stars_3", "pay_stars_9", "pay_stars_19", "pay_stars_pdf", "pay_stars_vip"}
+    if query.invoice_payload in valid_payloads:
+        await query.answer(ok=True)
+    else:
+        await query.answer(ok=False, error_message="Неизвестный способ оплаты. Попробуйте снова.")
 
 
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -741,6 +775,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_9", pay_9))
     application.add_handler(CommandHandler("pay_19", pay_19))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(CommandHandler("pin", pin_message))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
