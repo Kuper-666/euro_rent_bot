@@ -63,6 +63,10 @@ MESSAGES = {
         "vip_intro": "VIP-подписка — 1500 Stars (~15EUR/мес)\n\nЕжедневная подборка объявлений по вашим критериям.\n\nЧто входит:\n- До 10 проверенных объявлений в день\n- Фильтр по городу, цене, площади\n- Предупреждения о мошенниках\n- Безлимитные проверки",
         "pay_done_vip": "VIP активирован!\n\nОтправьте мне критерии поиска:\n- Город\n- Макс. цена\n- Мин. площадь\n- Количество комнат",
         "vip_ask_criteria": "Отправьте критерии поиска:\n\n- Город\n- Макс. цена (EUR/мес)\n- Мин. площадь (м2)\n- Количество комнат\n\nПример: Берлин, 800EUR, 40м2, 2 комнаты",
+        "pay_pdf": "PDF-заявление (Mieterprofil) — 500 Stars (~5EUR)\n\nОплатите: /pay_stars_pdf\n\nПосле оплаты отправьте данные.",
+        "pay_vip": "VIP-подписка — 1500 Stars (~15EUR/мес)\n\nОплатите: /pay_stars_vip\n\nПосле оплаты отправьте критерии.",
+        "pay_stars_pdf": "PDF-заявление (Mieterprofil) — 500 Stars (~5EUR)\n\nНажмите /pay_stars_pdf для оплаты.",
+        "pay_stars_vip": "VIP-подписка — 1500 Stars (~15EUR/мес)\n\nНажмите /pay_stars_vip для оплаты.",
         "system_prompt": (
             "Ты — профессиональный консультант по недвижимости с 10-летним опытом в Европе. "
             "Отвечай на русском языке.\n\n"
@@ -127,6 +131,10 @@ MESSAGES = {
         "vip_intro": "VIP — 1500 Stars (~15EUR/міс)\n\nЩоденна підбірка оголошень.\n\nЩо входить:\n- До 10 перевірених оголошень на день\n- Фільтр за містом, ціною\n- Попередження про шахраїв\n- Безлімітні перевірки",
         "pay_done_vip": "VIP активовано!\n\nНадішліть критерії:\n- Місто\n- Макс. ціна\n- Мін. площа\n- Кімнати",
         "vip_ask_criteria": "Критерії:\n\n- Місто\n- Макс. ціна (EUR/міс)\n- Мін. площа (м2)\n- Кімнати",
+        "pay_pdf": "PDF-заява (Mieterprofil) — 500 Stars (~5EUR)\n\nОплатіть: /pay_stars_pdf\n\nПісля оплати надішліть дані.",
+        "pay_vip": "VIP-підписка — 1500 Stars (~15EUR/міс)\n\nОплатіть: /pay_stars_vip\n\nПісля оплати надішліть критерії.",
+        "pay_stars_pdf": "PDF-заява (Mieterprofil) — 500 Stars (~5EUR)\n\nНатисніть /pay_stars_pdf для оплати.",
+        "pay_stars_vip": "VIP-підписка — 1500 Stars (~15EUR/міс)\n\nНатисніть /pay_stars_vip для оплати.",
         "system_prompt": (
             "Ти — професійний консультант з нерухомості з 10-річним досвідом в Європі. "
             "Відповідай українською.\n\n"
@@ -191,6 +199,10 @@ MESSAGES = {
         "vip_intro": "VIP — 1500 Stars (~15EUR/month)\n\nDaily curated listings.\n\nWhat's included:\n- Up to 10 verified listings per day\n- Filter by city, price\n- Scam alerts\n- Unlimited checks",
         "pay_done_vip": "VIP activated!\n\nSend criteria:\n- City\n- Max price\n- Min area\n- Rooms",
         "vip_ask_criteria": "Criteria:\n\n- City\n- Max price (EUR/month)\n- Min area (m2)\n- Rooms",
+        "pay_pdf": "PDF Application (Mieterprofil) — 500 Stars (~5EUR)\n\nPay: /pay_stars_pdf\n\nAfter payment send your data.",
+        "pay_vip": "VIP Subscription — 1500 Stars (~15EUR/month)\n\nPay: /pay_stars_vip\n\nAfter payment send your criteria.",
+        "pay_stars_pdf": "PDF Application (Mieterprofil) — 500 Stars (~5EUR)\n\nTap /pay_stars_pdf to pay.",
+        "pay_stars_vip": "VIP Subscription — 1500 Stars (~15EUR/month)\n\nTap /pay_stars_vip to pay.",
         "system_prompt": (
             "You are a professional real estate consultant with 10 years of experience in Europe. "
             "Respond in English.\n\n"
@@ -255,6 +267,10 @@ MESSAGES = {
         "vip_intro": "VIP — 1500 Stars (~15EUR/Monat)\n\nTaegliche Angebote.\n\nEnthalten:\n- Bis zu 10 gepruefte Angebote\n- Filter Stadt, Preis\n- Betrugswarnungen\n- Unbegrenzt",
         "pay_done_vip": "VIP aktiviert!\n\nSuchkriterien:\n- Stadt\n- Max. Preis\n- Flaeche\n- Zimmer",
         "vip_ask_criteria": "Kriterien:\n\n- Stadt\n- Max. Preis (EUR/Monat)\n- Flaeche (m2)\n- Zimmer",
+        "pay_pdf": "PDF-Antrag (Mieterprofil) — 500 Stars (~5EUR)\n\nBezahlen: /pay_stars_pdf\n\nNach Zahlung Daten senden.",
+        "pay_vip": "VIP-Abo — 1500 Stars (~15EUR/Monat)\n\nBezahlen: /pay_stars_vip\n\nNach Zahlung Kriterien senden.",
+        "pay_stars_pdf": "PDF-Antrag (Mieterprofil) — 500 Stars (~5EUR)\n\nTippe /pay_stars_pdf zum Bezahlen.",
+        "pay_stars_vip": "VIP-Abo — 1500 Stars (~15EUR/Monat)\n\nTippe /pay_stars_vip zum Bezahlen.",
         "system_prompt": (
             "Du bist Immobilienberater mit 10 Jahren Erfahrung in Europa. "
             "Antworte auf Deutsch.\n\n"
@@ -319,6 +335,10 @@ MESSAGES = {
         "vip_intro": "VIP — 1500 Stars (~15EUR/mies)\n\nCodzienne listy.\n\nCo zawiera:\n- Do 10 sprawdzonych ofert\n- Filtr miasto, cena\n- Ostrzezenia\n- Nieograniczone sprawdzenia",
         "pay_done_vip": "VIP aktywowany!\n\nKryteria:\n- Miasto\n- Maks. cena\n- Powierzchnia\n- Pokoje",
         "vip_ask_criteria": "Kryteria:\n\n- Miasto\n- Maks. cena (EUR/mies)\n- Powierzchnia (m2)\n- Pokoje",
+        "pay_pdf": "PDF-wniosek (Mieterprofil) — 500 Stars (~5EUR)\n\nZaplac: /pay_stars_pdf\n\nPo opacie wyslij dane.",
+        "pay_vip": "VIP — 1500 Stars (~15EUR/mies)\n\nZaplac: /pay_stars_vip\n\nPo opacie wyslij kryteria.",
+        "pay_stars_pdf": "PDF-wniosek (Mieterprofil) — 500 Stars (~5EUR)\n\nKliknij /pay_stars_pdf aby zaplacic.",
+        "pay_stars_vip": "VIP — 1500 Stars (~15EUR/mies)\n\nKliknij /pay_stars_vip aby zaplacic.",
         "system_prompt": (
             "Jestes konsultantem ds. nieruchomosci z 10-letnim doswiadczeniem w Europie. "
             "Odpowiadaj po polsku.\n\n"

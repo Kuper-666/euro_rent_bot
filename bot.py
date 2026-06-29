@@ -235,6 +235,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=get_keyboard())
         return
 
+    save_data(data)
+
     allowed, wait = check_rate_limit(user_id)
     if not allowed:
         await update.message.reply_text(
@@ -256,6 +258,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not can_use(user):
         await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
         return
+
+    save_data(data)
 
     allowed, wait = check_rate_limit(user_id)
     if not allowed:
@@ -473,7 +477,7 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_invoice(
         title="PDF заявление (Mieterprofil)",
-        description="Готовое PDF-заявление на аренду для房东.",
+        description="Готовое PDF-заявление на аренду для арендодателя.",
         payload="pay_stars_pdf",
         provider_token="",
         currency="XTR",
