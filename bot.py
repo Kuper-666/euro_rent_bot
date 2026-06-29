@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 from groq import Groq
 
-from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE
+from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT
 from messages import get_msg
 from utils import (
     load_data, save_data, get_lang, get_user_data,
@@ -623,32 +623,6 @@ async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
     except Exception:
         await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
-
-
-async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="10 проверок объявлений",
-        description="Доступ к 10 проверкам объявлений об аренде.",
-        payload="pay_stars_9",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="10 проверок", amount=900)],
-        need_name=False,
-    )
-
-
-async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="Безлимит на месяц",
-        description="Безлимитные проверки объявлений на 1 месяц.",
-        payload="pay_stars_19",
-        provider_token="",
-        currency="XTR",
-        prices=[LabeledPrice(label="Безлимит/мес", amount=1900)],
-        need_name=False,
-        need_phone_number=False,
-        need_email=False,
-    )
 
 
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
