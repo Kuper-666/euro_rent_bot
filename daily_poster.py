@@ -39,7 +39,7 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        analyze_url = f"https://t.me/{bot_username}?text={link}"
+        analyze_url = f"https://t.me/{bot_username}?start=analyze_{link}"
 
         post_text = (
             f"Доброе утро! Свежее объявление:\n\n"

@@ -67,6 +67,62 @@ def split_message(text: str, max_len: int = 4000) -> list:
     return parts
 
 
+async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_text: str, user_id: str, lang: str) -> None:
+    data = load_data()
+    user = get_user_data(data, user_id)
+
+    is_admin = False
+    if update.effective_chat.type in ["group", "supergroup"]:
+        try:
+            member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
+            if member.status in ["administrator", "creator"]:
+                is_admin = True
+        except Exception:
+            pass
+
+    try:
+        system_prompt = get_msg(lang, "system_prompt")
+        full_prompt = f"{system_prompt}\n\nListing text:\n{listing_text}"
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": full_prompt}]
+        )
+        result = response.choices[0].message.content
+
+        if is_admin:
+            save_data(data)
+        else:
+            use_check(user)
+            save_data(data)
+
+        remaining = calc_remaining(user)
+        safe_result = escape_markdown(result, version=2)
+        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
+        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
+        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
+        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
+        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
+
+        full_text = safe_result + safe_footer + admin_note + safe_balance + safe_share
+        parts = split_message(full_text)
+        for i, part in enumerate(parts):
+            markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
+            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
+
+    except Exception as e:
+        if "insufficient_quota" in str(e) or "429" in str(e):
+            await update.message.reply_text(
+                "Извините, анализатор сейчас перегружен.\n\n"
+                "Попробуйте отправить объявление через 5-10 минут — я обязательно отвечу!\n\n"
+                "А пока можете:\n"
+                "- Прочитать /help о тарифах\n"
+                "- Отправить ссылку позже",
+                reply_markup=get_keyboard()
+            )
+        else:
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+
+
 def check_followups(user: dict, lang: str) -> str:
     now = time.time()
     last_paid = user.get("last_paid_at", 0)
@@ -188,57 +244,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
-
-    is_admin = False
-    if update.effective_chat.type in ["group", "supergroup"]:
-        try:
-            member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
-            if member.status in ["administrator", "creator"]:
-                is_admin = True
-        except Exception:
-            pass
-
-    try:
-        system_prompt = get_msg(lang, "system_prompt")
-        full_prompt = f"{system_prompt}\n\nListing text:\n{listing_text}"
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": full_prompt}]
-        )
-        result = response.choices[0].message.content
-
-        if is_admin:
-            save_data(data)
-        else:
-            use_check(user)
-            save_data(data)
-
-        remaining = calc_remaining(user)
-        safe_result = escape_markdown(result, version=2)
-        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
-        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
-        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
-        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
-
-        full_text = safe_result + safe_footer + admin_note + safe_balance + safe_share
-        parts = split_message(full_text)
-        for i, part in enumerate(parts):
-            markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
-            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
-
-    except Exception as e:
-        if "insufficient_quota" in str(e) or "429" in str(e):
-            await update.message.reply_text(
-                "Извините, анализатор сейчас перегружен.\n\n"
-                "Попробуйте отправить объявление через 5-10 минут — я обязательно отвечу!\n\n"
-                "А пока можете:\n"
-                "- Прочитать /help о тарифах\n"
-                "- Отправить ссылку позже",
-                reply_markup=get_keyboard()
-            )
-        else:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+    await process_listing(update, context, listing_text, user_id, lang)
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -261,67 +267,17 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(get_msg(lang, "ocr_processing"), reply_markup=get_keyboard())
 
-    try:
-        photo = update.message.photo[-1]
-        file = await context.bot.get_file(photo.file_id)
-        photo_bytes = await file.download_as_bytearray()
-        listing_text = ocr_from_photo(bytes(photo_bytes))
+    photo = update.message.photo[-1]
+    file = await context.bot.get_file(photo.file_id)
+    photo_bytes = await file.download_as_bytearray()
+    listing_text = ocr_from_photo(bytes(photo_bytes))
 
-        if not listing_text or listing_text.startswith("ERROR"):
-            await update.message.reply_text("❌ Не удалось распознать текст. Попробуйте отправить текст или ссылку.", reply_markup=get_keyboard())
-            return
+    if not listing_text or listing_text.startswith("ERROR"):
+        await update.message.reply_text("❌ Не удалось распознать текст. Попробуйте отправить текст или ссылку.", reply_markup=get_keyboard())
+        return
 
-        await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
-
-        is_admin = False
-        if update.effective_chat.type in ["group", "supergroup"]:
-            try:
-                member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
-                if member.status in ["administrator", "creator"]:
-                    is_admin = True
-            except Exception:
-                pass
-
-        system_prompt = get_msg(lang, "system_prompt")
-        full_prompt = f"{system_prompt}\n\nListing text (from OCR):\n{listing_text}"
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": full_prompt}]
-        )
-        result = response.choices[0].message.content
-
-        if is_admin:
-            save_data(data)
-        else:
-            use_check(user)
-            save_data(data)
-
-        remaining = calc_remaining(user)
-        safe_result = escape_markdown(result, version=2)
-        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
-        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
-        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
-        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
-
-        full_text = safe_result + safe_footer + safe_balance + safe_share
-        parts = split_message(full_text)
-        for i, part in enumerate(parts):
-            markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
-            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
-
-    except Exception as e:
-        if "insufficient_quota" in str(e) or "429" in str(e):
-            await update.message.reply_text(
-                "Извините, анализатор сейчас перегружен.\n\n"
-                "Попробуйте отправить объявление через 5-10 минут — я обязательно отвечу!\n\n"
-                "А пока можете:\n"
-                "- Прочитать /help о тарифах\n"
-                "- Отправить ссылку позже",
-                reply_markup=get_keyboard()
-            )
-        else:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
+    await process_listing(update, context, listing_text, user_id, lang)
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -381,6 +337,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
+
+    if context.args and len(context.args) > 0:
+        payload = context.args[0]
+        if payload.startswith("analyze_"):
+            url = payload[len("analyze_"):]
+            if is_url(url):
+                await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=get_keyboard())
+                listing_text = fetch_url_text(url)
+                if listing_text.startswith("ERROR"):
+                    await update.message.reply_text(
+                        "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
+                        "Скопируйте текст объявления и отправьте его сюда.",
+                        reply_markup=get_keyboard()
+                    )
+                    return
+                await process_listing(update, context, listing_text, user_id=str(update.effective_user.id), lang=lang)
+                return
+
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as photo:
