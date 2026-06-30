@@ -1,8 +1,9 @@
 import os
+import json
 import asyncio
 import random
 import re
-from urllib.parse import quote
+import time
 import feedparser
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -13,10 +14,36 @@ bot = Bot(token=TELEGRAM_TOKEN)
 
 RSS_FEED_URL = "https://www.google.com/alerts/feeds/15276190721492704538/14744967623754419043"
 
+PENDING_FILE = "pending_listings.json"
+
 
 def strip_html(text: str) -> str:
     clean = re.sub(r'<[^>]+>', '', text)
     return clean.strip()
+
+
+def load_pending():
+    if os.path.exists(PENDING_FILE):
+        with open(PENDING_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def save_pending(data):
+    # Очищаем записи старше 1 часа
+    now = time.time()
+    data = {k: v for k, v in data.items() if now - v.get("ts", 0) < 3600}
+    with open(PENDING_FILE, "w") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def store_listing(url: str, title: str = "") -> str:
+    """Сохраняет ссылку и возвращает короткий ID для callback_data."""
+    pending = load_pending()
+    short_id = f"rss_{len(pending) + 1}_{int(time.time()) % 10000}"
+    pending[short_id] = {"url": url, "title": title, "ts": time.time()}
+    save_pending(pending)
+    return short_id
 
 
 async def send_daily_post():
@@ -40,12 +67,8 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        # URL-кодируем ссылку для безопасной передачи через ?start=
-        encoded_link = quote(link, safe="")
-        analyze_url = f"https://t.me/{bot_username}?start=analyze_{encoded_link}"
-
-        # Альтернатива: открываем бота с инструкцией
-        bot_url = f"https://t.me/{bot_username}"
+        # Сохраняем ссылку и получаем ID для кнопки
+        short_id = store_listing(link, title)
 
         post_text = (
             f"Доброе утро! Свежее объявление:\n\n"
@@ -56,8 +79,8 @@ async def send_daily_post():
         )
 
         keyboard = [
-            [InlineKeyboardButton("Да, проанализировать", url=analyze_url)],
-            [InlineKeyboardButton("Нет, спасибо", callback_data="skip_rss")],
+            [InlineKeyboardButton("🔍 Да, проанализировать", callback_data=f"analyze_rss:{short_id}")],
+            [InlineKeyboardButton("❌ Нет, спасибо", callback_data="skip_ad")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 

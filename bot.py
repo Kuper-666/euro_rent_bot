@@ -39,6 +39,22 @@ client = Groq(api_key=GROQ_API_KEY)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# Словарь для хранения ссылок из постов (message_id -> url)
+_pending_listings = {}
+PENDING_FILE = "pending_listings.json"
+
+
+def _load_pending_listings():
+    if os.path.exists(PENDING_FILE):
+        with open(PENDING_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_pending_listings(data):
+    with open(PENDING_FILE, "w") as f:
+        json.dump(data, f, ensure_ascii=False)
+
 
 def get_keyboard():
     keyboard = [
@@ -326,64 +342,93 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     lang = get_lang(update)
+    user_id = str(update.effective_user.id)
 
-    if query.data == "new":
+    data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
+
+    # Кнопка "Ещё одно объявление" — в личку
+    if data_prefix == "new":
         await query.edit_message_reply_markup(reply_markup=None)
-        user_id = str(update.effective_user.id)
         data = load_data()
         user = get_user_data(data, user_id)
         remaining = calc_remaining(user)
-        await query.message.reply_text(
-            f"🔍 Готов к анализу!\n\n"
-            f"Отправьте ссылку на объявление или текст объявления.\n"
-            f"Осталось проверок: {remaining}",
-            reply_markup=get_keyboard()
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🔍 Готов к анализу!\n\n"
+                "Отправьте ссылку на объявление или текст.\n"
+                f"Осталось проверок: {remaining}"
+            ),
+            reply_markup=get_keyboard(),
         )
 
-    elif query.data == "analyze_ad":
+    # Кнопка "Проанализировать" из группы — отправляем в ЛИЧКУ
+    elif data_prefix in ("analyze_ad", "analyze_rss"):
         await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text("Отправьте текст объявления или ссылку в личку боту!", reply_markup=get_keyboard())
-
-    elif query.data == "skip_ad":
-        await query.edit_message_reply_markup(reply_markup=None)
-        await query.answer("Ок", show_alert=False)
-
-    elif query.data == "analyze_rss":
-        await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(
-            "Отправьте ссылку на объявление сюда, и я сделаю разбор!",
-            reply_markup=get_keyboard()
-        )
-
-    elif query.data == "skip_rss":
-        await query.edit_message_reply_markup(reply_markup=None)
-        await query.answer("Хорошо, как известите!", show_alert=False)
-
-    elif query.data == "share":
-        bot_username = context.bot.username
-        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+ExpatRentBot+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
-        await query.message.reply_text(
-            f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
-            reply_markup=get_keyboard()
-        )
-
-    elif query.data == "copy":
-        await query.answer("Скопируйте текст выше 👆", show_alert=True)
-
-    elif query.data == "pdf":
-        user_id = str(update.effective_user.id)
         data = load_data()
         user = get_user_data(data, user_id)
-        await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(get_msg(lang, "pay_pdf"), reply_markup=get_keyboard())
 
-    elif query.data.startswith("show_pay_"):
-        await query.edit_message_reply_markup(reply_markup=None)
-        plan = query.data.replace("show_pay_", "")
+        if not can_use(user):
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=(
+                    "❌ У вас закончились проверки.\n\n"
+                    "Пакеты:\n"
+                    "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+                    "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+                    "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
+                ),
+            )
+            return
+
+        remaining = calc_remaining(user)
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🔍 Анализ готов!\n\n"
+                "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
+                f"📊 Осталось проверок: {remaining}"
+            ),
+            reply_markup=get_keyboard(),
+        )
+
+    # Кнопка "Пропустить"
+    elif data_prefix == "skip_ad":
+        await query.answer("Ок", show_alert=False)
+
+    # Кнопка "Скопировать"
+    elif data_prefix == "copy":
+        await query.answer("Скопируйте текст выше", show_alert=True)
+
+    # Кнопка "Поделиться"
+    elif data_prefix == "share":
+        bot_username = context.bot.username
+        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+EuroRent+AI+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
+            reply_markup=get_keyboard(),
+        )
+
+    # Кнопка "PDF"
+    elif data_prefix == "pdf":
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=get_msg(lang, "pay_pdf"),
+            reply_markup=get_keyboard(),
+        )
+
+    # Кнопки оплаты
+    elif data_prefix.startswith("show_pay_"):
+        plan = data_prefix.replace("show_pay_", "")
         msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
         if plan == "vip":
             msg_key = "vip_intro"
-        await query.message.reply_text(get_msg(lang, msg_key), reply_markup=get_keyboard())
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=get_msg(lang, msg_key),
+            reply_markup=get_keyboard(),
+        )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -859,6 +904,66 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
     subs = get_active_subscribers()
     await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
+
+
+# ============================================================================
+# ОБРАБОТЧИК КНОПОК ИЗ ГРУПП (личные сообщения)
+# ============================================================================
+
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Нажатие кнопки 'Проанализировать' в группе → личное сообщение."""
+    query = update.callback_query
+    await query.answer()
+
+    data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
+
+    if data_prefix in ("analyze_ad", "analyze_rss"):
+        user_id = str(update.effective_user.id)
+        user_data = load_data()
+        user = get_user_data(user_data, user_id)
+
+        if not can_use(user):
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text="❌ У вас закончились проверки.\n\n"
+                     "Пакеты:\n"
+                     "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+                     "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+                     "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
+            )
+            return
+
+        remaining = calc_remaining(user)
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🔍 Анализ готов!\n\n"
+                "Отправьте мне ссылку на объявление или текст прямо сюда в личку.\n\n"
+                f"📊 Осталось проверок: {remaining}"
+            ),
+            reply_markup=get_keyboard(),
+        )
+
+    elif data_prefix == "copy":
+        await query.answer("Скопируйте текст выше", show_alert=True)
+
+    elif data_prefix == "new":
+        user_id = str(update.effective_user.id)
+        user_data = load_data()
+        user = get_user_data(user_data, user_id)
+        remaining = calc_remaining(user)
+        await context.bot.send_message(
+            chat_id=int(user_id),
+            text=(
+                "🔍 Готов к анализу!\n\n"
+                "Отправьте ссылку на объявление или текст.\n"
+                f"Осталось проверок: {remaining}"
+            ),
+            reply_markup=get_keyboard(),
+        )
+
+    elif data_prefix == "skip_ad":
+        await query.answer("Ок", show_alert=False)
 
 
 if __name__ == "__main__":
