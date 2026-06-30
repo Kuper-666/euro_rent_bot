@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -17,6 +20,16 @@ AFFILIATE_WISE = "https://wise.com/invite/arhc/radikm15"
 
 PDF_PRICE = 5
 VIP_PRICE = 15
+
+# Channel posting
+CHANNEL_ID = os.getenv("CHANNEL_ID", "")
+
+# Email newsletter
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai>")
 
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")

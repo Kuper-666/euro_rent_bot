@@ -8,5 +8,81 @@ services:
     envVars:
       - key: TELEGRAM_TOKEN
         sync: false
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
+      - key: WEBHOOK_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: CITY_CHANNELS
+        value: '{}'
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NEWSLETTER_FROM
+        value: EuroRent AI <noreply@eurorent.ai>
+      - key: ADMIN_ID
+        sync: false
+
+  - type: cron
+    name: channel-poster-morning
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 9 * * *"
+    startCommand: python channel_poster.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: CITY_CHANNELS
+        sync: false
+
+  - type: cron
+    name: channel-poster-evening
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 18 * * *"
+    startCommand: python channel_poster.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: CITY_CHANNELS
+        sync: false
+
+  - type: cron
+    name: email-newsletter
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 10 * * 1"
+    startCommand: python email_newsletter.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NEWSLETTER_FROM
+        value: EuroRent AI <noreply@eurorent.ai>

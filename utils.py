@@ -1,17 +1,33 @@
 import re
 import time
+import hashlib
 import requests
 from bs4 import BeautifulSoup
 import pytesseract
 from PIL import Image
 from io import BytesIO
 from telegram import Update
+from collections import OrderedDict
 
 from config import FREE_LIMIT, SUBSCRIPTION_DAYS, GROQ_RATE_LIMIT_SECONDS
 from messages import DEFAULT_LANG, MESSAGES
 from storage import load_data, save_data
 
-_last_groq_call: dict[str, float] = {}
+
+class LimitedDict(OrderedDict):
+    def __init__(self, max_size=100000):
+        super().__init__()
+        self.max_size = max_size
+
+    def __setitem__(self, key, value):
+        if key in self:
+            del self[key]
+        elif len(self) >= self.max_size:
+            self.popitem(last=False)
+        super().__setitem__(key, value)
+
+
+_last_groq_call = LimitedDict(max_size=100000)
 
 
 def get_lang(update: Update) -> str:
@@ -116,3 +132,34 @@ def sanitize_pdf_input(text: str) -> str:
     text = re.sub(r'[^\w\s.,@+\-()/üöäÜÖÄßéèêëàâîïôûùçñÿäëöüÉÈÊËÀÂÎÏÔÛÙÇÑÿÄËÖÜ\-\n\r]', '', text)
     lines = text.strip().split('\n')
     return '\n'.join(line.strip() for line in lines if line.strip())
+
+
+def clean_text(text: str) -> str:
+    return text.replace('\xa0', ' ').replace('\u200b', '').strip()
+
+
+def validate_pdf_data(data: dict) -> tuple[bool, str]:
+    required_fields = ["name", "dob", "phone", "email", "address", "employer", "income", "occupants"]
+    missing = [f for f in required_fields if not data.get(f, "").strip()]
+    if missing:
+        return False, f"Отсутствуют данные: {', '.join(missing)}"
+    if len(data.get("name", "").strip()) < 3:
+        return False, "Имя должно быть минимум 3 символа"
+    if len(data.get("email", "").strip()) < 5 or "@" not in data.get("email", ""):
+        return False, "Некорректный email"
+    if len(data.get("phone", "").strip()) < 5:
+        return False, "Некорректный номер телефона"
+    return True, ""
+
+
+def is_pdf_state_expired(user: dict, timeout_seconds: int = 1800) -> bool:
+    if user.get("pdf_state") != "awaiting_data":
+        return False
+    pdf_started = user.get("pdf_started_at", 0)
+    if not pdf_started:
+        return True
+    return (time.time() - pdf_started) > timeout_seconds
+
+
+def hash_user_id(user_id: str, salt: str = "eurorent2024") -> str:
+    return hashlib.sha256(f"{user_id}{salt}".encode()).hexdigest()[:16]

@@ -31,6 +31,15 @@ MESSAGES = {
             "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19\n"
             "PDF-заявление — 500 Stars (~5EUR) -> /pdf\n"
             "VIP-подписка — 1500 Stars (~15EUR/мес) -> /vip\n\n"
+            "Дайджест по email:\n"
+            "Каждую неделю — подборка лучших объявлений.\n"
+            "Подписаться: /subscribe_email your@email.com\n"
+            "Отписаться: /unsubscribe_email\n\n"
+            "Фильтр по городу:\n"
+            "/set_city berlin — показывать только Берлин\n"
+            "/my_city — ваш город и тренд цен\n"
+            "/trend berlin — тренд цен по городу\n"
+            "/holygrail — идеальные квартиры\n\n"
             "Официальная страница: euro-rent-bot.onrender.com\n\n"
             "Готов начать? Просто пришли мне любое объявление прямо сейчас!"
         ),
@@ -169,6 +178,10 @@ MESSAGES = {
             "Unlimited/month — 1900 Stars (~19EUR) -> /pay_19\n"
             "PDF Application — 500 Stars (~5EUR) -> /pdf\n"
             "VIP Subscription — 1500 Stars (~15EUR/month) -> /vip\n\n"
+            "Weekly email digest:\n"
+            "Best listings every week.\n"
+            "Subscribe: /subscribe_email your@email.com\n"
+            "Unsubscribe: /unsubscribe_email\n\n"
             "Ready? Send me a listing!"
         ),
         "analyzing": "Analyzing listing...",

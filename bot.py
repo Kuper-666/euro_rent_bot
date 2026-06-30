@@ -1,7 +1,9 @@
 import os
+import re
 import logging
 import threading
 import time
+import hashlib
 from io import BytesIO
 from telegram.helpers import escape_markdown
 from telegram import (
@@ -22,6 +24,13 @@ from utils import (
     calc_remaining, check_rate_limit, sanitize_pdf_input
 )
 from pdf_generator import generate_mieterprofil_pdf
+from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
+from listing_features import (
+    cmd_set_city, cmd_remove_city, cmd_my_city, cmd_trend, cmd_holygrail,
+    get_user_city, filter_by_city, detect_city, record_listing, is_holy_grail,
+    format_holy_grail_alert, extract_price, record_price, extract_score,
+    POPULAR_CITIES
+)
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -89,6 +98,32 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         )
         result = response.choices[0].message.content
 
+        # Определяем город и цену для трендов
+        city_key = detect_city(listing_text)
+        price = extract_price(listing_text)
+        if city_key and price:
+            record_price(city_key, price)
+        record_listing(
+            url=listing_text[:200],
+            city=city_key or "",
+            price=price or 0,
+            score=extract_score(result) if result else 5,
+            text=listing_text,
+        )
+
+        # Добавляем примечание о городе
+        city_note = ""
+        if city_key:
+            from listing_features import POPULAR_CITIES, is_good_deal
+            ci = POPULAR_CITIES[city_key]
+            city_note = f"\n\n🏙 Город: {ci['emoji']} {ci['name']}"
+            if price and ci.get("avg_price"):
+                ratio = price / ci["avg_price"]
+                if ratio < 0.75:
+                    city_note += f"\n🔥 Цена {price} EUR — ниже средней ({ratio:.0%})"
+                elif ratio < 0.9:
+                    city_note += f"\n💰 Цена {price} EUR — ниже средней"
+
         if is_admin:
             save_data(data)
         else:
@@ -103,7 +138,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
         safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
 
-        full_text = safe_result + safe_footer + admin_note + safe_balance + safe_share
+        full_text = safe_result + city_note + safe_footer + admin_note + safe_balance + safe_share
         parts = split_message(full_text)
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
@@ -291,7 +326,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if query.data == "new":
         await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(get_msg(lang, "send_listing"), reply_markup=get_keyboard())
+        user_id = str(update.effective_user.id)
+        data = load_data()
+        user = get_user_data(data, user_id)
+        remaining = calc_remaining(user)
+        await query.message.reply_text(
+            f"🔍 Готов к анализу!\n\n"
+            f"Отправьте ссылку на объявление или текст объявления.\n"
+            f"Осталось проверок: {remaining}",
+            reply_markup=get_keyboard()
+        )
 
     elif query.data == "analyze_ad":
         await query.edit_message_reply_markup(reply_markup=None)
@@ -342,6 +386,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
 
+    user_id = str(update.effective_user.id)
+    data = load_data()
+
+    if user_id not in data:
+        data[user_id] = {"free_used": 0, "balance": 0}
+        data[user_id]["ref_code"] = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
+        save_data(data)
+
     if context.args and len(context.args) > 0:
         payload = context.args[0]
         if payload.startswith("analyze_"):
@@ -356,8 +408,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         reply_markup=get_keyboard()
                     )
                     return
-                await process_listing(update, context, listing_text, user_id=str(update.effective_user.id), lang=lang)
+                await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
                 return
+        elif payload.startswith("ref_"):
+            ref_code = payload
+            referrer_id = None
+            for uid, u in data.items():
+                if u.get("ref_code") == ref_code:
+                    referrer_id = uid
+                    break
+            if referrer_id and referrer_id != user_id:
+                referrer = data.setdefault(referrer_id, {"free_used": 0, "balance": 0})
+                referrals = referrer.setdefault("referrals", [])
+                if user_id not in referrals:
+                    referrals.append(user_id)
+                    reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
+                    if reward == -1:
+                        referrer["balance"] = -1
+                        referrer["last_paid_at"] = time.time()
+                    elif reward > 0:
+                        referrer["balance"] = referrer.get("balance", 0) + reward
+                    save_data(data)
+                    try:
+                        await context.bot.send_message(
+                            chat_id=referrer_id,
+                            text=f"🎉 Ваш друг присоединился!\nПриглашено: {len(referrals)} чел."
+                        )
+                    except Exception:
+                        pass
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
@@ -731,6 +809,55 @@ async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
+async def subscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    if not context.args or len(context.args) < 1:
+        await update.message.reply_text(
+            "📧 Подписка на недельный дайджест\n\n"
+            "Отправьте свою почту:\n/subscribe_email your@email.com\n\n"
+            "Каждую неделю вы будете получать подборку лучших объявлений!"
+        )
+        return
+
+    email = context.args[0].strip()
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        await update.message.reply_text("❌ Некорректный email. Попробуйте ещё раз.")
+        return
+
+    if add_email_subscriber(email, user_id):
+        await update.message.reply_text(
+            f"✅ Вы подписались на дайджест!\n\n"
+            f"Email: {email}\n"
+            f"Частота: 1 раз в неделю (понедельник)\n\n"
+            f"Отписаться: /unsubscribe_email"
+        )
+    else:
+        await update.message.reply_text("ℹ️ Этот email уже подписан на дайджест.")
+
+
+async def unsubscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args or len(context.args) < 1:
+        await update.message.reply_text(
+            "📧 Отписка от дайджеста\n\n"
+            "Отправьте свою почту:\n/unsubscribe_email your@email.com"
+        )
+        return
+
+    email = context.args[0].strip()
+    if remove_email_subscriber(email):
+        await update.message.reply_text(f"✅ Вы отписались от дайджеста ({email}).")
+    else:
+        await update.message.reply_text("ℹ️ Этот email не найден в подписчиках.")
+
+
+async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
+    subs = get_active_subscribers()
+    await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
+
+
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -760,6 +887,14 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(CommandHandler("pin", pin_message))
+    application.add_handler(CommandHandler("subscribe_email", subscribe_email))
+    application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email))
+    application.add_handler(CommandHandler("subscribers", subscribers_count))
+    application.add_handler(CommandHandler("set_city", cmd_set_city))
+    application.add_handler(CommandHandler("remove_city", cmd_remove_city))
+    application.add_handler(CommandHandler("my_city", cmd_my_city))
+    application.add_handler(CommandHandler("trend", cmd_trend))
+    application.add_handler(CommandHandler("holygrail", cmd_holygrail))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
@@ -768,7 +903,7 @@ if __name__ == "__main__":
         group_greeting
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.ChatType.GROUP & filters.Entity("url"), handle_message))
+    application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_message))
 
     logging.info("Starting bot polling...")
     application.run_polling(drop_pending_updates=True)
