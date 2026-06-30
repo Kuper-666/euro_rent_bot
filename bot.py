@@ -489,9 +489,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as photo:
-            await update.message.reply_photo(photo=photo, caption=get_msg(lang, "start"), reply_markup=get_keyboard())
-    else:
-        await update.message.reply_text(get_msg(lang, "start"), reply_markup=get_keyboard())
+            await update.message.reply_photo(photo=photo)
+    await update.message.reply_text(get_msg(lang, "start"), reply_markup=get_keyboard())
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -499,9 +498,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     icon_path = os.path.join(os.path.dirname(__file__), "icons", "help.png")
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
-            await update.message.reply_photo(photo=photo, caption=get_msg(lang, "help"), reply_markup=get_keyboard())
-    else:
-        await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
+            await update.message.reply_photo(photo=photo)
+    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
 
 
 async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -530,9 +528,8 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     icon_path = os.path.join(os.path.dirname(__file__), "icons", "pay.png")
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
-            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
-    else:
-        await update.message.reply_text(text, reply_markup=get_keyboard())
+            await update.message.reply_photo(photo=photo)
+    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -596,9 +593,8 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
-            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
-    else:
-        await update.message.reply_text(text, reply_markup=get_keyboard())
+            await update.message.reply_photo(photo=photo)
+    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -641,9 +637,8 @@ async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
-            await update.message.reply_photo(photo=photo, caption=text, reply_markup=get_keyboard())
-    else:
-        await update.message.reply_text(text, reply_markup=get_keyboard())
+            await update.message.reply_photo(photo=photo)
+    await update.message.reply_text(text, reply_markup=get_keyboard())
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
