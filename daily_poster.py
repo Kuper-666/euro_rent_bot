@@ -2,6 +2,7 @@ import os
 import asyncio
 import random
 import re
+from urllib.parse import quote
 import feedparser
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -39,7 +40,12 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        analyze_url = f"https://t.me/{bot_username}?start=analyze_{link}"
+        # URL-кодируем ссылку для безопасной передачи через ?start=
+        encoded_link = quote(link, safe="")
+        analyze_url = f"https://t.me/{bot_username}?start=analyze_{encoded_link}"
+
+        # Альтернатива: открываем бота с инструкцией
+        bot_url = f"https://t.me/{bot_username}"
 
         post_text = (
             f"Доброе утро! Свежее объявление:\n\n"

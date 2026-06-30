@@ -31,6 +31,7 @@ from listing_features import (
     format_holy_grail_alert, extract_price, record_price, extract_score,
     POPULAR_CITIES
 )
+from scheduler import update_last_activity, run_scheduler
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -204,6 +205,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     user_id = str(update.effective_user.id)
+    update_last_activity(user_id)
     data = load_data()
     user = get_user_data(data, user_id)
 
@@ -862,6 +864,10 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logging.info("Flask started in background")
+
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logging.info("Scheduler started in background")
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
