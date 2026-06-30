@@ -61,7 +61,15 @@ def load_data():
                     "pdf_paid": row.get("pdf_paid", False),
                     "vip": row.get("vip", False),
                     "vip_criteria": row.get("vip_criteria", ""),
+                    "vip_state": row.get("vip_state", ""),
+                    "pdf_state": row.get("pdf_state", ""),
+                    "pdf_started_at": row.get("pdf_started_at", 0),
                     "last_paid_at": row.get("last_paid_at", 0),
+                    "last_activity": row.get("last_activity", 0),
+                    "last_reminder": row.get("last_reminder", 0),
+                    "last_limit_reminder": row.get("last_limit_reminder", 0),
+                    "ref_code": row.get("ref_code", ""),
+                    "referrals": row.get("referrals", []),
                 }
             return data
         except Exception as e:
@@ -89,7 +97,15 @@ def save_data(data):
                     "pdf_paid": info.get("pdf_paid", False),
                     "vip": info.get("vip", False),
                     "vip_criteria": info.get("vip_criteria", ""),
+                    "vip_state": info.get("vip_state", ""),
+                    "pdf_state": info.get("pdf_state", ""),
+                    "pdf_started_at": info.get("pdf_started_at", 0),
                     "last_paid_at": info.get("last_paid_at", 0),
+                    "last_activity": info.get("last_activity", 0),
+                    "last_reminder": info.get("last_reminder", 0),
+                    "last_limit_reminder": info.get("last_limit_reminder", 0),
+                    "ref_code": info.get("ref_code", ""),
+                    "referrals": info.get("referrals", []),
                 }
                 if uid in existing:
                     sb.table("users").update(row_data).eq("id", existing[uid]).execute()

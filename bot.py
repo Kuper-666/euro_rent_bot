@@ -133,7 +133,6 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         # Добавляем примечание о городе
         city_note = ""
         if city_key:
-            from listing_features import POPULAR_CITIES, is_good_deal
             ci = POPULAR_CITIES[city_key]
             city_note = f"\n\n🏙 Город: {ci['emoji']} {ci['name']}"
             if price and ci.get("avg_price"):
@@ -152,7 +151,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
         safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "\\u221e" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
+        remaining_text = "∞" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
         admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
         safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
         safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
@@ -289,8 +288,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(listing_text) < 10:
         await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=get_keyboard())
         return
-
-    save_data(data)
 
     allowed, wait = check_rate_limit(user_id)
     if not allowed:
@@ -667,7 +664,7 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["balance"] += 3
     user["last_paid_at"] = time.time()
     save_data(data)
-    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+    remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard())
 
 
@@ -680,7 +677,7 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["balance"] += 10
     user["last_paid_at"] = time.time()
     save_data(data)
-    remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+    remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard())
 
 
@@ -704,7 +701,6 @@ def parse_pdf_data(text: str) -> dict:
     for i, key in enumerate(keys):
         if i < len(lines):
             line = lines[i]
-            import re
             line = re.sub(r'^[1-8]\.\s+', '', line)
             data[key] = line
     return data
@@ -768,14 +764,13 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = str(update.effective_user.id)
     data = load_data()
     user = get_user_data(data, user_id)
-    lang = get_lang(update)
     payload = update.message.successful_payment.invoice_payload
 
     if payload == "pay_stars_3":
         user["balance"] += 3
         user["last_paid_at"] = time.time()
         save_data(data)
-        remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+        remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
             f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
             reply_markup=get_keyboard()
@@ -784,7 +779,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         user["balance"] += 10
         user["last_paid_at"] = time.time()
         save_data(data)
-        remaining = user["balance"] + (FREE_LIMIT - user["free_used"])
+        remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
             f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
             reply_markup=get_keyboard()
@@ -901,67 +896,6 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     subs = get_active_subscribers()
     await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
 
-
-# ============================================================================
-# ОБРАБОТЧИК КНОПОК ИЗ ГРУПП (личные сообщения)
-# ============================================================================
-
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Нажатие кнопки 'Проанализировать' в группе → личное сообщение."""
-    query = update.callback_query
-    await query.answer()
-
-    data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
-
-    if data_prefix in ("analyze_ad", "analyze_rss"):
-        user_id = str(update.effective_user.id)
-        user_data = load_data()
-        user = get_user_data(user_data, user_id)
-
-        if not can_use(user):
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text="❌ У вас закончились проверки.\n\n"
-                     "Пакеты:\n"
-                     "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                     "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                     "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
-            )
-            return
-
-        remaining = calc_remaining(user)
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=(
-                "🔍 Анализ готов!\n\n"
-                "Отправьте мне ссылку на объявление или текст прямо сюда в личку.\n\n"
-                f"📊 Осталось проверок: {remaining}"
-            ),
-            reply_markup=get_keyboard(),
-        )
-
-    elif data_prefix == "copy":
-        await query.answer("Скопируйте текст выше", show_alert=True)
-
-    elif data_prefix == "new":
-        user_id = str(update.effective_user.id)
-        user_data = load_data()
-        user = get_user_data(user_data, user_id)
-        remaining = calc_remaining(user)
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=(
-                "🔍 Готов к анализу!\n\n"
-                "Отправьте ссылку на объявление или текст.\n"
-                f"Осталось проверок: {remaining}"
-            ),
-            reply_markup=get_keyboard(),
-        )
-
-    elif data_prefix == "skip_ad":
-        await query.answer("Ок", show_alert=False)
-
-
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -1007,7 +941,7 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(
-        filters.ChatType.GROUPS & filters.Regex(r'(?i)^(привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
+        filters.ChatType.GROUPS & filters.Regex(r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
         group_greeting
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))

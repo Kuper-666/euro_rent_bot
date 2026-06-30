@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from groq import Groq
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
-from config import GROQ_API_KEY
+from config import TELEGRAM_TOKEN, GROQ_API_KEY
 from utils import clean_text
 from urllib.parse import quote
 from listing_features import (
@@ -36,7 +36,6 @@ from listing_features import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "")
 CHANNEL_ID = int(CHANNEL_ID) if CHANNEL_ID else None
 

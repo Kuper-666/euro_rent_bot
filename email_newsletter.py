@@ -11,6 +11,7 @@ import logging
 import smtplib
 import feedparser
 import re
+import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone, timedelta
@@ -214,7 +215,6 @@ async def run_weekly_digest():
         logger.info("No entries found")
         return
 
-    import random
     random.shuffle(entries)
     top_entries = entries[:5]
 

@@ -114,7 +114,7 @@ def calc_remaining(user: dict) -> str:
         return "∞"
     if user["balance"] > 0:
         return str(user["balance"])
-    return str(FREE_LIMIT - user.get("free_used", 0))
+    return str(max(0, FREE_LIMIT - user.get("free_used", 0)))
 
 
 def check_rate_limit(user_id: str) -> tuple[bool, float]:
