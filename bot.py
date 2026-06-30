@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import hashlib
+from urllib.parse import unquote
 from io import BytesIO
 from telegram.helpers import escape_markdown
 from telegram import (
@@ -399,7 +400,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if context.args and len(context.args) > 0:
         payload = context.args[0]
         if payload.startswith("analyze_"):
-            url = payload[len("analyze_"):]
+            url = unquote(payload[len("analyze_"):])
             if is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=get_keyboard())
                 listing_text = fetch_url_text(url)
