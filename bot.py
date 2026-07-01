@@ -1062,16 +1062,10 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    logging.info("Flask started in background")
-
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
-    logging.info("Scheduler started in background")
-
+    # 1. Создаём приложение
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
+    # 2. Регистрируем все команды
     priv = filters.ChatType.PRIVATE
 
     application.add_handler(CommandHandler("start", start, priv))
@@ -1117,5 +1111,15 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_group_listing))
 
+    # 3. Запускаем Flask и планировщик в фоновых потоках (до polling)
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logging.info("Flask started in background")
+
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logging.info("Scheduler started in background")
+
+    # 4. Запускаем бота (в основном потоке)
     logging.info("Starting bot polling...")
     application.run_polling(drop_pending_updates=True)
