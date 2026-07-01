@@ -363,6 +363,49 @@ def test_city_callback_data_format():
     print("City callback data format OK")
 
 
+def test_kb_returns_none_for_group():
+    class MockChat:
+        def __init__(self, chat_type):
+            self.type = chat_type
+
+    class MockUpdate:
+        def __init__(self, chat_type):
+            self.effective_chat = MockChat(chat_type)
+
+    def kb(update, chat_type=None):
+        if chat_type is None:
+            chat_type = update.effective_chat.type if update and update.effective_chat else None
+        if chat_type == "private":
+            return "KEYBOARD"
+        return None
+
+    assert kb(MockUpdate("private")) == "KEYBOARD"
+    assert kb(MockUpdate("group")) is None
+    assert kb(MockUpdate("supergroup")) is None
+    assert kb(None) is None
+    assert kb(MockUpdate("group"), chat_type="private") == "KEYBOARD"
+    assert kb(MockUpdate("private"), chat_type="group") is None
+    print("kb(update) logic OK")
+
+
+def test_timezone_valid():
+    import pytz
+    valid = ["Europe/Berlin", "Europe/London", "Europe/Riga", "Europe/Helsinki",
+             "America/New_York", "Asia/Tokyo", "Europe/Moscow"]
+    for tz in valid:
+        pytz.timezone(tz)
+
+    invalid = ["Berlin", "London", "GMT+2", "Invalid/Zone"]
+    for tz in invalid:
+        try:
+            pytz.timezone(tz)
+        except pytz.exceptions.UnknownTimeZoneError:
+            pass
+        else:
+            assert False, f"Expected error for timezone: {tz}"
+    print("Timezone validation OK")
+
+
 if __name__ == "__main__":
     tests = [
         test_messages_load,
@@ -392,6 +435,8 @@ if __name__ == "__main__":
         test_city_filter_logic,
         test_cities_keyboard_structure,
         test_city_callback_data_format,
+        test_kb_returns_none_for_group,
+        test_timezone_valid,
     ]
     passed = 0
     failed = 0

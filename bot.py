@@ -65,9 +65,12 @@ def get_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 
-def kb(update):
-    """Reply-keyboard только в личке. В группе — None."""
-    if update and update.effective_chat and update.effective_chat.type == "private":
+def kb(update, chat_type=None):
+    """Reply-keyboard только в личке. В группе — None.
+    chat_type: override для случаев, когда update.effective_chat != целевой чат."""
+    if chat_type is None:
+        chat_type = update.effective_chat.type if update and update.effective_chat else None
+    if chat_type == "private":
         return get_keyboard()
     return None
 
@@ -376,7 +379,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "Отправьте ссылку на объявление или текст.\n"
                 f"Осталось проверок: {remaining}"
             ),
-            reply_markup=kb(update),
+            reply_markup=kb(update, chat_type="private"),
         )
 
     # Кнопка "Проанализировать" из группы — отправляем в ЛИЧКУ
@@ -406,7 +409,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
                 f"📊 Осталось проверок: {remaining}"
             ),
-            reply_markup=kb(update),
+            reply_markup=kb(update, chat_type="private"),
         )
 
     # Кнопка "Пропустить"
@@ -424,7 +427,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
-            reply_markup=kb(update),
+            reply_markup=kb(update, chat_type="private"),
         )
 
     # Кнопка "PDF"
@@ -432,7 +435,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=get_msg(lang, "pay_pdf"),
-            reply_markup=kb(update),
+            reply_markup=kb(update, chat_type="private"),
         )
 
     # Кнопки оплаты
@@ -444,7 +447,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=get_msg(lang, msg_key),
-            reply_markup=kb(update),
+            reply_markup=kb(update, chat_type="private"),
         )
 
 
@@ -1046,7 +1049,7 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(
         f"✅ Часовой пояс сохранён: {tz_name}\n\n"
-        "Когда запущу личный дайджест — פוסטים будут приходить в удобное время."
+        "Когда запущу личный дайджест — посты будут приходить в удобное время."
     )
 
 if __name__ == "__main__":
