@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 import hashlib
+import asyncio
 from urllib.parse import unquote
 from io import BytesIO
 from telegram.helpers import escape_markdown
@@ -37,6 +38,10 @@ from scheduler import update_last_activity, run_scheduler
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
+
+_payment_lock = asyncio.Lock()
+_flood_tracker = {}  # user_id -> (count, window_start)
+MAX_MESSAGES_PER_MINUTE = 10
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -217,6 +222,18 @@ def check_followups(user: dict, lang: str) -> str:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    now = time.time()
+    count, window_start = _flood_tracker.get(user_id, (0, now))
+    if now - window_start > 60:
+        count = 0
+        window_start = now
+    count += 1
+    _flood_tracker[user_id] = (count, window_start)
+    if count > MAX_MESSAGES_PER_MINUTE:
+        await update.message.reply_text("⏳ Слишком много сообщений. Подождите минуту.", reply_markup=kb(update))
+        return
+
     text = update.message.text.replace('\xa0', ' ').strip().lower()
     lang = get_lang(update)
 
@@ -231,7 +248,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await btn_map[text](update, context)
         return
 
-    user_id = str(update.effective_user.id)
     update_last_activity(user_id)
     data = load_data()
     user = get_user_data(data, user_id)
@@ -257,6 +273,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 reply_markup=kb(update)
             )
         except Exception as e:
+            logging.error(f"PDF generation error: {e}")
             await update.message.reply_text(get_msg(lang, "pdf_error").format(e), reply_markup=kb(update))
         return
 
@@ -320,7 +337,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
-    await process_listing(update, context, listing_text, user_id, lang)
+    try:
+        await process_listing(update, context, listing_text, user_id, lang)
+    except Exception as e:
+        logging.error(f"process_listing error for user {user_id}: {e}")
+        try:
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+        except Exception:
+            pass
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -355,7 +379,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
-    await process_listing(update, context, listing_text, user_id, lang)
+    try:
+        await process_listing(update, context, listing_text, user_id, lang)
+    except Exception as e:
+        logging.error(f"process_listing (photo) error for user {user_id}: {e}")
+        try:
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+        except Exception:
+            pass
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -382,7 +413,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=kb(update, chat_type="private"),
         )
 
-    # Кнопка "Проанализировать" из группы — отправляем в ЛИЧКУ
+    # Кнопка "Проанализировать" из группы — автоматически анализируем RSS-ссылку
     elif data_prefix in ("analyze_ad", "analyze_rss"):
         await query.edit_message_reply_markup(reply_markup=None)
         data = load_data()
@@ -401,16 +432,67 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return
 
-        remaining = calc_remaining(user)
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=(
-                "🔍 Анализ готов!\n\n"
-                "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
-                f"📊 Осталось проверок: {remaining}"
-            ),
-            reply_markup=kb(update, chat_type="private"),
-        )
+        short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
+        pending = _load_pending_listings()
+        listing = pending.get(short_id, {})
+        rss_url = listing.get("url", "")
+
+        if rss_url and is_url(rss_url):
+            try:
+                await context.bot.send_message(
+                    chat_id=int(user_id),
+                    text="🔍 Загружаю объявление...",
+                    reply_markup=kb(update, chat_type="private"),
+                )
+                listing_text = fetch_url_text(rss_url)
+                if listing_text.startswith("ERROR"):
+                    await context.bot.send_message(
+                        chat_id=int(user_id),
+                        text=(
+                            f"❌ Не удалось загрузить страницу.\n\n"
+                            f"Ссылка: {rss_url}\n\n"
+                            f"Скопируйте текст объявления и отправьте в личку бота."
+                        ),
+                    )
+                    return
+
+                from telegram import Update as TGUpdate
+                fake_msg = type('obj', (object,), {
+                    'reply_text': lambda self, text, **kw: context.bot.send_message(
+                        chat_id=int(user_id), text=text,
+                        reply_markup=kw.get('reply_markup'), parse_mode=kw.get('parse_mode')
+                    ),
+                    'reply_document': lambda self, **kw: context.bot.send_document(
+                        chat_id=int(user_id), **kw
+                    ),
+                })()
+                fake_update = type('obj', (object,), {
+                    'message': fake_msg,
+                    'effective_user': update.effective_user,
+                    'effective_chat': type('obj', (object,), {'type': 'private'})(),
+                })()
+                await process_listing(fake_update, context, listing_text, user_id, lang)
+            except Exception as e:
+                logging.error(f"RSS auto-analyze error: {e}")
+                await context.bot.send_message(
+                    chat_id=int(user_id),
+                    text=(
+                        f"❌ Ошибка при анализе.\n\n"
+                        f"Ссылка: {rss_url}\n\n"
+                        f"Отправьте её в личку бота вручную."
+                    ),
+                )
+        else:
+            remaining = calc_remaining(user)
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=(
+                    "🔍 Анализ готов!\n\n"
+                    "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
+                    f"📊 Осталось проверок: {remaining}"
+                ),
+                reply_markup=kb(update, chat_type="private"),
+            )
 
     # Кнопка "Пропустить"
     elif data_prefix == "skip_ad":
@@ -476,7 +558,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         reply_markup=kb(update)
                     )
                     return
-                await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
+                try:
+                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
+                except Exception as e:
+                    logging.error(f"process_listing (start) error for user {user_id}: {e}")
+                    try:
+                        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+                    except Exception:
+                        pass
                 return
         elif payload.startswith("ref_"):
             ref_code = payload
@@ -486,24 +575,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     referrer_id = uid
                     break
             if referrer_id and referrer_id != user_id:
-                referrer = data.setdefault(referrer_id, {"free_used": 0, "balance": 0})
-                referrals = referrer.setdefault("referrals", [])
-                if user_id not in referrals:
-                    referrals.append(user_id)
-                    reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
-                    if reward == -1:
-                        referrer["balance"] = -1
-                        referrer["last_paid_at"] = time.time()
-                    elif reward > 0:
-                        referrer["balance"] = referrer.get("balance", 0) + reward
-                    save_data(data)
-                    try:
-                        await context.bot.send_message(
-                            chat_id=referrer_id,
-                            text=f"🎉 Ваш друг присоединился!\nПриглашено: {len(referrals)} чел."
-                        )
-                    except Exception:
-                        pass
+                async with _payment_lock:
+                    data = load_data()
+                    referrer = data.setdefault(referrer_id, {"free_used": 0, "balance": 0})
+                    referrals = referrer.setdefault("referrals", [])
+                    if user_id not in referrals:
+                        referrals.append(user_id)
+                        reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
+                        if reward == -1:
+                            referrer["balance"] = -1
+                            referrer["last_paid_at"] = time.time()
+                        elif reward > 0:
+                            referrer["balance"] = referrer.get("balance", 0) + reward
+                        save_data(data)
+                        try:
+                            await context.bot.send_message(
+                                chat_id=referrer_id,
+                                text=f"🎉 Ваш друг присоединился!\nПриглашено: {len(referrals)} чел."
+                            )
+                        except Exception:
+                            pass
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
@@ -679,39 +770,39 @@ async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
-    lang = get_lang(update)
-
-    user["balance"] += 3
-    user["last_paid_at"] = time.time()
-    save_data(data)
-    remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+        lang = get_lang(update)
+        user["balance"] = user.get("balance", 0) + 3
+        user["last_paid_at"] = time.time()
+        save_data(data)
+        remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
-    lang = get_lang(update)
-
-    user["balance"] += 10
-    user["last_paid_at"] = time.time()
-    save_data(data)
-    remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+        lang = get_lang(update)
+        user["balance"] = user.get("balance", 0) + 10
+        user["last_paid_at"] = time.time()
+        save_data(data)
+        remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
-    lang = get_lang(update)
-
-    user["balance"] = -1
-    user["last_paid_at"] = time.time()
-    save_data(data)
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+        lang = get_lang(update)
+        user["balance"] = -1
+        user["last_paid_at"] = time.time()
+        save_data(data)
     await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=kb(update))
 
 
@@ -784,44 +875,46 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
     payload = update.message.successful_payment.invoice_payload
 
-    if payload == "pay_stars_3":
-        user["balance"] += 3
-        user["last_paid_at"] = time.time()
-        save_data(data)
-        remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
-        await update.message.reply_text(
-            f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
-            reply_markup=kb(update)
-        )
-    elif payload == "pay_stars_9":
-        user["balance"] += 10
-        user["last_paid_at"] = time.time()
-        save_data(data)
-        remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
-        await update.message.reply_text(
-            f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
-            reply_markup=kb(update)
-        )
-    elif payload == "pay_stars_19":
-        user["balance"] = -1
-        user["last_paid_at"] = time.time()
-        save_data(data)
-        await update.message.reply_text(
-            "Оплата подтверждена! Безлимит на месяц активирован!",
-            reply_markup=kb(update)
-        )
-    elif payload == "pay_stars_pdf":
-        user["pdf_paid"] = True
-        user["pdf_state"] = "awaiting_data"
-        save_data(data)
-        await update.message.reply_text(
-            "Оплата PDF подтверждена! Отправьте данные для заявления.",
-            reply_markup=kb(update)
-        )
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+
+        if payload == "pay_stars_3":
+            user["balance"] = user.get("balance", 0) + 3
+            user["last_paid_at"] = time.time()
+            save_data(data)
+            remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
+            await update.message.reply_text(
+                f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
+                reply_markup=kb(update)
+            )
+        elif payload == "pay_stars_9":
+            user["balance"] = user.get("balance", 0) + 10
+            user["last_paid_at"] = time.time()
+            save_data(data)
+            remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
+            await update.message.reply_text(
+                f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
+                reply_markup=kb(update)
+            )
+        elif payload == "pay_stars_19":
+            user["balance"] = -1
+            user["last_paid_at"] = time.time()
+            save_data(data)
+            await update.message.reply_text(
+                "Оплата подтверждена! Безлимит на месяц активирован!",
+                reply_markup=kb(update)
+            )
+        elif payload == "pay_stars_pdf":
+            user["pdf_paid"] = True
+            user["pdf_state"] = "awaiting_data"
+            save_data(data)
+            await update.message.reply_text(
+                "Оплата PDF подтверждена! Отправьте данные для заявления.",
+                reply_markup=kb(update)
+            )
 
 
 def run_flask():

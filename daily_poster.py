@@ -33,9 +33,11 @@ def load_pending():
 
 
 def save_pending(data):
-    # Очищаем записи старше 1 часа
     now = time.time()
     data = {k: v for k, v in data.items() if now - v.get("ts", 0) < 3600}
+    if len(data) > 500:
+        sorted_items = sorted(data.items(), key=lambda x: x[1].get("ts", 0), reverse=True)
+        data = dict(sorted_items[:500])
     with open(PENDING_FILE, "w") as f:
         json.dump(data, f, ensure_ascii=False)
 

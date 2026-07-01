@@ -34,15 +34,27 @@ def _get_supabase():
 
 
 def _load_json():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"JSON load error: {e}, returning empty data")
     return {}
 
 
 def _save_json(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+    import tempfile
+    try:
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=".", suffix=".tmp")
+        with os.fdopen(tmp_fd, "w") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp_path, DATA_FILE)
+    except Exception as e:
+        logger.error(f"JSON save error: {e}")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
 
 
 def load_data():

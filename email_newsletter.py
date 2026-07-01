@@ -62,6 +62,9 @@ def save_email_subscribers(subscribers: list[dict]):
 
 
 def add_email_subscriber(email: str, user_id: str) -> bool:
+    if not re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$', email):
+        logger.warning(f"Invalid email rejected: {email}")
+        return False
     subscribers = get_email_subscribers()
     for s in subscribers:
         if s["email"] == email:

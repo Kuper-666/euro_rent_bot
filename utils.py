@@ -90,7 +90,7 @@ def fetch_url_text(url: str) -> str:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
         }
-        resp = requests.get(url, headers=headers, timeout=15)
+        resp = requests.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         for tag in soup(["script", "style", "meta", "noscript", "nav", "footer", "header", "aside"]):
@@ -101,6 +101,10 @@ def fetch_url_text(url: str) -> str:
         if len(result) > 6000:
             result = result[:6000] + "... (текст сокращён для анализа)"
         return result
+    except requests.exceptions.Timeout:
+        return "ERROR: Timeout — сайт не ответил за 10 секунд"
+    except requests.exceptions.ConnectionError:
+        return "ERROR: Не удалось подключиться к сайту"
     except Exception as e:
         return f"ERROR: {e}"
 
