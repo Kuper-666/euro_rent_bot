@@ -81,6 +81,8 @@ MESSAGES = {
             "Нажмите кнопку ниже, чтобы перейти в бота.\n"
             "Скопируйте ссылку на объявление и отправьте её мне в личку — я разберу за 5 секунд!"
         ),
+        "city_selected": "✅ Город установлен: {emoji} {name}\n\nТеперь я буду анализировать только объявления из {name}.\nСнять фильтр: /remove_city",
+        "city_filter_skip": "⏭ Объявление не из вашего города ({user_city}). Анализ пропущен.\n\nЧтобы снять фильтр: /remove_city",
         "system_prompt": (
             "Ты — профессиональный консультант по недвижимости с 10-летним опытом в Европе. "
             "Отвечай на русском языке.\n\n"
@@ -154,6 +156,8 @@ MESSAGES = {
             "Натисніть кнопку нижче, щоб перейти в бота.\n"
             "Скопіюйте посилання на оголошення та надішліть мені в особисті повідомлення — я розберу за 5 секунд!"
         ),
+        "city_selected": "✅ Місто встановлено: {emoji} {name}\n\nТепер я аналізуватиму лише оголошення з {name}.\nЗняти фільтр: /remove_city",
+        "city_filter_skip": "⏭ Оголошення не з вашого міста ({user_city}). Аналіз пропущено.\n\nЩоб зняти фільтр: /remove_city",
         "system_prompt": (
             "Ти — професійний консультант з нерухомості з 10-річним досвідом в Європі. "
             "Відповідай українською.\n\n"
@@ -231,6 +235,8 @@ MESSAGES = {
             "Tap the button below to go to the bot.\n"
             "Copy the listing link and send it to me in a private chat — I'll analyze it in 5 seconds!"
         ),
+        "city_selected": "✅ City set: {emoji} {name}\n\nNow I'll only analyze listings from {name}.\nRemove filter: /remove_city",
+        "city_filter_skip": "⏭ Listing is not from your city ({user_city}). Analysis skipped.\n\nTo remove filter: /remove_city",
         "system_prompt": (
             "You are a professional real estate consultant with 10 years of experience in Europe. "
             "Respond in English.\n\n"
@@ -304,6 +310,8 @@ MESSAGES = {
             "Klicke auf die Schaltflaeche unten, um zum Bot zu gehen.\n"
             "Kopiere den Link und sende ihn mir per PN — Analyse in 5 Sekunden!"
         ),
+        "city_selected": "✅ Stadt eingestellt: {emoji} {name}\n\nJetzt analysiere ich nur Angebote aus {name}.\nFilter entfernen: /remove_city",
+        "city_filter_skip": "⏭ Angebot nicht aus Ihrer Stadt ({user_city}). Analyse uebersprungen.\n\nFilter entfernen: /remove_city",
         "system_prompt": (
             "Du bist Immobilienberater mit 10 Jahren Erfahrung in Europa. "
             "Antworte auf Deutsch.\n\n"
@@ -377,6 +385,8 @@ MESSAGES = {
             "Kliknij przycisk ponizej, zeby przejsc do bota.\n"
             "Skopiuj link i wyslij mi w wiadomosci prywatnej — przeanalizuje w 5 sekund!"
         ),
+        "city_selected": "✅ Miasto ustawione: {emoji} {name}\n\nTeraz bede analizowal tylko oferty z {name}.\nUsun filtr: /remove_city",
+        "city_filter_skip": "⏭ Oferta nie z Twojego miasta ({user_city}). Analiza pominieta.\n\nAby usunac filtr: /remove_city",
         "system_prompt": (
             "Jestes konsultantem ds. nieruchomosci z 10-letnim doswiadczeniem w Europie. "
             "Odpowiadaj po polsku.\n\n"

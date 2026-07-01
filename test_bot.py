@@ -273,6 +273,96 @@ def test_welcome_new_member_text():
     print("Welcome new member text OK")
 
 
+def test_city_selected_messages_exist():
+    for lang in ["ru", "uk", "en", "de", "pl"]:
+        msg = get_msg(lang, "city_selected")
+        assert msg, f"Missing city_selected for {lang}"
+        assert "{emoji}" in msg, f"city_selected for {lang} missing {{emoji}} placeholder"
+        assert "{name}" in msg, f"city_selected for {lang} missing {{name}} placeholder"
+    print("All city_selected messages exist OK")
+
+
+def test_city_filter_skip_messages_exist():
+    for lang in ["ru", "uk", "en", "de", "pl"]:
+        msg = get_msg(lang, "city_filter_skip")
+        assert msg, f"Missing city_filter_skip for {lang}"
+        assert "{user_city}" in msg, f"city_filter_skip for {lang} missing {{user_city}} placeholder"
+    print("All city_filter_skip messages exist OK")
+
+
+def test_popular_cities_complete():
+    from listing_features import POPULAR_CITIES
+    required_keys = ["name", "name_en", "name_de", "avg_price", "emoji"]
+    for city_key, info in POPULAR_CITIES.items():
+        for k in required_keys:
+            assert k in info, f"City {city_key} missing key: {k}"
+        assert isinstance(info["avg_price"], int), f"City {city_key} avg_price not int"
+        assert info["avg_price"] > 0, f"City {city_key} avg_price not positive"
+    print("All popular cities complete OK")
+
+
+def test_detect_city():
+    from listing_features import detect_city
+    assert detect_city("2-комнатная квартира в Берлине, 800 EUR") == "berlin"
+    assert detect_city("Apartment in Munich, 2 Zimmer") == "munich"
+    assert detect_city("Wohnung in Berlin, Kaltmiete 750 EUR") == "berlin"
+    assert detect_city("Wohnung in München, 900 EUR") == "munich"
+    assert detect_city("Wohnung in Köln, 700 EUR") == "cologne"
+    assert detect_city("Apartment in Vienna, 3 rooms") == "vienna"
+    assert detect_city("Wohnung in Wien, 2 Zimmer") == "vienna"
+    assert detect_city("Piso en Barcelona, 850 EUR") == "barcelona"
+    assert detect_city("Flat in London, 1200 GBP") is None
+    print("detect_city OK")
+
+
+def test_city_filter_logic():
+    from listing_features import detect_city, get_user_city, POPULAR_CITIES
+
+    user_city = "berlin"
+    listing_berlin = "2-комнатная квартира в Берлине, 800 EUR"
+    listing_munich = "Apartment in Munich, 2 Zimmer, 900 EUR"
+
+    detected_berlin = detect_city(listing_berlin)
+    detected_munich = detect_city(listing_munich)
+
+    assert detected_berlin == "berlin"
+    assert detected_munich == "munich"
+    assert detected_berlin == user_city
+    assert detected_munich != user_city
+
+    print("City filter logic OK")
+
+
+def test_cities_keyboard_structure():
+    from listing_features import POPULAR_CITIES
+    cities = sorted(POPULAR_CITIES.items(), key=lambda x: x[1]["avg_price"])
+    keyboard = []
+    row = []
+    for key, info in cities:
+        row.append(f"{info['emoji']} {info['name_en']}")
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+
+    total_buttons = sum(len(r) for r in keyboard)
+    assert total_buttons == len(POPULAR_CITIES), f"Expected {len(POPULAR_CITIES)} buttons, got {total_buttons}"
+    assert all(len(r) <= 2 for r in keyboard), "Some rows have more than 2 buttons"
+    print("Cities keyboard structure OK")
+
+
+def test_city_callback_data_format():
+    callback_data = "select_city:berlin"
+    assert callback_data.startswith("select_city:")
+    city_key = callback_data.split(":")[1]
+    assert city_key == "berlin"
+
+    callback_remove = "select_city:remove"
+    assert callback_remove.split(":")[1] == "remove"
+    print("City callback data format OK")
+
+
 if __name__ == "__main__":
     tests = [
         test_messages_load,
@@ -295,6 +385,13 @@ if __name__ == "__main__":
         test_start_analyze_payload,
         test_start_ref_payload,
         test_welcome_new_member_text,
+        test_city_selected_messages_exist,
+        test_city_filter_skip_messages_exist,
+        test_popular_cities_complete,
+        test_detect_city,
+        test_city_filter_logic,
+        test_cities_keyboard_structure,
+        test_city_callback_data_format,
     ]
     passed = 0
     failed = 0

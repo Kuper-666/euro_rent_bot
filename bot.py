@@ -31,7 +31,7 @@ from listing_features import (
     cmd_set_city, cmd_remove_city, cmd_my_city, cmd_trend, cmd_holygrail,
     get_user_city, filter_by_city, detect_city, record_listing, is_holy_grail,
     format_holy_grail_alert, extract_price, record_price, extract_score,
-    POPULAR_CITIES
+    POPULAR_CITIES, list_cities, set_user_city
 )
 from scheduler import update_last_activity, run_scheduler
 from web import app
@@ -288,6 +288,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(listing_text) < 10:
         await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=get_keyboard())
         return
+
+    user_city = get_user_city(user_id)
+    if user_city:
+        detected = detect_city(listing_text)
+        if detected and detected != user_city:
+            user_city_info = POPULAR_CITIES.get(user_city, {})
+            city_name = user_city_info.get("name", user_city)
+            await update.message.reply_text(
+                get_msg(lang, "city_filter_skip").format(user_city=city_name),
+                reply_markup=get_keyboard(),
+            )
+            return
 
     allowed, wait = check_rate_limit(user_id)
     if not allowed:
@@ -884,6 +896,62 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
 
+def get_cities_keyboard():
+    cities = sorted(POPULAR_CITIES.items(), key=lambda x: x[1]["avg_price"])
+    keyboard = []
+    row = []
+    for key, info in cities:
+        row.append(InlineKeyboardButton(
+            f"{info['emoji']} {info['name_en']}",
+            callback_data=f"select_city:{key}"
+        ))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("❌ Снять фильтр", callback_data="select_city:remove")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def cmd_cities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
+    user_id = str(update.effective_user.id)
+    current_city = get_user_city(user_id)
+    current_name = ""
+    if current_city and current_city in POPULAR_CITIES:
+        ci = POPULAR_CITIES[current_city]
+        current_name = f"\n\nТекущий город: {ci['emoji']} {ci['name']}" if lang == "ru" else f"\n\nCurrent city: {ci['emoji']} {ci['name_en']}"
+
+    await update.message.reply_text(
+        f"🏙 Выберите город для фильтрации объявлений:{current_name}\n\n"
+        f"{list_cities()}\n\n"
+        "Нажмите на кнопку или используйте /set_city <город>",
+        reply_markup=get_cities_keyboard(),
+    )
+
+
+async def handle_city_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    lang = get_lang(update)
+    user_id = str(update.effective_user.id)
+    data_payload = query.data.split(":")[1] if ":" in query.data else ""
+
+    if data_payload == "remove":
+        from listing_features import remove_user_city
+        remove_user_city(user_id)
+        await query.edit_message_text("✅ Фильтр города снят. Показываю все объявления.")
+        return
+
+    if data_payload in POPULAR_CITIES:
+        set_user_city(user_id, data_payload)
+        info = POPULAR_CITIES[data_payload]
+        await query.edit_message_text(
+            get_msg(lang, "city_selected").format(emoji=info["emoji"], name=info["name"])
+        )
+
+
 async def subscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     if not context.args or len(context.args) < 1:
@@ -973,7 +1041,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("my_city", cmd_my_city))
     application.add_handler(CommandHandler("trend", cmd_trend))
     application.add_handler(CommandHandler("holygrail", cmd_holygrail))
+    application.add_handler(CommandHandler("cities", cmd_cities))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
+    application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(MessageHandler(
