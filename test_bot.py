@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import unittest
+from unittest.mock import MagicMock, AsyncMock, patch
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -134,6 +136,143 @@ def test_all_langs_have_start():
     print("All start messages have brand OK")
 
 
+def test_group_redirect_messages_exist():
+    for lang in ["ru", "uk", "en", "de", "pl"]:
+        msg = get_msg(lang, "group_redirect")
+        assert msg, f"Missing group_redirect for {lang}"
+        assert len(msg) > 20, f"group_redirect for {lang} too short: {msg}"
+    print("All group_redirect messages exist OK")
+
+
+def test_group_redirect_messages_length():
+    for lang in ["ru", "uk", "en", "de", "pl"]:
+        msg = get_msg(lang, "group_redirect")
+        assert len(msg) <= 4096, f"{lang}.group_redirect too long: {len(msg)}"
+    print("group_redirect messages within Telegram limits OK")
+
+
+def test_greeting_pattern():
+    pattern = re.compile(
+        r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай|hey|hallo|servus|cześć|witaj)\b'
+    )
+
+    greetings = [
+        "Привет", "привет", "ПРИВЕТ",
+        "Здравствуй", "здравствуй",
+        "Hello", "hello", "HELLO",
+        "Hi", "hi", "HI",
+        "Добрый день", "добрый день",
+        "Доброе утро", "доброе утро",
+        "Добрый вечер", "добрый вечер",
+        "Ку", "ку", "КУ",
+        "Хай", "хай",
+        "Hey", "hey",
+        "Hallo", "hallo",
+        "Servus", "servus",
+        "Cześć", "cześć",
+        "Witaj", "witaj",
+    ]
+
+    for g in greetings:
+        assert pattern.match(g), f"Greeting pattern should match: {g}"
+
+    non_greetings = [
+        "Квартира в Берлине",
+        "https://example.com",
+        "Тест",
+    ]
+
+    for ng in non_greetings:
+        if ng.strip():
+            assert not pattern.match(ng), f"Greeting pattern should NOT match: {ng}"
+
+    print("Greeting pattern OK")
+
+
+def test_group_listing_detection_logic():
+    def should_redirect(text):
+        greeting_pattern = re.compile(
+            r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай|hey|hallo|servus|cześć|witaj)\b'
+        )
+        if greeting_pattern.match(text.strip()):
+            return False
+        is_url = text.strip().startswith(("http://", "https://", "t.me/"))
+        is_long_text = len(text.strip()) > 30
+        return is_url or is_long_text
+
+    assert should_redirect("https://www.immobilienscout24.de/Suche/123")
+    assert should_redirect("http://example.com/listing/456")
+    assert should_redirect("t.me/channel/123")
+    assert should_redirect("2-комнатная квартира в Берлине, 800 EUR, 55м2, рядом с метро")
+    assert should_redirect("Kuche im Zentrum, 2 Zimmer, 750 EUR warm, 45m2")
+
+    assert not should_redirect("Привет")
+    assert not should_redirect("Hello")
+    assert not should_redirect("Ку")
+    assert not should_redirect("Hi")
+    assert not should_redirect("Hey")
+    assert not should_redirect("Привет, вот ссылка https://example.com")
+    assert not should_redirect("Hello world")
+    assert not should_redirect("短い")
+    assert not should_redirect("")
+    assert not should_redirect("  ")
+
+    print("Group listing detection logic OK")
+
+
+def test_deep_link_construction():
+    bot_username = "ExpatRentBot"
+    user_id = "12345678"
+    deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    assert deep_link == "https://t.me/ExpatRentBot?start=ref_12345678"
+    assert "analyze_" not in deep_link
+    assert len(deep_link) < 200
+    print("Deep link construction OK")
+
+
+def test_handler_no_commands_filter():
+    cmd_pattern = re.compile(r'^/')
+    assert not cmd_pattern.match("Привет")
+    assert not cmd_pattern.match("https://example.com")
+    assert cmd_pattern.match("/start")
+    assert cmd_pattern.match("/help")
+    print("No-commands filter OK")
+
+
+def test_start_analyze_payload():
+    payload = "analyze_https%3A%2F%2Fexample.com%2Flisting"
+    assert payload.startswith("analyze_")
+    from urllib.parse import unquote
+    url = unquote(payload[len("analyze_"):])
+    assert url == "https://example.com/listing"
+    print("Start analyze payload OK")
+
+
+def test_start_ref_payload():
+    payload = "ref_abc123"
+    assert payload.startswith("ref_")
+    ref_code = payload
+    assert ref_code == "ref_abc123"
+    print("Start ref payload OK")
+
+
+def test_welcome_new_member_text():
+    name = "Тест Узер"
+    welcome_text = (
+        f"Добро пожаловать, {name}!\n\n"
+        f"Этот чат создан для экспатов в Европе. "
+        f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n\n"
+        f"Как анализировать объявления:\n"
+        f"Просто отправьте ссылку или текст объявления сюда в чат.\n"
+        f"Я перенаправлю вас в личку с ботом, где он сделает полный разбор за 5 секунд!\n\n"
+        f"Или начните сразу: /start"
+    )
+    assert "Тест Узер" in welcome_text
+    assert "/start" in welcome_text
+    assert "личк" in welcome_text
+    print("Welcome new member text OK")
+
+
 if __name__ == "__main__":
     tests = [
         test_messages_load,
@@ -147,6 +286,15 @@ if __name__ == "__main__":
         test_button_texts,
         test_button_regex,
         test_all_langs_have_start,
+        test_group_redirect_messages_exist,
+        test_group_redirect_messages_length,
+        test_greeting_pattern,
+        test_group_listing_detection_logic,
+        test_deep_link_construction,
+        test_handler_no_commands_filter,
+        test_start_analyze_payload,
+        test_start_ref_payload,
+        test_welcome_new_member_text,
     ]
     passed = 0
     failed = 0

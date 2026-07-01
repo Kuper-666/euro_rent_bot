@@ -76,6 +76,11 @@ MESSAGES = {
         "pay_vip": "VIP-подписка — 1500 Stars (~15EUR/мес)\n\nОплатите: /pay_stars_vip\n\nПосле оплаты отправьте критерии.",
         "pay_stars_pdf": "PDF-заявление (Mieterprofil) — 500 Stars (~5EUR)\n\nНажмите /pay_stars_pdf для оплаты.",
         "pay_stars_vip": "VIP-подписка — 1500 Stars (~15EUR/мес)\n\nНажмите /pay_stars_vip для оплаты.",
+        "group_redirect": (
+            "🔍 Вижу объявление!\n\n"
+            "Нажмите кнопку ниже, чтобы перейти в бота.\n"
+            "Скопируйте ссылку на объявление и отправьте её мне в личку — я разберу за 5 секунд!"
+        ),
         "system_prompt": (
             "Ты — профессиональный консультант по недвижимости с 10-летним опытом в Европе. "
             "Отвечай на русском языке.\n\n"
@@ -144,6 +149,11 @@ MESSAGES = {
         "pay_vip": "VIP-підписка — 1500 Stars (~15EUR/міс)\n\nОплатіть: /pay_stars_vip\n\nПісля оплати надішліть критерії.",
         "pay_stars_pdf": "PDF-заява (Mieterprofil) — 500 Stars (~5EUR)\n\nНатисніть /pay_stars_pdf для оплати.",
         "pay_stars_vip": "VIP-підписка — 1500 Stars (~15EUR/міс)\n\nНатисніть /pay_stars_vip для оплати.",
+        "group_redirect": (
+            "🔍 Бачу оголошення!\n\n"
+            "Натисніть кнопку нижче, щоб перейти в бота.\n"
+            "Скопіюйте посилання на оголошення та надішліть мені в особисті повідомлення — я розберу за 5 секунд!"
+        ),
         "system_prompt": (
             "Ти — професійний консультант з нерухомості з 10-річним досвідом в Європі. "
             "Відповідай українською.\n\n"
@@ -216,6 +226,11 @@ MESSAGES = {
         "pay_vip": "VIP Subscription — 1500 Stars (~15EUR/month)\n\nPay: /pay_stars_vip\n\nAfter payment send your criteria.",
         "pay_stars_pdf": "PDF Application (Mieterprofil) — 500 Stars (~5EUR)\n\nTap /pay_stars_pdf to pay.",
         "pay_stars_vip": "VIP Subscription — 1500 Stars (~15EUR/month)\n\nTap /pay_stars_vip to pay.",
+        "group_redirect": (
+            "🔍 I see a listing!\n\n"
+            "Tap the button below to go to the bot.\n"
+            "Copy the listing link and send it to me in a private chat — I'll analyze it in 5 seconds!"
+        ),
         "system_prompt": (
             "You are a professional real estate consultant with 10 years of experience in Europe. "
             "Respond in English.\n\n"
@@ -284,6 +299,11 @@ MESSAGES = {
         "pay_vip": "VIP-Abo — 1500 Stars (~15EUR/Monat)\n\nBezahlen: /pay_stars_vip\n\nNach Zahlung Kriterien senden.",
         "pay_stars_pdf": "PDF-Antrag (Mieterprofil) — 500 Stars (~5EUR)\n\nTippe /pay_stars_pdf zum Bezahlen.",
         "pay_stars_vip": "VIP-Abo — 1500 Stars (~15EUR/Monat)\n\nTippe /pay_stars_vip zum Bezahlen.",
+        "group_redirect": (
+            "🔍 Ich sehe ein Angebot!\n\n"
+            "Klicke auf die Schaltflaeche unten, um zum Bot zu gehen.\n"
+            "Kopiere den Link und sende ihn mir per PN — Analyse in 5 Sekunden!"
+        ),
         "system_prompt": (
             "Du bist Immobilienberater mit 10 Jahren Erfahrung in Europa. "
             "Antworte auf Deutsch.\n\n"
@@ -352,6 +372,11 @@ MESSAGES = {
         "pay_vip": "VIP — 1500 Stars (~15EUR/mies)\n\nZaplac: /pay_stars_vip\n\nPo opacie wyslij kryteria.",
         "pay_stars_pdf": "PDF-wniosek (Mieterprofil) — 500 Stars (~5EUR)\n\nKliknij /pay_stars_pdf aby zaplacic.",
         "pay_stars_vip": "VIP — 1500 Stars (~15EUR/mies)\n\nKliknij /pay_stars_vip aby zaplacic.",
+        "group_redirect": (
+            "🔍 Widze oferte!\n\n"
+            "Kliknij przycisk ponizej, zeby przejsc do bota.\n"
+            "Skopiuj link i wyslij mi w wiadomosci prywatnej — przeanalizuje w 5 sekund!"
+        ),
         "system_prompt": (
             "Jestes konsultantem ds. nieruchomosci z 10-letnim doswiadczeniem w Europie. "
             "Odpowiadaj po polsku.\n\n"

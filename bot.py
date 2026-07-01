@@ -817,15 +817,17 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             welcome_text = (
                 f"Добро пожаловать, {new_member.user.full_name}!\n\n"
                 f"Этот чат создан для экспатов в Европе. "
-                f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n"
-                f"Бот EuroRent AI всегда поможет с анализом объявлений.\n\n"
-                f"Начните с /start"
+                f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n\n"
+                f"Как анализировать объявления:\n"
+                f"Просто отправьте ссылку или текст объявления сюда в чат.\n"
+                f"Я перенаправлю вас в личку с ботом, где он сделает полный разбор за 5 секунд!\n\n"
+                f"Или начните сразу: /start"
             )
-            msg = await update.effective_chat.send_message(welcome_text)
-            try:
-                await msg.pin()
-            except Exception:
-                pass
+        msg = await update.effective_chat.send_message(welcome_text)
+        try:
+            await msg.pin()
+        except Exception:
+            pass
 
 
 async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -846,6 +848,40 @@ async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"Привет, {first_name}! Рад тебя видеть в чате.\n"
             "Кидай ссылку на любое объявление об аренде, я разберу его за 5 секунд!"
         )
+
+
+async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_chat.type not in ["group", "supergroup"]:
+        return
+
+    text = update.message.text or ""
+
+    greeting_pattern = re.compile(
+        r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай|hey|hallo|servus|cześć|witaj)\b'
+    )
+    if greeting_pattern.match(text.strip()):
+        return
+
+    bot_username = context.bot.username
+    user_id = str(update.effective_user.id)
+
+    is_url = text.strip().startswith(("http://", "https://", "t.me/"))
+    is_long_text = len(text.strip()) > 30
+
+    if not is_url and not is_long_text:
+        return
+
+    lang = get_lang(update)
+    deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Проанализировать в боте", url=deep_link)]
+    ])
+
+    await update.message.reply_text(
+        get_msg(lang, "group_redirect"),
+        reply_markup=keyboard,
+    )
 
 
 async def subscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -945,7 +981,7 @@ if __name__ == "__main__":
         group_greeting
     ))
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_group_listing))
 
     logging.info("Starting bot polling...")
     application.run_polling(drop_pending_updates=True)
