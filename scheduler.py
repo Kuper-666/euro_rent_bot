@@ -148,12 +148,15 @@ async def weekly_email_digest():
 # 5. ПОСТЫ В ГРУППУ (10:00 и 18:00 по Берлину)
 # ============================================================================
 
-GROUP_ID = int(os.environ.get("GROUP_ID", "-1004303604754"))
+GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 
 async def send_group_digest():
     """Отправляет дайджест в основную группу."""
     if not bot:
+        return
+    if not GROUP_ID:
+        logger.warning("GROUP_ID not set, skipping group digest")
         return
     try:
         from daily_poster import send_daily_post

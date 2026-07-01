@@ -8,9 +8,12 @@ import feedparser
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROUP_ID = int(os.environ.get("GROUP_ID") or "-1004303604754")
+GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 bot = Bot(token=TELEGRAM_TOKEN)
+
+if not GROUP_ID:
+    print("WARNING: GROUP_ID not set. Daily post will not work.")
 
 RSS_FEED_URL = "https://www.google.com/alerts/feeds/15276190721492704538/14744967623754419043"
 

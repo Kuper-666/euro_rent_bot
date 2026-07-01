@@ -18,6 +18,8 @@ services:
         sync: false
       - key: CHANNEL_ID
         sync: false
+      - key: GROUP_ID
+        sync: false
       - key: CITY_CHANNELS
         value: '{}'
       - key: SMTP_HOST
@@ -32,6 +34,8 @@ services:
         value: EuroRent AI <noreply@eurorent.ai>
       - key: ADMIN_ID
         sync: false
+      - key: WEB_CONCURRENCY
+        value: "1"
 
   - type: cron
     name: channel-poster-morning
