@@ -70,6 +70,7 @@ def load_data():
                     "last_limit_reminder": row.get("last_limit_reminder", 0),
                     "ref_code": row.get("ref_code", ""),
                     "referrals": row.get("referrals", []),
+                    "timezone": row.get("timezone", ""),
                 }
             return data
         except Exception as e:
@@ -106,6 +107,7 @@ def save_data(data):
                     "last_limit_reminder": info.get("last_limit_reminder", 0),
                     "ref_code": info.get("ref_code", ""),
                     "referrals": info.get("referrals", []),
+                    "timezone": info.get("timezone", ""),
                 }
                 if uid in existing:
                     sb.table("users").update(row_data).eq("id", existing[uid]).execute()

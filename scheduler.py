@@ -3,6 +3,7 @@
 - Возврат неактивных пользователей (7 дней)
 - Напоминание о последней бесплатной проверке
 - Еженедельный email-дайджест
+- Посты в группу в 10:00 и 18:00 по Берлину
 
 Запуск: python scheduler.py (или интегрирован в bot.py как фоновый поток)
 """
@@ -12,7 +13,10 @@ import time
 import asyncio
 import logging
 import schedule
+import pytz
 from datetime import datetime, timezone, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from telegram import Bot
 
 from config import TELEGRAM_TOKEN
@@ -141,11 +145,43 @@ async def weekly_email_digest():
 
 
 # ============================================================================
+# 5. ПОСТЫ В ГРУППУ (10:00 и 18:00 по Берлину)
+# ============================================================================
+
+GROUP_ID = int(os.environ.get("GROUP_ID", "-1004303604754"))
+
+
+async def send_group_digest():
+    """Отправляет дайджест в основную группу."""
+    if not bot:
+        return
+    try:
+        from daily_poster import send_daily_post
+        await send_daily_post()
+        logger.info("Group digest sent")
+    except Exception as e:
+        logger.error(f"Failed to send group digest: {e}")
+
+
+def _run_group_digest():
+    """Обёртка для APScheduler — запускает async-функцию."""
+    asyncio.run(send_group_digest())
+
+
+# ============================================================================
 # ПЛАНИРОВЩИК
 # ============================================================================
 
 def run_scheduler():
     """Запускает планировщик в фоновом потоке."""
+    # --- Группа: 10:00 и 18:00 по Берлину (APScheduler) ---
+    apscheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Berlin"))
+    apscheduler.add_job(_run_group_digest, CronTrigger(hour=10, minute=0))
+    apscheduler.add_job(_run_group_digest, CronTrigger(hour=18, minute=0))
+    apscheduler.start()
+    logger.info("APScheduler: group posts at 10:00 and 18:00 Berlin time")
+
+    # --- Личные задачи (schedule) ---
     schedule.every(1).hours.do(lambda: asyncio.run(remind_last_free_check()))
     schedule.every(6).hours.do(lambda: asyncio.run(return_inactive_users()))
     schedule.every().monday.at("10:00").do(lambda: asyncio.run(weekly_email_digest()))

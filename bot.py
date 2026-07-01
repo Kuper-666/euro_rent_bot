@@ -65,6 +65,13 @@ def get_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 
+def kb(update):
+    """Reply-keyboard только в личке. В группе — None."""
+    if update and update.effective_chat and update.effective_chat.type == "private":
+        return get_keyboard()
+    return None
+
+
 def get_analysis_inline_buttons():
     keyboard = [
         [
@@ -170,10 +177,10 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 "А пока можете:\n"
                 "- Прочитать /help о тарифах\n"
                 "- Отправить ссылку позже",
-                reply_markup=get_keyboard()
+                reply_markup=kb(update)
             )
         else:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=get_keyboard())
+            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
 
 
 def check_followups(user: dict, lang: str) -> str:
@@ -228,26 +235,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     followup = check_followups(user, lang)
     if followup:
-        await update.message.reply_text(followup, reply_markup=get_keyboard())
+        await update.message.reply_text(followup, reply_markup=kb(update))
 
     pdf_state = user.get("pdf_state")
     if pdf_state == "awaiting_data":
         user.pop("pdf_state", None)
         pdf_data = parse_pdf_data(update.message.text)
         if not pdf_data:
-            await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=get_keyboard())
+            await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
             return
-        await update.message.reply_text(get_msg(lang, "pdf_generating"), reply_markup=get_keyboard())
+        await update.message.reply_text(get_msg(lang, "pdf_generating"), reply_markup=kb(update))
         try:
             pdf_bytes = generate_mieterprofil_pdf(pdf_data)
             await update.message.reply_document(
                 document=BytesIO(pdf_bytes),
                 filename="Mieterprofil.pdf",
                 caption=get_msg(lang, "pdf_done"),
-                reply_markup=get_keyboard()
+                reply_markup=kb(update)
             )
         except Exception as e:
-            await update.message.reply_text(get_msg(lang, "pdf_error").format(e), reply_markup=get_keyboard())
+            await update.message.reply_text(get_msg(lang, "pdf_error").format(e), reply_markup=kb(update))
         return
 
     vip_state = user.get("vip_state")
@@ -258,35 +265,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         save_data(data)
         await update.message.reply_text(
             f"✅ *VIP активирован!*\n\nКритерии сохранены:\n{update.message.text}\n\nЯ буду присылать подборку каждый день!",
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
             parse_mode="Markdown"
         )
         return
 
     if not can_use(user):
-        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
+        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
         return
 
     user_text = update.message.text
 
     if user_text and is_url(user_text):
-        await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=get_keyboard())
+        await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
         listing_text = fetch_url_text(user_text)
         if listing_text.startswith("ERROR"):
             await update.message.reply_text(
                 "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
                 "Скопируйте текст объявления и отправьте его сюда.",
-                reply_markup=get_keyboard()
+                reply_markup=kb(update)
             )
             return
     elif user_text:
         listing_text = user_text
     else:
-        await update.message.reply_text(get_msg(lang, "send_listing"), reply_markup=get_keyboard())
+        await update.message.reply_text(get_msg(lang, "send_listing"), reply_markup=kb(update))
         return
 
     if len(listing_text) < 10:
-        await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=get_keyboard())
+        await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=kb(update))
         return
 
     user_city = get_user_city(user_id)
@@ -297,7 +304,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             city_name = user_city_info.get("name", user_city)
             await update.message.reply_text(
                 get_msg(lang, "city_filter_skip").format(user_city=city_name),
-                reply_markup=get_keyboard(),
+                reply_markup=kb(update),
             )
             return
 
@@ -305,11 +312,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not allowed:
         await update.message.reply_text(
             f"⏳ Подождите {int(wait)} сек. перед следующим анализом.",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
         return
 
-    await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     await process_listing(update, context, listing_text, user_id, lang)
 
 
@@ -320,7 +327,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = get_user_data(data, user_id)
 
     if not can_use(user):
-        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=get_keyboard())
+        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
         return
 
     save_data(data)
@@ -329,11 +336,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not allowed:
         await update.message.reply_text(
             f"⏳ Подождите {int(wait)} сек. перед следующим анализом.",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
         return
 
-    await update.message.reply_text(get_msg(lang, "ocr_processing"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "ocr_processing"), reply_markup=kb(update))
 
     photo = update.message.photo[-1]
     file = await context.bot.get_file(photo.file_id)
@@ -341,10 +348,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     listing_text = ocr_from_photo(bytes(photo_bytes))
 
     if not listing_text or listing_text.startswith("ERROR"):
-        await update.message.reply_text("❌ Не удалось распознать текст. Попробуйте отправить текст или ссылку.", reply_markup=get_keyboard())
+        await update.message.reply_text("❌ Не удалось распознать текст. Попробуйте отправить текст или ссылку.", reply_markup=kb(update))
         return
 
-    await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     await process_listing(update, context, listing_text, user_id, lang)
 
 
@@ -369,7 +376,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "Отправьте ссылку на объявление или текст.\n"
                 f"Осталось проверок: {remaining}"
             ),
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
         )
 
     # Кнопка "Проанализировать" из группы — отправляем в ЛИЧКУ
@@ -399,7 +406,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
                 f"📊 Осталось проверок: {remaining}"
             ),
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
         )
 
     # Кнопка "Пропустить"
@@ -417,7 +424,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
         )
 
     # Кнопка "PDF"
@@ -425,7 +432,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=get_msg(lang, "pay_pdf"),
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
         )
 
     # Кнопки оплаты
@@ -437,7 +444,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await context.bot.send_message(
             chat_id=int(user_id),
             text=get_msg(lang, msg_key),
-            reply_markup=get_keyboard(),
+            reply_markup=kb(update),
         )
 
 
@@ -457,13 +464,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if payload.startswith("analyze_"):
             url = unquote(payload[len("analyze_"):])
             if is_url(url):
-                await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=get_keyboard())
+                await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
                 listing_text = fetch_url_text(url)
                 if listing_text.startswith("ERROR"):
                     await update.message.reply_text(
                         "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
                         "Скопируйте текст объявления и отправьте его сюда.",
-                        reply_markup=get_keyboard()
+                        reply_markup=kb(update)
                     )
                     return
                 await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
@@ -499,7 +506,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
-    await update.message.reply_text(get_msg(lang, "start"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -508,7 +515,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
-    await update.message.reply_text(get_msg(lang, "help"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "help"), reply_markup=kb(update))
 
 
 async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -538,7 +545,7 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
-    await update.message.reply_text(text, reply_markup=get_keyboard())
+    await update.message.reply_text(text, reply_markup=kb(update))
 
 
 async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -553,7 +560,7 @@ async def pay_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=kb(update))
 
 
 async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -568,7 +575,7 @@ async def pay_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=kb(update))
 
 
 async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -583,7 +590,7 @@ async def pay_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. У вас достаточно Stars?", reply_markup=kb(update))
 
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -603,7 +610,7 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
-    await update.message.reply_text(text, reply_markup=get_keyboard())
+    await update.message.reply_text(text, reply_markup=kb(update))
 
 
 async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -629,7 +636,7 @@ async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["pdf_paid"] = True
     user["pdf_state"] = "awaiting_data"
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=kb(update))
 
 
 async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -647,12 +654,12 @@ async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
-    await update.message.reply_text(text, reply_markup=get_keyboard())
+    await update.message.reply_text(text, reply_markup=kb(update))
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = get_lang(update)
-    await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=kb(update))
 
 
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -664,7 +671,7 @@ async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["vip"] = True
     user["vip_state"] = "awaiting_criteria"
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=kb(update))
 
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -677,7 +684,7 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
-    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -690,7 +697,7 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["last_paid_at"] = time.time()
     save_data(data)
     remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
-    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -702,7 +709,7 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user["balance"] = -1
     user["last_paid_at"] = time.time()
     save_data(data)
-    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=get_keyboard())
+    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=kb(update))
 
 
 def parse_pdf_data(text: str) -> dict:
@@ -730,7 +737,7 @@ async def pay_stars_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=kb(update))
 
 
 async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -745,7 +752,7 @@ async def pay_stars_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=kb(update))
 
 
 async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -760,7 +767,7 @@ async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             need_name=False,
         )
     except Exception:
-        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=get_keyboard())
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=kb(update))
 
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -785,7 +792,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
             f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
     elif payload == "pay_stars_9":
         user["balance"] += 10
@@ -794,7 +801,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         remaining = user["balance"] + max(0, FREE_LIMIT - user["free_used"])
         await update.message.reply_text(
             f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
     elif payload == "pay_stars_19":
         user["balance"] = -1
@@ -802,7 +809,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_data(data)
         await update.message.reply_text(
             "Оплата подтверждена! Безлимит на месяц активирован!",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
     elif payload == "pay_stars_pdf":
         user["pdf_paid"] = True
@@ -810,7 +817,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         save_data(data)
         await update.message.reply_text(
             "Оплата PDF подтверждена! Отправьте данные для заявления.",
-            reply_markup=get_keyboard()
+            reply_markup=kb(update)
         )
 
 
@@ -1000,6 +1007,48 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     subs = get_active_subscribers()
     await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
 
+
+async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    args = context.args
+
+    if not args:
+        await update.message.reply_text(
+            "Укажите ваш часовой пояс, например:\n"
+            "/timezone Europe/London\n"
+            "/timezone Europe/Riga\n"
+            "/timezone Europe/Helsinki\n"
+            "/timezone Europe/Berlin\n\n"
+            "Список всех зон: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        )
+        return
+
+    tz_name = args[0]
+    try:
+        import pytz
+        pytz.timezone(tz_name)
+    except pytz.exceptions.UnknownTimeZoneError:
+        await update.message.reply_text(
+            f"❌ Часовой пояс \"{tz_name}\" не найден.\n\n"
+            "Примеры:\n"
+            "Europe/Berlin\n"
+            "Europe/London\n"
+            "Europe/Riga\n"
+            "Europe/Helsinki\n"
+            "America/New_York"
+        )
+        return
+
+    data = load_data()
+    user = get_user_data(data, user_id)
+    user["timezone"] = tz_name
+    save_data(data)
+
+    await update.message.reply_text(
+        f"✅ Часовой пояс сохранён: {tz_name}\n\n"
+        "Когда запущу личный дайджест — פוסטים будут приходить в удобное время."
+    )
+
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -1036,6 +1085,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("subscribe_email", subscribe_email))
     application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email))
     application.add_handler(CommandHandler("subscribers", subscribers_count))
+    application.add_handler(CommandHandler("timezone", set_timezone))
     application.add_handler(CommandHandler("set_city", cmd_set_city))
     application.add_handler(CommandHandler("remove_city", cmd_remove_city))
     application.add_handler(CommandHandler("my_city", cmd_my_city))

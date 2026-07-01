@@ -10,3 +10,5 @@ supabase
 feedparser
 python-dotenv
 schedule
+apscheduler
+pytz
