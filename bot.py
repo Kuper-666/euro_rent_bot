@@ -867,8 +867,17 @@ async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if update.effective_chat.type in ["group", "supergroup"]:
         first_name = update.effective_user.first_name
         await update.message.reply_text(
-            f"Привет, {first_name}! Рад тебя видеть в чате.\n"
-            "Кидай ссылку на любое объявление об аренде, я разберу его за 5 секунд!"
+            f"Привет, {first_name}! 👋\n\n"
+            f"Я EuroRent AI — бот для анализа объявлений об аренде в Европе.\n\n"
+            f"Что я умею:\n"
+            f"🔍 Разбираю объявления за 5 секунд\n"
+            f"💰 Считаю реальную цену со всеми комиссиями\n"
+            f"📄 Подсказываю нужные документы\n"
+            f"⚠️ Предупреждаю о мошенниках\n"
+            f"🌍 Работаю с 30+ сайтами по всей Европе\n\n"
+            f"Как пользоваться:\n"
+            f"Просто отправьте ссылку на объявление сюда в чат — "
+            f"я перенаправлю вас в личку с ботом для полного разбора!"
         )
 
 
@@ -1063,38 +1072,40 @@ if __name__ == "__main__":
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("revolut", revolut_command))
-    application.add_handler(CommandHandler("pay", pay_command))
-    application.add_handler(CommandHandler("pdf", pdf_command))
-    application.add_handler(CommandHandler("pay_done_pdf", pay_done_pdf))
-    application.add_handler(CommandHandler("vip", vip_command))
-    application.add_handler(CommandHandler("pay_vip", pay_vip))
-    application.add_handler(CommandHandler("pay_done_vip", pay_done_vip))
-    application.add_handler(CommandHandler("pay_done_3", pay_done_3))
-    application.add_handler(CommandHandler("pay_done_9", pay_done_9))
-    application.add_handler(CommandHandler("pay_done_19", pay_done_19))
-    application.add_handler(CommandHandler("pay_stars_3", pay_stars_3))
-    application.add_handler(CommandHandler("pay_stars_9", pay_stars_9))
-    application.add_handler(CommandHandler("pay_stars_19", pay_stars_19))
-    application.add_handler(CommandHandler("pay_stars_pdf", pay_stars_pdf))
-    application.add_handler(CommandHandler("pay_3", pay_3))
-    application.add_handler(CommandHandler("pay_9", pay_9))
-    application.add_handler(CommandHandler("pay_19", pay_19))
+    priv = filters.ChatType.PRIVATE
+
+    application.add_handler(CommandHandler("start", start, priv))
+    application.add_handler(CommandHandler("help", help_command, priv))
+    application.add_handler(CommandHandler("revolut", revolut_command, priv))
+    application.add_handler(CommandHandler("pay", pay_command, priv))
+    application.add_handler(CommandHandler("pdf", pdf_command, priv))
+    application.add_handler(CommandHandler("pay_done_pdf", pay_done_pdf, priv))
+    application.add_handler(CommandHandler("vip", vip_command, priv))
+    application.add_handler(CommandHandler("pay_vip", pay_vip, priv))
+    application.add_handler(CommandHandler("pay_done_vip", pay_done_vip, priv))
+    application.add_handler(CommandHandler("pay_done_3", pay_done_3, priv))
+    application.add_handler(CommandHandler("pay_done_9", pay_done_9, priv))
+    application.add_handler(CommandHandler("pay_done_19", pay_done_19, priv))
+    application.add_handler(CommandHandler("pay_stars_3", pay_stars_3, priv))
+    application.add_handler(CommandHandler("pay_stars_9", pay_stars_9, priv))
+    application.add_handler(CommandHandler("pay_stars_19", pay_stars_19, priv))
+    application.add_handler(CommandHandler("pay_stars_pdf", pay_stars_pdf, priv))
+    application.add_handler(CommandHandler("pay_3", pay_3, priv))
+    application.add_handler(CommandHandler("pay_9", pay_9, priv))
+    application.add_handler(CommandHandler("pay_19", pay_19, priv))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    application.add_handler(CommandHandler("pin", pin_message))
-    application.add_handler(CommandHandler("subscribe_email", subscribe_email))
-    application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email))
-    application.add_handler(CommandHandler("subscribers", subscribers_count))
-    application.add_handler(CommandHandler("timezone", set_timezone))
-    application.add_handler(CommandHandler("set_city", cmd_set_city))
-    application.add_handler(CommandHandler("remove_city", cmd_remove_city))
-    application.add_handler(CommandHandler("my_city", cmd_my_city))
-    application.add_handler(CommandHandler("trend", cmd_trend))
-    application.add_handler(CommandHandler("holygrail", cmd_holygrail))
-    application.add_handler(CommandHandler("cities", cmd_cities))
+    application.add_handler(CommandHandler("pin", pin_message, priv))
+    application.add_handler(CommandHandler("subscribe_email", subscribe_email, priv))
+    application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email, priv))
+    application.add_handler(CommandHandler("subscribers", subscribers_count, priv))
+    application.add_handler(CommandHandler("timezone", set_timezone, priv))
+    application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
+    application.add_handler(CommandHandler("remove_city", cmd_remove_city, priv))
+    application.add_handler(CommandHandler("my_city", cmd_my_city, priv))
+    application.add_handler(CommandHandler("trend", cmd_trend, priv))
+    application.add_handler(CommandHandler("holygrail", cmd_holygrail, priv))
+    application.add_handler(CommandHandler("cities", cmd_cities, priv))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
     application.add_handler(CallbackQueryHandler(handle_callback))
