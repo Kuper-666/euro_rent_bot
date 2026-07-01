@@ -863,6 +863,28 @@ async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.message.reply_text("Чтобы закрепить пост, ответьте на него и напишите /pin")
 
 
+async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    bot_username = context.bot.username
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Открыть бота в личке", url=f"https://t.me/{bot_username}")]
+    ])
+    await update.message.reply_text(
+        "👋 Нажмите кнопку ниже, чтобы начать работу со мной в личке!",
+        reply_markup=keyboard,
+    )
+
+
+async def group_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    bot_username = context.bot.username
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📖 Открыть помощь в личке", url=f"https://t.me/{bot_username}?start=help")]
+    ])
+    await update.message.reply_text(
+        "📖 Нажмите кнопку ниже, чтобы получить справку в личке!",
+        reply_markup=keyboard,
+    )
+
+
 async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat.type in ["group", "supergroup"]:
         first_name = update.effective_user.first_name
@@ -1100,6 +1122,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("trend", cmd_trend, priv))
     application.add_handler(CommandHandler("holygrail", cmd_holygrail, priv))
     application.add_handler(CommandHandler("cities", cmd_cities, priv))
+    groups = filters.ChatType.GROUPS
+    application.add_handler(CommandHandler("start", group_start, groups))
+    application.add_handler(CommandHandler("help", group_help, groups))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
     application.add_handler(CallbackQueryHandler(handle_callback))
