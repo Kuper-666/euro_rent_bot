@@ -1109,7 +1109,7 @@ if __name__ == "__main__":
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
     application.add_handler(CallbackQueryHandler(handle_callback))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.PHOTO & priv, handle_photo))
     application.add_handler(MessageHandler(
         filters.ChatType.GROUPS & filters.Regex(r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
         group_greeting
