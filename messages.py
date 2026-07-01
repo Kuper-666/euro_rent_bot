@@ -42,6 +42,7 @@ MESSAGES = {
             "/trend berlin — тренд цен по городу\n"
             "/holygrail — идеальные квартиры\n\n"
             "Официальная страница: euro-rent-bot.onrender.com\n\n"
+            "Работает с любыми порталами Европы — от Лиссабона до Таллина.\n\n"
             "Готов начать? Просто пришли мне любое объявление прямо сейчас!"
         ),
         "analyzing": "Анализирую объявление...",
@@ -121,6 +122,7 @@ MESSAGES = {
             "Безліміт/міс — 1900 Stars (~19EUR) -> /pay_19\n"
             "PDF-заява — 500 Stars (~5EUR) -> /pdf\n"
             "VIP-підписка — 1500 Stars (~15EUR/міс) -> /vip\n\n"
+            "Працює з будь-якими порталами Європи — від Лісабона до Талліна.\n\n"
             "Готові? Пришліть оголошення!"
         ),
         "analyzing": "Аналізую оголошення...",
@@ -203,6 +205,7 @@ MESSAGES = {
             "Best listings every week.\n"
             "Subscribe: /subscribe_email your@email.com\n"
             "Unsubscribe: /unsubscribe_email\n\n"
+            "Works with any European portal — from Lisbon to Tallinn.\n\n"
             "Ready? Send me a listing!"
         ),
         "analyzing": "Analyzing listing...",
@@ -281,6 +284,7 @@ MESSAGES = {
             "Unbegrenzt/Monat — 1900 Stars (~19EUR) -> /pay_19\n"
             "PDF-Antrag — 500 Stars (~5EUR) -> /pdf\n"
             "VIP-Abo — 1500 Stars (~15EUR/Monat) -> /vip\n\n"
+            "Funktioniert mit jedem europaeischen Portal — von Lissabon bis Tallinn.\n\n"
             "Bereit? Schick ein Angebot!"
         ),
         "analyzing": "Analysiere Angebot...",
@@ -359,6 +363,7 @@ MESSAGES = {
             "Nieograniczony/mies — 1900 Stars (~19EUR) -> /pay_19\n"
             "PDF-wniosek — 500 Stars (~5EUR) -> /pdf\n"
             "VIP — 1500 Stars (~15EUR/mies) -> /vip\n\n"
+            "Dziala z kazdym europejskim portalem — od Lizbony po Tallin.\n\n"
             "Gotowy? Wyslij oferte!"
         ),
         "analyzing": "Analizuje oferte...",
