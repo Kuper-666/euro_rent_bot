@@ -86,16 +86,21 @@ def fetch_url_text(url: str) -> str:
     url = resolve_redirect_url(url)
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
         }
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+        for tag in soup(["script", "style", "meta", "noscript", "nav", "footer", "header", "aside"]):
             tag.decompose()
         text = soup.get_text(separator="\n", strip=True)
-        lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 10]
-        return "\n".join(lines[:200])
+        lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 5]
+        result = "\n".join(lines)
+        if len(result) > 6000:
+            result = result[:6000] + "... (текст сокращён для анализа)"
+        return result
     except Exception as e:
         return f"ERROR: {e}"
 

@@ -63,7 +63,7 @@ async def send_daily_post():
         random.shuffle(feed.entries)
         entry = feed.entries[0]
 
-        title = entry.title
+        title = strip_html(entry.title)
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 

@@ -103,7 +103,7 @@ def fetch_week_entries():
                 url = entry.get("link", "")
                 if not url:
                     continue
-                title = clean_text(entry.get("title", ""))
+                title = strip_html(entry.get("title", ""))
                 summary = strip_html(entry.get("summary", ""))[:500]
                 entries.append({"url": url, "title": title, "summary": summary})
         except Exception as e:
