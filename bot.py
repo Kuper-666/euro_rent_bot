@@ -1135,6 +1135,20 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
 
 
+async def post_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
+    await update.message.reply_text("🔄 Запускаю отправку дайджеста в группу...")
+    try:
+        from scheduler import send_group_digest
+        await send_group_digest()
+        await update.message.reply_text("✅ Дайджест отправлен! Проверьте группу.")
+    except Exception as e:
+        logging.error(f"/post_now error: {e}")
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
 async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     args = context.args
@@ -1208,6 +1222,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("subscribe_email", subscribe_email, priv))
     application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email, priv))
     application.add_handler(CommandHandler("subscribers", subscribers_count, priv))
+    application.add_handler(CommandHandler("post_now", post_now, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
     application.add_handler(CommandHandler("remove_city", cmd_remove_city, priv))

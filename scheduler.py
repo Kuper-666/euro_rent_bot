@@ -153,22 +153,30 @@ GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 async def send_group_digest():
     """Отправляет дайджест в основную группу."""
+    logger.info(f"send_group_digest called. bot={bool(bot)}, GROUP_ID={GROUP_ID}")
     if not bot:
+        logger.error("send_group_digest: bot is None, skipping")
         return
     if not GROUP_ID:
         logger.warning("GROUP_ID not set, skipping group digest")
         return
     try:
         from daily_poster import send_daily_post
+        logger.info(f"send_group_digest: calling send_daily_post for GROUP_ID={GROUP_ID}")
         await send_daily_post()
-        logger.info("Group digest sent")
+        logger.info("send_group_digest: send_daily_post completed")
     except Exception as e:
-        logger.error(f"Failed to send group digest: {e}")
+        logger.error(f"Failed to send group digest: {e}", exc_info=True)
 
 
 def _run_group_digest():
     """Обёртка для APScheduler — запускает async-функцию."""
-    asyncio.run(send_group_digest())
+    logger.info("APScheduler: triggering group digest...")
+    try:
+        asyncio.run(send_group_digest())
+        logger.info("APScheduler: group digest completed")
+    except Exception as e:
+        logger.error(f"APScheduler: group digest failed: {e}")
 
 
 # ============================================================================

@@ -8,6 +8,7 @@ DATA_FILE = "users_data.json"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_TABLE = "Users"
 
 _supabase = None
 _storage_mode = None
@@ -61,7 +62,7 @@ def load_data():
     if _get_mode() == "supabase":
         try:
             sb = _get_supabase()
-            result = sb.table("users").select("*").execute()
+            result = sb.table(SUPABASE_TABLE).select("*").execute()
             data = {}
             for row in result.data:
                 uid = str(row.get("user_id", ""))
@@ -96,7 +97,7 @@ def save_data(data):
         try:
             sb = _get_supabase()
             existing = {}
-            result = sb.table("users").select("id,user_id").execute()
+            result = sb.table(SUPABASE_TABLE).select("id,user_id").execute()
             for row in result.data:
                 uid = str(row.get("user_id", ""))
                 if uid:
@@ -122,9 +123,9 @@ def save_data(data):
                     "timezone": info.get("timezone", ""),
                 }
                 if uid in existing:
-                    sb.table("users").update(row_data).eq("id", existing[uid]).execute()
+                    sb.table(SUPABASE_TABLE).update(row_data).eq("id", existing[uid]).execute()
                 else:
-                    sb.table("users").insert(row_data).execute()
+                    sb.table(SUPABASE_TABLE).insert(row_data).execute()
             return
         except Exception as e:
             logger.error(f"Supabase save error: {e}, falling back to JSON")
