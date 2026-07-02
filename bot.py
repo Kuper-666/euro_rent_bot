@@ -457,19 +457,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     return
 
                 from telegram import Update as TGUpdate
-                fake_msg = type('obj', (object,), {
-                    'reply_text': lambda self, text, **kw: context.bot.send_message(
+                async def _fake_reply_text(text, **kw):
+                    return await context.bot.send_message(
                         chat_id=int(user_id), text=text,
                         reply_markup=kw.get('reply_markup'), parse_mode=kw.get('parse_mode')
-                    ),
-                    'reply_document': lambda self, **kw: context.bot.send_document(
+                    )
+                async def _fake_reply_document(**kw):
+                    return await context.bot.send_document(
                         chat_id=int(user_id), **kw
-                    ),
+                    )
+                fake_msg = type('obj', (object,), {
+                    'reply_text': _fake_reply_text,
+                    'reply_document': _fake_reply_document,
                 })()
                 fake_update = type('obj', (object,), {
                     'message': fake_msg,
                     'effective_user': update.effective_user,
-                    'effective_chat': type('obj', (object,), {'type': 'private'})(),
+                    'effective_chat': type('obj', (object,), {'type': 'private', 'id': int(user_id)})(),
                 })()
                 await process_listing(fake_update, context, listing_text, user_id, lang)
             except Exception as e:
