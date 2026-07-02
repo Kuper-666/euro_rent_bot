@@ -19,7 +19,7 @@ services:
       - key: CHANNEL_ID
         sync: false
       - key: GROUP_ID
-        sync: false
+        value: "-1004303604754"
       - key: CITY_CHANNELS
         value: '{}'
       - key: SMTP_HOST
@@ -33,7 +33,7 @@ services:
       - key: NEWSLETTER_FROM
         value: EuroRent AI <noreply@eurorent.ai>
       - key: ADMIN_ID
-        sync: false
+        value: "939191689"
       - key: WEB_CONCURRENCY
         value: "1"
 
