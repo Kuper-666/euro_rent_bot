@@ -413,89 +413,40 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=kb(update, chat_type="private"),
         )
 
-    # Кнопка "Проанализировать" из группы — автоматически анализируем RSS-ссылку
+    # Кнопка "Проанализировать" из группы — открываем бота в личке
     elif data_prefix in ("analyze_ad", "analyze_rss"):
         await query.edit_message_reply_markup(reply_markup=None)
         data = load_data()
         user = get_user_data(data, user_id)
 
-        if not can_use(user):
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=(
-                    "❌ У вас закончились проверки.\n\n"
-                    "Пакеты:\n"
-                    "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                    "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                    "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
-                ),
-            )
-            return
-
         short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
         pending = _load_pending_listings()
         listing = pending.get(short_id, {})
         rss_url = listing.get("url", "")
+        bot_username = context.bot.username
 
         if rss_url and is_url(rss_url):
-            try:
-                await context.bot.send_message(
-                    chat_id=int(user_id),
-                    text="🔍 Загружаю объявление...",
-                    reply_markup=kb(update, chat_type="private"),
-                )
-                listing_text = fetch_url_text(rss_url)
-                if listing_text.startswith("ERROR"):
-                    await context.bot.send_message(
-                        chat_id=int(user_id),
-                        text=(
-                            f"❌ Не удалось загрузить страницу.\n\n"
-                            f"Ссылка: {rss_url}\n\n"
-                            f"Скопируйте текст объявления и отправьте в личку бота."
-                        ),
-                    )
-                    return
-
-                from telegram import Update as TGUpdate
-                async def _fake_reply_text(text, **kw):
-                    return await context.bot.send_message(
-                        chat_id=int(user_id), text=text,
-                        reply_markup=kw.get('reply_markup'), parse_mode=kw.get('parse_mode')
-                    )
-                async def _fake_reply_document(**kw):
-                    return await context.bot.send_document(
-                        chat_id=int(user_id), **kw
-                    )
-                fake_msg = type('obj', (object,), {
-                    'reply_text': _fake_reply_text,
-                    'reply_document': _fake_reply_document,
-                })()
-                fake_update = type('obj', (object,), {
-                    'message': fake_msg,
-                    'effective_user': update.effective_user,
-                    'effective_chat': type('obj', (object,), {'type': 'private', 'id': int(user_id)})(),
-                })()
-                await process_listing(fake_update, context, listing_text, user_id, lang)
-            except Exception as e:
-                logging.error(f"RSS auto-analyze error: {e}")
-                await context.bot.send_message(
-                    chat_id=int(user_id),
-                    text=(
-                        f"❌ Ошибка при анализе.\n\n"
-                        f"Ссылка: {rss_url}\n\n"
-                        f"Отправьте её в личку бота вручную."
-                    ),
-                )
+            analyze_url = f"https://t.me/{bot_username}?start=analyze_{unquote(rss_url)}"
         else:
-            remaining = calc_remaining(user)
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=(
-                    "🔍 Анализ готов!\n\n"
-                    "Отправьте ссылку на объявление или текст прямо сюда, в личку.\n\n"
-                    f"📊 Осталось проверок: {remaining}"
-                ),
-                reply_markup=kb(update, chat_type="private"),
+            analyze_url = f"https://t.me/{bot_username}"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
+        ])
+
+        if not can_use(user):
+            await query.message.reply_text(
+                "❌ У вас закончились проверки.\n\n"
+                "Пакеты:\n"
+                "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+                "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+                "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
+                reply_markup=keyboard,
+            )
+        else:
+            await query.message.reply_text(
+                "🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
+                reply_markup=keyboard,
             )
 
     # Кнопка "Пропустить"
