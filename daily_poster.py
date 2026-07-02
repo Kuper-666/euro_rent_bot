@@ -5,6 +5,8 @@ import random
 import re
 import time
 import feedparser
+import pytz
+from datetime import datetime
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -18,6 +20,18 @@ if not GROUP_ID:
 RSS_FEED_URL = "https://www.google.com/alerts/feeds/15276190721492704538/14744967623754419043"
 
 PENDING_FILE = "pending_listings.json"
+
+
+def get_greeting():
+    hour = datetime.now(pytz.timezone("Europe/Berlin")).hour
+    if 5 <= hour < 12:
+        return "Доброе утро"
+    elif 12 <= hour < 17:
+        return "Добрый день"
+    elif 17 <= hour < 22:
+        return "Добрый вечер"
+    else:
+        return "Доброй ночи"
 
 
 def strip_html(text: str) -> str:
@@ -61,7 +75,7 @@ async def send_daily_post():
         if not feed.entries:
             await bot.send_message(
                 chat_id=GROUP_ID,
-                text="Доброе утро! Сегодня нет свежих объявлений. Загляните позже!"
+                text=f"{get_greeting()}! Сегодня нет свежих объявлений. Загляните позже!"
             )
             return
 
@@ -72,11 +86,10 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        # Сохраняем ссылку и получаем ID для кнопки
         short_id = store_listing(link, title)
 
         post_text = (
-            f"Доброе утро! Свежее объявление:\n\n"
+            f"{get_greeting()}! Свежее объявление:\n\n"
             f"{title}\n"
             f"{summary[:300]}\n\n"
             f"Ссылка: {link}\n\n"
