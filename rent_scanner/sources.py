@@ -18,14 +18,8 @@ class Source:
         return f"https://t.me/{self.username}"
 
 SOURCES: list[Source] = [
-    Source("@mieten_berlin", "Mieten Berlin", "Группа аренды Берлин"),
-    Source("@berlin_rentals", "Berlin Rentals", "Свежие объявления в Берлине"),
-    Source("@wohnung_berlin", "Wohnung Berlin", "Квартиры Берлин"),
-    Source("@immo_deals_berlin", "Immo Deals Berlin", "Выгодные предложения Берлин"),
-    Source("@berlin_expats_apartments", "Berlin Expats Apartments", "Для экспатов"),
-    Source("@munich_rentals", "Munich Rentals", "Аренда Мюнхен"),
-    Source("@russian_berlin_rent", "Русские в Берлине — Аренда", "Русскоязычные объявления"),
-    Source("@expats_germany_rent", "Expats Germany Rent", "Аренда по всей Германии"),
+    Source("@wohnung_berlin", "Wohnung Berlin", "Крупный канал с квартирами в Берлине"),
+    Source("@russians_in_berlin", "Русские в Берлине", "Много объявлений от русскоязычных"),
 ]
 
 def enabled_sources() -> list[Source]:

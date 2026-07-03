@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 import signal
 from datetime import datetime, timezone
 from typing import Iterable
@@ -17,9 +18,14 @@ from .formatting import format_lead
 from .sources import Source, enabled_sources
 from .storage import LeadRecord, Storage
 
+import os
+from dotenv import load_dotenv
+
 LOGGER = logging.getLogger("rent_scanner")
 
 class RentScanner:
+    MAX_AUTO_SUBS_PER_DAY = 3
+
     def __init__(self, config: RuntimeConfig):
         self.config = config
         config.user_session_path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,10 +34,25 @@ class RentScanner:
         self.sources = enabled_sources()
         self.user_client = TelegramClient(str(config.user_session_path), config.api_id, config.api_hash)
         self.bot_client = TelegramClient(str(config.bot_session_path), config.api_id, config.api_hash)
+        self._auto_sub_today = 0
+        self._auto_sub_date = datetime.now(timezone.utc).date()
 
     async def run(self) -> None:
         self._register_bot_commands()
-        await self.user_client.start()
+        load_dotenv()
+        env_code = os.getenv("TELEGRAM_CODE", "").strip()
+
+        await self.user_client.connect()
+        if not await self.user_client.is_user_authorized():
+            if not self.config.phone:
+                raise RuntimeError("TELEGRAM_PHONE is required for first-time login")
+            await self.user_client.send_code_request(self.config.phone)
+            if env_code:
+                code = env_code
+            else:
+                code = input("Please enter the code you received: ")
+            await self.user_client.sign_in(self.config.phone, code)
+
         await self.bot_client.start(bot_token=self.config.bot_token)
 
         if self.config.target_chat_id is not None:
@@ -108,6 +129,10 @@ class RentScanner:
         if not text.strip():
             return
 
+        # ========== CHANNEL HUNTER: ищем новые каналы в тексте ==========
+        await self._discover_channels(text)
+        # =================================================================
+
         match = match_text(text)
         if not match.accepted:
             return
@@ -144,6 +169,46 @@ class RentScanner:
         if delivered:
             self.storage.mark_notified(lead.source, lead.message_id)
             LOGGER.info("✅ Объявление доставлено из %s (ID: %s)", source.handle, message.id)
+
+    async def _discover_channels(self, text: str) -> None:
+        """Ищет @username в тексте и автоматически подписывается на новые каналы (макс 3/день)."""
+        today = datetime.now(timezone.utc).date()
+        if today != self._auto_sub_date:
+            self._auto_sub_today = 0
+            self._auto_sub_date = today
+
+        if self._auto_sub_today >= self.MAX_AUTO_SUBS_PER_DAY:
+            return
+
+        found_channels = re.findall(r'@([A-Za-z0-9_]{5,32})', text)
+        for channel_name in found_channels:
+            if self._auto_sub_today >= self.MAX_AUTO_SUBS_PER_DAY:
+                break
+
+            handle = f"@{channel_name}"
+            if any(s.handle == handle for s in self.sources):
+                continue
+            try:
+                entity = await self.user_client.get_entity(handle)
+                if not hasattr(entity, 'title'):
+                    continue
+                new_source = Source(
+                    handle=handle,
+                    title=entity.title,
+                    reason="Найден автоматически",
+                    enabled=True,
+                )
+                self.sources.append(new_source)
+                self._auto_sub_today += 1
+
+                @self.user_client.on(events.NewMessage(chats=entity))
+                async def new_channel_handler(event: events.NewMessage.Event, src: Source = new_source) -> None:
+                    await self._process_message(src, event.message)
+
+                LOGGER.info("📡 Новый канал: %s (%s) [%d/%d сегодня]",
+                            handle, entity.title, self._auto_sub_today, self.MAX_AUTO_SUBS_PER_DAY)
+            except (ValueError, RPCError):
+                pass
 
     async def _wait_until_stopped(self) -> None:
         stop_event = asyncio.Event()
