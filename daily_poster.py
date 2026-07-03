@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import logging
 import random
 import re
 import time
@@ -9,13 +10,15 @@ import pytz
 from datetime import datetime
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
+logger = logging.getLogger(__name__)
+
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
 if not GROUP_ID:
-    print("WARNING: GROUP_ID not set. Daily post will not work.")
+    logger.warning("GROUP_ID not set. Daily post will not work.")
 
 RSS_FEED_URL = "https://www.google.com/alerts/feeds/15276190721492704538/14744967623754419043"
 
@@ -103,14 +106,14 @@ async def send_daily_post():
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await bot.send_message(chat_id=GROUP_ID, text=post_text, reply_markup=reply_markup)
-        print("Дайджест отправлен!")
+        logger.info("Дайджест отправлен!")
 
     except Exception as e:
         await bot.send_message(
             chat_id=GROUP_ID,
             text=f"Ошибка: {e}"
         )
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка: {e}")
 
 
 if __name__ == "__main__":

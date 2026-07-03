@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from telethon import TelegramClient, events
-from telethon.errors import RPCError
+from telethon.errors import RPCError, FloodWaitError
 from telethon.tl.custom.message import Message
 
 from .config import RuntimeConfig
@@ -163,6 +163,15 @@ class RentScanner:
             try:
                 await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
                 delivered = True
+            except FloodWaitError as exc:
+                wait_seconds = min(exc.seconds, 300)
+                LOGGER.warning("Flood wait %ds, sleeping...", wait_seconds)
+                await asyncio.sleep(wait_seconds)
+                try:
+                    await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
+                    delivered = True
+                except RPCError as exc2:
+                    LOGGER.warning("Не удалось доставить объявление в %s после retry: %s", chat_id, exc2)
             except RPCError as exc:
                 LOGGER.warning("Не удалось доставить объявление в %s: %s", chat_id, exc)
 

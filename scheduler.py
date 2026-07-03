@@ -18,6 +18,7 @@ import pytz
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.events import EVENT_JOB_ERROR
 from telegram import Bot
 
 from config import TELEGRAM_TOKEN
@@ -236,13 +237,19 @@ async def send_promo_to_group():
 # ПЛАНИРОВЩИК
 # ============================================================================
 
+def _job_error_handler(job, exception):
+    """Обработчик ошибок для всех APScheduler jobs."""
+    logger.error(f"APScheduler job '{job.name}' failed: {exception}", exc_info=True)
+
+
 def run_scheduler():
     """Запускает планировщик в фоновом потоке."""
     # --- Группа: 10:00 и 18:00 по Берлину (APScheduler) ---
     apscheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Berlin"))
-    apscheduler.add_job(_run_group_digest, CronTrigger(hour=10, minute=0))
-    apscheduler.add_job(_run_group_digest, CronTrigger(hour=18, minute=0))
-    apscheduler.add_job(lambda: asyncio.run(send_promo_to_group()), CronTrigger(hour=15, minute=0))
+    apscheduler.add_job(_run_group_digest, CronTrigger(hour=10, minute=0), name="group_digest_10")
+    apscheduler.add_job(_run_group_digest, CronTrigger(hour=18, minute=0), name="group_digest_18")
+    apscheduler.add_job(lambda: asyncio.run(send_promo_to_group()), CronTrigger(hour=15, minute=0), name="promo_15")
+    apscheduler.add_listener(_job_error_handler, EVENT_JOB_ERROR)
     apscheduler.start()
     logger.info("APScheduler: group posts at 10:00, 18:00, promo at 15:00 Berlin time")
 

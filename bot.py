@@ -44,6 +44,7 @@ _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Словарь для хранения ссылок из постов (message_id -> url)
 _pending_listings = {}
@@ -390,102 +391,110 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    lang = get_lang(update)
-    user_id = str(update.effective_user.id)
+    try:
+        query = update.callback_query
+        await query.answer()
+        lang = get_lang(update)
+        user_id = str(update.effective_user.id)
 
-    data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
+        data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
 
-    # Кнопка "Ещё одно объявление" — в личку
-    if data_prefix == "new":
-        await query.edit_message_reply_markup(reply_markup=None)
-        data = load_data()
-        user = get_user_data(data, user_id)
-        remaining = calc_remaining(user)
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=(
-                "🔍 Готов к анализу!\n\n"
-                "Отправьте ссылку на объявление или текст.\n"
-                f"Осталось проверок: {remaining}"
-            ),
-            reply_markup=kb(update, chat_type="private"),
-        )
-
-    # Кнопка "Проанализировать" из группы — открываем бота в личке
-    elif data_prefix in ("analyze_ad", "analyze_rss"):
-        await query.edit_message_reply_markup(reply_markup=None)
-        data = load_data()
-        user = get_user_data(data, user_id)
-
-        short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
-        pending = _load_pending_listings()
-        listing = pending.get(short_id, {})
-        rss_url = listing.get("url", "")
-        bot_username = context.bot.username
-
-        if rss_url and is_url(rss_url):
-            analyze_url = f"https://t.me/{bot_username}?start=analyze_{unquote(rss_url)}"
-        else:
-            analyze_url = f"https://t.me/{bot_username}"
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
-        ])
-
-        if not can_use(user):
-            await query.message.reply_text(
-                "❌ У вас закончились проверки.\n\n"
-                "Пакеты:\n"
-                "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
-                reply_markup=keyboard,
-            )
-        else:
-            await query.message.reply_text(
-                "🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
-                reply_markup=keyboard,
+        # Кнопка "Ещё одно объявление" — в личку
+        if data_prefix == "new":
+            await query.edit_message_reply_markup(reply_markup=None)
+            data = load_data()
+            user = get_user_data(data, user_id)
+            remaining = calc_remaining(user)
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=(
+                    "🔍 Готов к анализу!\n\n"
+                    "Отправьте ссылку на объявление или текст.\n"
+                    f"Осталось проверок: {remaining}"
+                ),
+                reply_markup=kb(update, chat_type="private"),
             )
 
-    # Кнопка "Пропустить"
-    elif data_prefix == "skip_ad":
-        await query.answer("Ок", show_alert=False)
+        # Кнопка "Проанализировать" из группы — открываем бота в личке
+        elif data_prefix in ("analyze_ad", "analyze_rss"):
+            await query.edit_message_reply_markup(reply_markup=None)
+            data = load_data()
+            user = get_user_data(data, user_id)
 
-    # Кнопка "Скопировать"
-    elif data_prefix == "copy":
-        await query.answer("Скопируйте текст выше", show_alert=True)
+            short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
+            pending = _load_pending_listings()
+            listing = pending.get(short_id, {})
+            rss_url = listing.get("url", "")
+            bot_username = context.bot.username
 
-    # Кнопка "Поделиться"
-    elif data_prefix == "share":
-        bot_username = context.bot.username
-        share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+EuroRent+AI+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
-            reply_markup=kb(update, chat_type="private"),
-        )
+            if rss_url and is_url(rss_url):
+                analyze_url = f"https://t.me/{bot_username}?start=analyze_{unquote(rss_url)}"
+            else:
+                analyze_url = f"https://t.me/{bot_username}"
 
-    # Кнопка "PDF"
-    elif data_prefix == "pdf":
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=get_msg(lang, "pay_pdf"),
-            reply_markup=kb(update, chat_type="private"),
-        )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
+            ])
 
-    # Кнопки оплаты
-    elif data_prefix.startswith("show_pay_"):
-        plan = data_prefix.replace("show_pay_", "")
-        msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
-        if plan == "vip":
-            msg_key = "vip_intro"
-        await context.bot.send_message(
-            chat_id=int(user_id),
-            text=get_msg(lang, msg_key),
-            reply_markup=kb(update, chat_type="private"),
-        )
+            if not can_use(user):
+                await query.message.reply_text(
+                    "❌ У вас закончились проверки.\n\n"
+                    "Пакеты:\n"
+                    "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+                    "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+                    "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
+                    reply_markup=keyboard,
+                )
+            else:
+                await query.message.reply_text(
+                    "🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
+                    reply_markup=keyboard,
+                )
+
+        # Кнопка "Пропустить"
+        elif data_prefix == "skip_ad":
+            await query.answer("Ок", show_alert=False)
+
+        # Кнопка "Скопировать"
+        elif data_prefix == "copy":
+            await query.answer("Скопируйте текст выше", show_alert=True)
+
+        # Кнопка "Поделиться"
+        elif data_prefix == "share":
+            bot_username = context.bot.username
+            share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+EuroRent+AI+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
+                reply_markup=kb(update, chat_type="private"),
+            )
+
+        # Кнопка "PDF"
+        elif data_prefix == "pdf":
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=get_msg(lang, "pay_pdf"),
+                reply_markup=kb(update, chat_type="private"),
+            )
+
+        # Кнопки оплаты
+        elif data_prefix.startswith("show_pay_"):
+            plan = data_prefix.replace("show_pay_", "")
+            msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
+            if plan == "vip":
+                msg_key = "vip_intro"
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=get_msg(lang, msg_key),
+                reply_markup=kb(update, chat_type="private"),
+            )
+
+    except Exception as e:
+        logger.error(f"handle_callback error: {e}", exc_info=True)
+        try:
+            await query.answer("Произошла ошибка", show_alert=True)
+        except Exception:
+            pass
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
