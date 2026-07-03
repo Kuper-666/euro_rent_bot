@@ -6,33 +6,53 @@ from dataclasses import dataclass
 MIN_SCORE = 3
 
 KEYWORDS: dict[str, int] = {
+    # DE Germany
     "wohnung": 5,
-    "apartment": 5,
-    "flat": 4,
     "zu vermieten": 5,
-    "for rent": 4,
-    "à louer": 4,
-    "alquilar": 3,
-    "аренда": 4,
-    "квартира": 4,
-    "снять": 3,
     "mieten": 4,
-    "rental": 3,
-    "piso": 3,
-    "appartement": 3,
-    "Immoscout": 3,
     "Nebenkosten": 5,
     "Kaltmiete": 4,
     "Warmmiete": 4,
     "Kaution": 4,
     "Schufa": 4,
-    "provision": 3,
+    "zimmer": 3,
+    "Immoscout": 3,
+    # EN English
+    "apartment": 5,
+    "flat": 4,
+    "for rent": 4,
+    "rental": 3,
+    "loft": 3,
+    # RU Russian
+    "аренда": 4,
+    "квартира": 4,
+    "снять": 3,
     "м²": 3,
     "кв.м": 3,
     "комнат": 3,
-    "zimmer": 3,
     "студія": 3,
-    "loft": 3,
+    # PL Poland
+    "wynajem": 4,
+    "mieszkanie": 4,
+    "do wynajęcia": 4,
+    "mieszkania": 3,
+    # IT Italy
+    "affitto": 4,
+    "appartamento": 4,
+    "casa in affitto": 4,
+    # CZ Czech
+    "pronájem": 4,
+    "byt": 3,
+    "k pronájmu": 3,
+    # ES Spain
+    "alquiler": 4,
+    "piso": 4,
+    "apartamento": 3,
+    # FR France
+    "appartement": 3,
+    "à louer": 4,
+    # AT Austria
+    "Wohnung Wien": 4,
 }
 
 STOP_WORDS: list[str] = [
@@ -43,9 +63,7 @@ STOP_WORDS: list[str] = [
     "gambling", "onlyfans", "работа", "вакансия", "фриланс",
     # Персидские и арабские
     "اجاره", "آپارتمان", "اتاق", "استودیو", "برلین", "در", "به", "برای", "با", "از", "یک", "دو",
-    "قابلیت", "ملده", "ماهانе", "یورو", "منطقه", "طولانی", "موقت", "امکانات", "باشگاه", "ورزشی",
-    # Другие нерелевантные города
-    "barcelona", "madrid", "paris", "london", "amsterdam", "vienna", "prague", "warsaw",
+    "قابلیت", "ملده", "ماهانه", "یورو", "منطقه", "طولانی", "موقت", "امکانات", "باشگاه", "ورزشی",
 ]
 
 
