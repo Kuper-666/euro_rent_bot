@@ -12,6 +12,7 @@ import os
 import time
 import asyncio
 import logging
+import random
 import schedule
 import pytz
 from datetime import datetime, timezone, timedelta
@@ -180,6 +181,58 @@ def _run_group_digest():
 
 
 # ============================================================================
+# 6. ПРОМО-СООБЩЕНИЕ В ГРУППУ (15:00 по Берлину)
+# ============================================================================
+
+PROMO_MESSAGES = [
+    (
+        "👋 *EuroRent AI — твой помощник по аренде в Европе!*\n\n"
+        "🔑 Чем я умею:\n"
+        "• Перевожу объявления с любого портала\n"
+        "• Нахожу скрытые платежи (Nebenkosten, Service Charge)\n"
+        "• Подсказываю документы (Schufa, NIE, Garant)\n"
+        "• Проверяю на мошенников и фейки\n\n"
+        "🎁 *Первые 3 проверки — бесплатно!*\n"
+        "Просто отправь ссылку или текст в этот чат."
+    ),
+    (
+        "🏠 *Ищешь квартиру в Европе?*\n\n"
+        "Я могу проверить любое объявление за 5 секунд:\n"
+        "💰 Реальная цена со всеми комиссиями\n"
+        "📋 Какие документы нужны\n"
+        "🚨 Есть ли риски\n\n"
+        "🎁 *3 бесплатные проверки!* Просто кинь ссылку."
+    ),
+    (
+        "💡 *Знаешь ли ты, что большинство объявлений скрывают真实 стоимость?*\n\n"
+        "Nebenkosten, Kaution, Provision — всё это можно узнать до переезда.\n\n"
+        "Отправь мне ссылку на объявление — я покажу реальную цену.\n\n"
+        "🎁 *Первые 3 проверки бесплатно!*"
+    ),
+    (
+        "⚠️ *Не попадись на мошенников!*\n\n"
+        "Каждый день кто-то теряет депозит из-за фейковых объявлений.\n\n"
+        "Я проверю:\n"
+        "✅ Существует ли объявление\n"
+        "✅ Нормальная ли цена\n"
+        "✅ Не прос ли хозяин лишнего\n\n"
+        "🎁 *Попробуй бесплатно — отправь ссылку!*"
+    ),
+]
+
+
+async def send_promo_to_group():
+    if not bot or not GROUP_ID:
+        return
+    text = random.choice(PROMO_MESSAGES)
+    try:
+        await bot.send_message(chat_id=GROUP_ID, text=text, parse_mode="Markdown")
+        logger.info("Promo sent to group")
+    except Exception as e:
+        logger.error(f"Failed to send promo: {e}")
+
+
+# ============================================================================
 # ПЛАНИРОВЩИК
 # ============================================================================
 
@@ -189,8 +242,9 @@ def run_scheduler():
     apscheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Berlin"))
     apscheduler.add_job(_run_group_digest, CronTrigger(hour=10, minute=0))
     apscheduler.add_job(_run_group_digest, CronTrigger(hour=18, minute=0))
+    apscheduler.add_job(lambda: asyncio.run(send_promo_to_group()), CronTrigger(hour=15, minute=0))
     apscheduler.start()
-    logger.info("APScheduler: group posts at 10:00 and 18:00 Berlin time")
+    logger.info("APScheduler: group posts at 10:00, 18:00, promo at 15:00 Berlin time")
 
     # --- Личные задачи (schedule) ---
     schedule.every(1).hours.do(lambda: asyncio.run(remind_last_free_check()))
