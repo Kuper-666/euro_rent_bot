@@ -57,7 +57,9 @@ MESSAGES = {
             "Пакеты и цены:\n"
             "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
             "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
+            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19\n\n"
+            "🎁 Или пригласите друга — получите +1 проверку бесплатно!\n"
+            "Ваша ссылка: {}"
         ),
         "pay_done_3": "Оплата подтверждена! Добавлены 3 проверки. Осталось: {}.",
         "pay_done_9": "Оплата подтверждена! Добавлено 10 проверок. Осталось: {}.",
@@ -142,7 +144,9 @@ MESSAGES = {
             "Пакети та ціни:\n"
             "3 перевірки — 300 Stars (~3EUR) -> /pay_3\n"
             "10 перевірок — 900 Stars (~9EUR) -> /pay_9\n"
-            "Безліміт/міс — 1900 Stars (~19EUR) -> /pay_19"
+            "Безліміт/міс — 1900 Stars (~19EUR) -> /pay_19\n\n"
+            "🎁 Або запросіть друга — отримайте +1 перевірку безкоштовно!\n"
+            "Ваше посилання: {}"
         ),
         "pay_done_3": "Оплата підтверджена! Додано 3 перевірки. Залишилось: {}.",
         "pay_done_9": "Оплата підтверджена! Додано 10 перевірок. Залишилось: {}.",
@@ -230,7 +234,9 @@ MESSAGES = {
             "Packages & Pricing:\n"
             "3 checks — 300 Stars (~3EUR) -> /pay_3\n"
             "10 checks — 900 Stars (~9EUR) -> /pay_9\n"
-            "Unlimited/month — 1900 Stars (~19EUR) -> /pay_19"
+            "Unlimited/month — 1900 Stars (~19EUR) -> /pay_19\n\n"
+            "🎁 Or invite a friend — get +1 free check!\n"
+            "Your link: {}"
         ),
         "pay_done_3": "Payment confirmed! 3 checks added. Remaining: {}.",
         "pay_done_9": "Payment confirmed! 10 checks added. Remaining: {}.",
@@ -315,7 +321,9 @@ MESSAGES = {
             "Pakete & Preise:\n"
             "3 Pruefungen — 300 Stars (~3EUR) -> /pay_3\n"
             "10 Pruefungen — 900 Stars (~9EUR) -> /pay_9\n"
-            "Unbegrenzt/Monat — 1900 Stars (~19EUR) -> /pay_19"
+            "Unbegrenzt/Monat — 1900 Stars (~19EUR) -> /pay_19\n\n"
+            "🎁 Oder laden Sie einen Freund ein — +1 kostenlose Pruefung!\n"
+            "Ihr Link: {}"
         ),
         "pay_done_3": "Zahlung bestaetigt! 3 Pruefungen. Verbleibend: {}.",
         "pay_done_9": "Zahlung bestaetigt! 10 Pruefungen. Verbleibend: {}.",
@@ -400,7 +408,9 @@ MESSAGES = {
             "Pakiety i ceny:\n"
             "3 sprawdzenia — 300 Stars (~3EUR) -> /pay_3\n"
             "10 sprawdzen — 900 Stars (~9EUR) -> /pay_9\n"
-            "Nieograniczony/mies — 1900 Stars (~19EUR) -> /pay_19"
+            "Nieograniczony/mies — 1900 Stars (~19EUR) -> /pay_19\n\n"
+            "🎁 Zaproś znajomego — otrzymaj +1 darmowe sprawdzenie!\n"
+            "Twój link: {}"
         ),
         "pay_done_3": "Platnosc potwierdzona! 3 sprawdzenia. Pozostalo: {}.",
         "pay_done_9": "Platnosc potwierdzona! 10 sprawdzen. Pozostalo: {}.",

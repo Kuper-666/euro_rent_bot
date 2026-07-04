@@ -166,10 +166,75 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 data = load_data()
                 user = get_user_data(data, user_id)
                 if not can_use(user):
-                    await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
+                    ref_code = user.get("ref_code", "")
+                    ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                    await update.message.reply_text(
+                        get_msg(lang, "limit_reached").format(ref_link),
+                        reply_markup=kb(update)
+                    )
                     return
                 use_check(user)
                 save_data(data)
+                if user.get("free_used", 0) == 1 and user.get("referred_by"):
+                    referrer_id = user["referred_by"]
+                    async with _payment_lock:
+                        data2 = load_data()
+                        referrer = data2.setdefault(referrer_id, {"free_used": 0, "balance": 0})
+                        referrals = referrer.setdefault("referrals", [])
+                        if user_id not in referrals:
+                            referrals.append(user_id)
+                            reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
+                            if reward == -1:
+                                referrer["balance"] = -1
+                                referrer["last_paid_at"] = time.time()
+                            elif reward > 0:
+                                referrer["balance"] = referrer.get("balance", 0) + reward
+                            save_data(data2)
+                            try:
+                                n = len(referrals)
+                                progress = ""
+                                if n < 3:
+                                    progress = f"Ещё {3 - n} друга до +3 проверок!"
+                                elif n < 5:
+                                    progress = f"Ещё {5 - n} друзей до +5 проверок!"
+                                elif n < 10:
+                                    progress = f"Ещё {10 - n} друзей до безлимита!"
+                                else:
+                                    progress = "🎉 Безлимит активирован!"
+                                ref_code = referrer.get("ref_code", "")
+                                ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                                await context.bot.send_message(
+                                    chat_id=referrer_id,
+                                    text=f"🎉 Ваш друг сделал первую проверку!\n"
+                                         f"Приглашено: {n} чел.\n\n"
+                                         f"📊 {progress}\n\n"
+                                         f"Ваша ссылка: {ref_link}"
+                                )
+                            except Exception:
+                                pass
+                    user.pop("referred_by", None)
+                    save_data(data)
+                if user.get("free_used", 0) == 1:
+                    ref_code = user.get("ref_code", "")
+                    ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                    aha_msg = (
+                        f"🎉 Это была ваша первая проверка!\n\n"
+                        f"Если пригодилось — пригласите друга, который тоже ищет квартиру, "
+                        f"и получите +1 проверку бесплатно.\n\n"
+                        f"Ваша ссылка: {ref_link}"
+                    )
+                    await update.message.reply_text(aha_msg, reply_markup=kb(update))
+                elif user.get("free_used", 0) % 5 == 0 and user.get("free_used", 0) > 0:
+                    ref_code = user.get("ref_code", "")
+                    ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                    total_checks = user.get("free_used", 0) + user.get("balance", 0)
+                    gentle_msg = (
+                        f"📊 Вы уже сделали {total_checks} проверок с ботом!\n\n"
+                        f"Если знаете кого-то в похожей ситуации — "
+                        f"пригласите и получите +1 проверку бесплатно.\n\n"
+                        f"Ваша ссылка: {ref_link}"
+                    )
+                    await update.message.reply_text(gentle_msg, reply_markup=kb(update))
 
         remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
@@ -311,7 +376,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     if not can_use(user):
-        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
+        ref_code = user.get("ref_code", "")
+        ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+        await update.message.reply_text(
+            get_msg(lang, "limit_reached").format(ref_link),
+            reply_markup=kb(update)
+        )
         return
 
     user_text = update.message.text
@@ -374,7 +444,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = get_user_data(data, user_id)
 
     if not can_use(user):
-        await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
+        ref_code = user.get("ref_code", "")
+        ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+        await update.message.reply_text(
+            get_msg(lang, "limit_reached").format(ref_link),
+            reply_markup=kb(update)
+        )
         return
 
     save_data(data)
@@ -569,26 +644,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     referrer_id = uid
                     break
             if referrer_id and referrer_id != user_id:
-                async with _payment_lock:
-                    data = load_data()
-                    referrer = data.setdefault(referrer_id, {"free_used": 0, "balance": 0})
-                    referrals = referrer.setdefault("referrals", [])
-                    if user_id not in referrals:
-                        referrals.append(user_id)
-                        reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
-                        if reward == -1:
-                            referrer["balance"] = -1
-                            referrer["last_paid_at"] = time.time()
-                        elif reward > 0:
-                            referrer["balance"] = referrer.get("balance", 0) + reward
-                        save_data(data)
-                        try:
-                            await context.bot.send_message(
-                                chat_id=referrer_id,
-                                text=f"🎉 Ваш друг присоединился!\nПриглашено: {len(referrals)} чел."
-                            )
-                        except Exception:
-                            pass
+                user["referred_by"] = referrer_id
+                save_data(data)
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
