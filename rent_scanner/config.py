@@ -28,6 +28,7 @@ class RuntimeConfig:
     api_id: int
     api_hash: str
     bot_token: str
+    phone: str
     target_chat_id: Optional[int]
     database_path: Path
     user_session_path: Path
@@ -43,6 +44,7 @@ class RuntimeConfig:
         api_id_raw = _first_env("TELEGRAM_API_ID", "API_ID")
         api_hash = _first_env("TELEGRAM_API_HASH", "API_HASH")
         bot_token = _first_env("TELEGRAM_BOT_TOKEN", "BOT_TOKEN")
+        phone = _first_env("TELEGRAM_PHONE", "PHONE")
 
         if not api_id_raw or not api_hash or not bot_token:
             raise RuntimeError("Missing required environment variables: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_BOT_TOKEN")
@@ -59,6 +61,7 @@ class RuntimeConfig:
             api_id=api_id,
             api_hash=api_hash,
             bot_token=bot_token,
+            phone=phone,
             target_chat_id=target_chat_id,
             database_path=Path(os.getenv("DATABASE_PATH", "data/leads.sqlite3")),
             user_session_path=Path(os.getenv("USER_SESSION_PATH", "sessions/scanner_user")),
