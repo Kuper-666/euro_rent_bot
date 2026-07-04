@@ -627,6 +627,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         data[user_id] = {"free_used": 0, "balance": 0}
         data[user_id]["ref_code"] = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
         save_data(data)
+    elif not data[user_id].get("ref_code"):
+        data[user_id]["ref_code"] = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
+        save_data(data)
 
     if context.args and len(context.args) > 0:
         payload = context.args[0]
