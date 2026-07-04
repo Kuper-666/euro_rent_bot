@@ -35,7 +35,14 @@ class RentScanner:
         config.bot_session_path.parent.mkdir(parents=True, exist_ok=True)
         self.storage = Storage(config.database_path)
         self.sources = enabled_sources()
-        self.user_client = TelegramClient(str(config.user_session_path), config.api_id, config.api_hash)
+
+        session_string = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
+        if session_string:
+            from telethon.sessions import StringSession
+            self.user_client = TelegramClient(StringSession(session_string), config.api_id, config.api_hash)
+        else:
+            self.user_client = TelegramClient(str(config.user_session_path), config.api_id, config.api_hash)
+
         self.bot_client = TelegramClient(str(config.bot_session_path), config.api_id, config.api_hash)
         self._auto_sub_today = 0
         self._auto_sub_date = datetime.now(timezone.utc).date()

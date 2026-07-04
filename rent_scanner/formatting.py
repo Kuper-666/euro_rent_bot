@@ -4,6 +4,7 @@ import html
 import re
 from datetime import datetime
 from typing import Optional
+from urllib.parse import quote
 
 from .sources import Source
 from .storage import LeadRecord
@@ -144,7 +145,7 @@ def format_lead(source: Source, lead: LeadRecord, bot_username: str = "expat_ren
     link_line = f'\n<a href="{html.escape(lead.link)}">🔗 Перейти к объявлению</a>' if lead.link else ""
     excerpt = html.escape(truncate(lead.text, 500))
 
-    analyze_url = f"https://t.me/{bot_username}?start=analyze_{lead.link}" if lead.link else f"https://t.me/{bot_username}"
+    analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(lead.link, safe='')}" if lead.link else f"https://t.me/{bot_username}"
 
     lines = [
         f"🏠 <b>Новое объявление</b> · score {lead.score}",

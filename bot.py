@@ -1193,8 +1193,9 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     lang = get_lang(update)
 
     if is_url:
+        from urllib.parse import quote
         listing_url = text.strip().split()[0]
-        deep_link = f"https://t.me/{bot_username}?start=analyze_{listing_url}"
+        deep_link = f"https://t.me/{bot_username}?start=analyze_{quote(listing_url, safe='')}"
     else:
         deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
 

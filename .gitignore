@@ -17,6 +17,9 @@ users_data.json
 pending_listings.json
 sent_groups_history.txt
 bot.log
+listing_history.json
+price_trends.json
+referral_events.jsonl
 
 # Telethon sessions
 *.session
@@ -26,6 +29,11 @@ rent_scanner/sessions/
 
 # Rent scanner data
 rent_scanner/data/
+
+# Icons (not needed in repo)
+*.png
+*.jpg
+*.jpeg
 
 # IDE
 .vscode/

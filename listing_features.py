@@ -379,7 +379,8 @@ def get_holy_grail_stats() -> dict:
 
 def format_holy_grail_alert(entry: dict, bot_username: str) -> str:
     """Форматирует уведомление о святом граале"""
-    analyze_url = f"https://t.me/{bot_username}?start=analyze_{entry['url']}"
+    from urllib.parse import quote
+    analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}"
     city_info = POPULAR_CITIES.get(entry.get("city", ""), {})
     city_name = city_info.get("name", entry.get("city", "Неизвестно"))
 

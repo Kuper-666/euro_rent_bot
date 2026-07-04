@@ -37,6 +37,29 @@ services:
       - key: WEB_CONCURRENCY
         value: "1"
 
+  - type: worker
+    name: rent-scanner
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m rent_scanner
+    envVars:
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_SESSION_STRING
+        sync: false
+      - key: TELEGRAM_PHONE
+        sync: false
+      - key: TELEGRAM_TARGET_CHAT_ID
+        sync: false
+      - key: DATABASE_PATH
+        value: "data/leads.sqlite3"
+      - key: LOG_LEVEL
+        value: "INFO"
+
   - type: cron
     name: channel-poster-morning
     runtime: python

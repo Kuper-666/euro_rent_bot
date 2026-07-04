@@ -15,6 +15,7 @@ import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone, timedelta
+from urllib.parse import quote
 from groq import Groq
 from telegram import Bot
 
@@ -135,7 +136,7 @@ def analyze_for_digest(title: str, summary: str) -> str | None:
 def build_digest_html(entries: list[dict], analyses: list[str], bot_username: str) -> str:
     listings_html = ""
     for entry, analysis in zip(entries, analyses):
-        analyze_url = f"https://t.me/{bot_username}?start=analyze_{entry['url']}"
+        analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}"
         listings_html += f"""
         <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:12px;border-left:4px solid #4CAF50;">
             <h3 style="margin:0 0 8px 0;color:#333;">{entry['title']}</h3>
@@ -177,7 +178,7 @@ def build_digest_plain(entries: list[dict], analyses: list[str], bot_username: s
         text += f"{i}. {entry['title']}\n"
         text += f"   {analysis}\n"
         text += f"   Объявление: {entry['url']}\n"
-        text += f"   Анализ: https://t.me/{bot_username}?start=analyze_{entry['url']}\n\n"
+        text += f"   Анализ: https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}\n\n"
     text += f"\n---\nБот: https://t.me/{bot_username}\nОтписаться: https://t.me/{bot_username}?start=unsubscribe_email\n"
     return text
 
