@@ -159,7 +159,7 @@ class RentScanner:
                     offset_date=None,
                     offset_id=0,
                     offset_peer=None,
-                    limit=20,
+                    limit=30,
                 ))
 
                 found = []
@@ -179,15 +179,30 @@ class RentScanner:
                             continue
                         title = entity.title
                         handle = f"@{entity.username}" if hasattr(entity, 'username') and entity.username else None
-                        members = getattr(entity, 'participants_count', '?')
-                        found.append(f"  {title} ({members} чел.) {handle or ''}")
+                        members = getattr(entity, 'participants_count', 0) or 0
+                        is_megagroup = getattr(entity, 'megagroup', False)
+                        chat_type = "группа" if is_megagroup else "канал"
+                        found.append({
+                            "title": title,
+                            "handle": handle or "",
+                            "members": members,
+                            "type": chat_type,
+                            "chat_id": chat_id,
+                        })
                     except Exception:
                         continue
 
-                if found:
-                    text = f"🔍 Найдено {len(found)}:\n" + "\n".join(found[:10])
-                else:
-                    text = f"❌ Ничего не найдено по запросу: {query}"
+                if not found:
+                    await event.respond(f"❌ Ничего не найдено по запросу: {query}")
+                    return
+
+                found.sort(key=lambda x: x["members"], reverse=True)
+                lines = []
+                for i, ch in enumerate(found[:10], 1):
+                    lines.append(f"{i}. [{ch['type']}] {ch['title']}")
+                    lines.append(f"   {ch['members']} чел. | {ch['handle']}")
+                text = f"🔍 Найдено {len(found)} (показано {min(len(found), 10)}):\n\n" + "\n".join(lines)
+                text += "\n\nДобавить: /add @handle"
                 await event.respond(text)
             except Exception as e:
                 await event.respond(f"❌ Ошибка поиска: {str(e)[:100]}")
