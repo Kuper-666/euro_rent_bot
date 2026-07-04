@@ -51,8 +51,27 @@ KEYWORDS: dict[str, int] = {
     # FR France
     "appartement": 3,
     "à louer": 4,
+    "location": 3,
     # AT Austria
     "Wohnung Wien": 4,
+    # PT Portugal
+    "arrendamento": 4,
+    "apartamento": 3,
+    "alugar": 4,
+    "quarto": 3,
+    # NL Netherlands
+    "huur": 4,
+    "te huur": 5,
+    "appartement": 3,
+    "kamer": 3,
+    # HU Hungary
+    "kiadó": 4,
+    "lakás": 4,
+    "albérlet": 4,
+    # GR Greece
+    "ενοικίαση": 4,
+    "διαμέρισμα": 4,
+    "μίσθωση": 3,
 }
 
 STOP_WORDS: list[str] = [
