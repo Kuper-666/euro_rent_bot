@@ -6,6 +6,7 @@ import threading
 import time
 import hashlib
 import asyncio
+import html
 from urllib.parse import unquote
 from io import BytesIO
 from telegram.helpers import escape_markdown
@@ -252,18 +253,19 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                     log_referral_event("5check_trigger_shown", user_id, {"total_checks": total_checks})
 
         remaining = calc_remaining(user)
-        safe_result = escape_markdown(result, version=2)
-        safe_footer = escape_markdown(get_msg(lang, "affiliate_footer"), version=2)
-        remaining_text = "∞" if user["balance"] == -1 else escape_markdown(str(remaining), version=2)
-        admin_note = escape_markdown("\n\nАдмин: проверка бесплатная", version=2) if is_admin else ""
-        safe_balance = escape_markdown(f"\n\nОсталось проверок: ", version=2) + remaining_text
-        safe_share = escape_markdown(f"\n\n{get_msg(lang, 'share_text')}\nhttps://t.me/{context.bot.username}?start=ref_{user_id}", version=2)
+        safe_result = html.escape(result)
+        safe_footer = html.escape(get_msg(lang, "affiliate_footer"))
+        remaining_text = "∞" if user["balance"] == -1 else html.escape(str(remaining))
+        admin_note = html.escape("\n\nАдмин: проверка бесплатная") if is_admin else ""
+        safe_balance = html.escape(f"\n\nОсталось проверок: ") + remaining_text
+        share_url = f"https://t.me/{context.bot.username}?start=ref_{user_id}"
+        safe_share = f"\n\n{html.escape(get_msg(lang, 'share_text'))}\n<a href=\"{share_url}\">Поделиться с другом</a>"
 
         full_text = safe_result + city_note + safe_footer + admin_note + safe_balance + safe_share
         parts = split_message(full_text)
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
-            await update.message.reply_text(part, reply_markup=markup, parse_mode="MarkdownV2")
+            await update.message.reply_text(part, reply_markup=markup, parse_mode="HTML")
 
     except Exception as e:
         if "insufficient_quota" in str(e) or "429" in str(e):
