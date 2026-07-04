@@ -52,6 +52,15 @@ KEYWORDS: dict[str, int] = {
     "appartement": 3,
     "à louer": 4,
     "location": 3,
+    "loyer": 4,
+    "meublé": 3,
+    "pièces": 3,
+    "chambres": 3,
+    "studio": 3,
+    "surface": 2,
+    "disponible": 2,
+    "rénové": 2,
+    "charges comprises": 3,
     # AT Austria
     "Wohnung Wien": 4,
     # PT Portugal
