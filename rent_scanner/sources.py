@@ -50,21 +50,17 @@ SOURCES: list[Source] = [
     Source("@realestateabaru", "Недвижимость Барселона", "Аренды Барселона"),
     Source("@alquilerpiso_madrid", "Alquiler Madrid", "Аренды Мадрид", enabled=False),
     # PT Portugal
-    Source("@lisbonapartments", "Lisbon Apartments", "Аренды Лиссабон", enabled=False),
-    Source("@portoapartments", "Porto Apartments", "Аренды Порту", enabled=False),
-    Source("@arrend_lisboa", "Arrendamento Lisboa", "Португальские аренды Лиссабон", enabled=False),
+    Source("@arrendamentolisboa", "Arrendamento Lisboa", "Португальские аренды Лиссабон"),
+    Source("@lisbon_rent", "Lisbon Rent", "Аренды Лиссабон"),
     # NL Netherlands
     Source("@amsterdamapartments", "Amsterdam Apartments", "Аренды Амстердам"),
-    Source("@woning_amsterdam", "Woning Amsterdam", "Голландские аренды Амстердам", enabled=False),
     # FR France
-    Source("@paris_appartements", "Appartements Paris", "Аренды Париж", enabled=False),
-    Source("@lyon_appartements", "Appartements Lyon", "Аренды Лион", enabled=False),
+    Source("@immobilier_paris", "Immobilier Paris", "Французские аренды Париж"),
+    Source("@paris_location", "Location Paris", "Русскоязычные аренды Париж"),
     # IE Ireland
-    Source("@dublin_rentals", "Dublin Rentals", "Аренды Дублин", enabled=False),
+    Source("@dublin_rent", "Dublin Rent", "Аренды Дублин (укр/рус)"),
     # HU Hungary
     Source("@budapest_apartments", "Budapest Apartments", "Аренды Будапешт"),
-    # GR Greece
-    Source("@athens_rentals", "Athens Rentals", "Аренды Афины", enabled=False),
     # UK United Kingdom
     Source("@SpacesLondon", "London Rentals", "Лондон аренды (рус)"),
     Source("@LondonRentHub", "London Rentals & Rooms", "Лондон аренды"),
