@@ -47,6 +47,20 @@ MAX_MESSAGES_PER_MINUTE = 10
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+REFERRAL_LOG = "referral_events.jsonl"
+
+
+def log_referral_event(event_type: str, user_id: str, extra: dict = None):
+    import time as _time
+    entry = {"ts": _time.time(), "type": event_type, "user_id": user_id}
+    if extra:
+        entry.update(extra)
+    try:
+        with open(REFERRAL_LOG, "a") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
 # Словарь для хранения ссылок из постов (message_id -> url)
 _pending_listings = {}
 PENDING_FILE = "pending_listings.json"
@@ -172,6 +186,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         get_msg(lang, "limit_reached").format(ref_link),
                         reply_markup=kb(update)
                     )
+                    log_referral_event("limit_ref_shown", user_id)
                     return
                 use_check(user)
                 save_data(data)
@@ -210,6 +225,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                                          f"📊 {progress}\n\n"
                                          f"Ваша ссылка: {ref_link}"
                                 )
+                                log_referral_event("referral_confirmed", referrer_id, {"referred": user_id, "total": n})
                             except Exception:
                                 pass
                     user.pop("referred_by", None)
@@ -224,6 +240,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         f"Ваша ссылка: {ref_link}"
                     )
                     await update.message.reply_text(aha_msg, reply_markup=kb(update))
+                    log_referral_event("aha_moment_shown", user_id)
                 elif user.get("free_used", 0) % 5 == 0 and user.get("free_used", 0) > 0:
                     ref_code = user.get("ref_code", "")
                     ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
@@ -235,6 +252,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         f"Ваша ссылка: {ref_link}"
                     )
                     await update.message.reply_text(gentle_msg, reply_markup=kb(update))
+                    log_referral_event("5check_trigger_shown", user_id, {"total_checks": total_checks})
 
         remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
@@ -646,6 +664,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if referrer_id and referrer_id != user_id:
                 user["referred_by"] = referrer_id
                 save_data(data)
+                log_referral_event("ref_link_clicked", user_id, {"referrer": referrer_id})
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):
@@ -1311,6 +1330,58 @@ async def metrics_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
+async def ref_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        import time as _time
+        from collections import Counter
+        events = []
+        if os.path.exists(REFERRAL_LOG):
+            with open(REFERRAL_LOG, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        events.append(json.loads(line))
+
+        now = _time.time()
+        day_ago = now - 86400
+        week_ago = now - 604800
+
+        total = len(events)
+        today = sum(1 for e in events if e["ts"] > day_ago)
+        week = sum(1 for e in events if e["ts"] > week_ago)
+
+        types = Counter(e["type"] for e in events)
+        types_today = Counter(e["type"] for e in events if e["ts"] > day_ago)
+
+        confirmed = types.get("referral_confirmed", 0)
+        clicked = types.get("ref_link_clicked", 0)
+        limit_shown = types.get("limit_ref_shown", 0)
+        aha_shown = types.get("aha_moment_shown", 0)
+        trigger5 = types.get("5check_trigger_shown", 0)
+
+        conv = f"{confirmed}/{clicked}" if clicked else "0/0"
+        rate = f"{confirmed/clicked*100:.0f}%" if clicked else "0%"
+
+        text = (
+            f"📊 <b>Статистика рефералов</b>\n\n"
+            f"📅 <b>Сегодня:</b> {today} событий\n"
+            f"📈 <b>7 дней:</b> {week} событий\n"
+            f"📋 <b>Всего:</b> {total} событий\n\n"
+            f"🔗 Ссылка показана (limit): {limit_shown}\n"
+            f"🎉 Aha-moment показан: {aha_shown}\n"
+            f"📊 Триггер 5 проверок: {trigger5}\n"
+            f"👆 Ссылка кликнута: {clicked}\n"
+            f"✅ Реферал подтверждён: {confirmed}\n\n"
+            f"💰 <b>Конверсия:</b> {conv} ({rate})"
+        )
+        await update.message.reply_text(text, parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
 async def post_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -1402,6 +1473,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email, priv))
     application.add_handler(CommandHandler("subscribers", subscribers_count, priv))
     application.add_handler(CommandHandler("metrics", metrics_command, priv))
+    application.add_handler(CommandHandler("ref_stats", ref_stats_command, priv))
     application.add_handler(CommandHandler("post_now", post_now, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
