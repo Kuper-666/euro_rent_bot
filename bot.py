@@ -24,7 +24,8 @@ from messages import get_msg
 from utils import (
     load_data, save_data, get_lang, get_user_data,
     can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
-    calc_remaining, check_rate_limit, sanitize_pdf_input
+    calc_remaining, check_rate_limit, sanitize_pdf_input,
+    is_pdf_state_expired, validate_pdf_data
 )
 from pdf_generator import generate_mieterprofil_pdf
 from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
@@ -161,8 +162,14 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         if is_admin:
             save_data(data)
         else:
-            use_check(user)
-            save_data(data)
+            async with _payment_lock:
+                data = load_data()
+                user = get_user_data(data, user_id)
+                if not can_use(user):
+                    await update.message.reply_text(get_msg(lang, "limit_reached"), reply_markup=kb(update))
+                    return
+                use_check(user)
+                save_data(data)
 
         remaining = calc_remaining(user)
         safe_result = escape_markdown(result, version=2)
@@ -258,11 +265,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(followup, reply_markup=kb(update))
 
     pdf_state = user.get("pdf_state")
+    if pdf_state == "awaiting_data" and is_pdf_state_expired(user):
+        user.pop("pdf_state", None)
+        user.pop("pdf_started_at", None)
+        save_data(data)
+        pdf_state = None
     if pdf_state == "awaiting_data":
         user.pop("pdf_state", None)
+        user.pop("pdf_started_at", None)
         pdf_data = parse_pdf_data(update.message.text)
         if not pdf_data:
             await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
+            return
+        valid, error_msg = validate_pdf_data(pdf_data)
+        if not valid:
+            await update.message.reply_text(f"❌ {error_msg}\n\nПопробуйте ещё раз.", reply_markup=kb(update))
             return
         await update.message.reply_text(get_msg(lang, "pdf_generating"), reply_markup=kb(update))
         try:
@@ -686,14 +703,19 @@ async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
-    lang = get_lang(update)
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+        lang = get_lang(update)
 
-    user["pdf_paid"] = True
-    user["pdf_state"] = "awaiting_data"
-    save_data(data)
+        user["pdf_paid"] = True
+        user["pdf_state"] = "awaiting_data"
+        user["pdf_started_at"] = time.time()
+        save_data(data)
     await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=kb(update))
 
 
@@ -721,18 +743,25 @@ async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
-    lang = get_lang(update)
+    async with _payment_lock:
+        data = load_data()
+        user = get_user_data(data, user_id)
+        lang = get_lang(update)
 
-    user["vip"] = True
-    user["vip_state"] = "awaiting_criteria"
-    save_data(data)
+        user["vip"] = True
+        user["vip_state"] = "awaiting_criteria"
+        save_data(data)
     await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=kb(update))
 
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
     user_id = str(update.effective_user.id)
     async with _payment_lock:
         data = load_data()
@@ -746,6 +775,9 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
     user_id = str(update.effective_user.id)
     async with _payment_lock:
         data = load_data()
@@ -759,6 +791,9 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
     user_id = str(update.effective_user.id)
     async with _payment_lock:
         data = load_data()
@@ -874,6 +909,7 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
         elif payload == "pay_stars_pdf":
             user["pdf_paid"] = True
             user["pdf_state"] = "awaiting_data"
+            user["pdf_started_at"] = time.time()
             save_data(data)
             await update.message.reply_text(
                 "Оплата PDF подтверждена! Отправьте данные для заявления.",
@@ -892,16 +928,17 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
     old_member = update.chat_member.old_chat_member
 
     if old_member.status != "member" and new_member.status == "member":
-        if new_member.user.id != context.bot.id:
-            welcome_text = (
-                f"Добро пожаловать, {new_member.user.full_name}!\n\n"
-                f"Этот чат создан для экспатов в Европе. "
-                f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n\n"
-                f"Как анализировать объявления:\n"
-                f"Просто отправьте ссылку или текст объявления сюда в чат.\n"
-                f"Я перенаправлю вас в личку с ботом, где он сделает полный разбор за 5 секунд!\n\n"
-                f"Или начните сразу: /start"
-            )
+        if new_member.user.id == context.bot.id:
+            return
+        welcome_text = (
+            f"Добро пожаловать, {new_member.user.full_name}!\n\n"
+            f"Этот чат создан для экспатов в Европе. "
+            f"Полезные ссылки и подборки по аренде можно найти в закрепленных сообщениях.\n\n"
+            f"Как анализировать объявления:\n"
+            f"Просто отправьте ссылку или текст объявления сюда в чат.\n"
+            f"Я перенаправлю вас в личку с ботом, где он сделает полный разбор за 5 секунд!\n\n"
+            f"Или начните сразу: /start"
+        )
         msg = await update.effective_chat.send_message(welcome_text)
         try:
             await msg.pin()

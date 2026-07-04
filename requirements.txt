@@ -12,3 +12,5 @@ python-dotenv
 schedule
 apscheduler
 pytz
+telethon
+langdetect

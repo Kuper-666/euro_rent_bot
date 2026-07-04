@@ -75,7 +75,7 @@ def is_url(text: str) -> bool:
 def resolve_redirect_url(url: str) -> str:
     from urllib.parse import urlparse, parse_qs
     parsed = urlparse(url)
-    if "google" in parsed.hostname and "/url" in parsed.path:
+    if parsed.hostname and "google" in parsed.hostname and "/url" in parsed.path:
         params = parse_qs(parsed.query)
         if "url" in params:
             return params["url"][0]
