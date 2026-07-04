@@ -146,12 +146,12 @@ class TestMessagesConfig(unittest.TestCase):
             self.assertIn("@expat_rent_bot", msg)
 
     def test_post_messages_disclose_creator(self):
-        """Тексты честно представляются от создателя бота."""
+        """Тексты должны честно представляться от создателя бота, а не притворяться случайным юзером."""
+        disclosure_markers = ["разработчик", "сделал бота", "мой бот"]
         for msg in POST_MESSAGES:
             self.assertTrue(
-                "пользуюсь" in msg.lower() or "мой" in msg.lower()
-                or "пользуйтесь" in msg.lower() or "попробуйте" in msg.lower(),
-                f"Message does not sound like personal recommendation: {msg}"
+                any(marker in msg.lower() for marker in disclosure_markers),
+                f"Message does not disclose bot creator: {msg}"
             )
 
 
