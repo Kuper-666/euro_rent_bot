@@ -75,16 +75,78 @@ class RentScanner:
         self.storage.close()
 
     def _register_bot_commands(self) -> None:
+        from telethon import Button
+
         @self.bot_client.on(events.NewMessage(pattern=r"^/start"))
         async def start(event: events.NewMessage.Event) -> None:
             chat_id = int(event.chat_id)
             self.storage.add_subscriber(chat_id)
+            buttons = [
+                [Button.inline("📊 Статистика", data="stat"), Button.inline("📋 Каналы", data="list")],
+                [Button.inline("🔍 Поиск", data="search_menu"), Button.inline("➕ Добавить", data="add_menu")],
+                [Button.inline("❌ Остановить", data="stop")],
+            ]
             await event.respond(
-                "✅ Чат подписан на новые объявления.\n\n"
-                f"Chat ID: <code>{chat_id}</code>\n"
-                "Команды: /status, /stop",
+                "✅ Подписка активна!\n\n"
+                "Выберите действие:",
+                buttons=buttons
+            )
+
+        @self.bot_client.on(events.CallbackQuery(data=b"stat"))
+        async def cb_stat(event: events.CallbackQuery.Event) -> None:
+            stats = self.storage.full_stats()
+            top = list(stats["by_source"].items())[:5]
+            top_text = "\n".join(f"  {s}: {c}" for s, c in top) if top else "  нет данных"
+            today = stats["today"]
+            text = (
+                f"📊 <b>Статистика</b>\n\n"
+                f"👥 Подписчиков: {stats['subscribers']}\n"
+                f"📋 Всего: {stats['total_leads']}\n"
+                f"📤 Доставлено: {stats['total_notified']}\n\n"
+                f"📅 Сегодня: найдено {today['found']}, доставлено {today['delivered']}\n\n"
+                f"🏆 Топ каналов:\n{top_text}\n\n"
+                f"🔑 Источников: {len(self.sources)}"
+            )
+            await event.answer()
+            await event.respond(text, parse_mode="html")
+
+        @self.bot_client.on(events.CallbackQuery(data=b"list"))
+        async def cb_list(event: events.CallbackQuery.Event) -> None:
+            sources = enabled_sources()
+            lines = [f"  {s.handle} — {s.title}" for s in sources[:15]]
+            text = f"📋 <b>Активные каналы ({len(sources)}):</b>\n\n" + "\n".join(lines)
+            if len(sources) > 15:
+                text += f"\n\n... и ещё {len(sources) - 15}"
+            await event.answer()
+            await event.respond(text, parse_mode="html")
+
+        @self.bot_client.on(events.CallbackQuery(data=b"search_menu"))
+        async def cb_search(event: events.CallbackQuery.Event) -> None:
+            await event.answer()
+            await event.respond(
+                "🔍 <b>Поиск каналов</b>\n\n"
+                "Отправьте:\n"
+                "<code>/search аренда Берлин</code>\n"
+                "<code>/search affitto Roma</code>\n"
+                "<code>/search Wohnung München</code>",
                 parse_mode="html"
             )
+
+        @self.bot_client.on(events.CallbackQuery(data=b"add_menu"))
+        async def cb_add(event: events.CallbackQuery.Event) -> None:
+            await event.answer()
+            await event.respond(
+                "➕ <b>Добавить канал</b>\n\n"
+                "Отправьте:\n"
+                "<code>/add @channel_name</code>",
+                parse_mode="html"
+            )
+
+        @self.bot_client.on(events.CallbackQuery(data=b"stop"))
+        async def cb_stop(event: events.CallbackQuery.Event) -> None:
+            self.storage.remove_subscriber(int(event.chat_id))
+            await event.answer("Остановлено")
+            await event.respond("✅ Чат отписан от уведомлений.")
 
         @self.bot_client.on(events.NewMessage(pattern=r"^/stop"))
         async def stop(event: events.NewMessage.Event) -> None:
