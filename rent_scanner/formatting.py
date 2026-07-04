@@ -13,9 +13,9 @@ CONTACT_RE = re.compile(
 )
 
 PRICE_RE = re.compile(
-    r"(\d[\d\s.,]*)\s*(?:€|EUR|eur|/mo|/month|/мес|/міс|pcm|pw)|"
-    r"(?:€|EUR)\s*(\d[\d\s.,]*)|"
-    r"(?:аренда|оренда|rent|loyer|huur|affitto|miete|alquiler|aluguer|количество|цена|стоимость)[\s:]*(\d[\d\s.,]*)",
+    r"(\d[\d.,]*)\s*(?:€|EUR|eur|/mo|/month|/мес|/міс|pcm|pw)|"
+    r"(?:€|EUR)\s*(\d[\d.,]*)|"
+    r"\b(?:аренда|оренда|rent|loyer|huur|affitto|miete|alquiler|aluguer|количество|цена|стоимость)[\s:]*(\d[\d.,]*)",
     re.IGNORECASE,
 )
 
@@ -55,18 +55,26 @@ def extract_contacts(text: str) -> tuple[str, ...]:
 
 
 def extract_price(text: str) -> Optional[str]:
-    best = None
+    area_ranges = [(m.start(), m.end()) for m in AREA_RE.finditer(text)]
     for m in PRICE_RE.finditer(text):
+        overlaps_area = any(s <= m.start() < e or s < m.end() <= e for s, e in area_ranges)
+        if overlaps_area:
+            continue
         for g in m.groups():
             if g:
-                price = re.sub(r"\s+", "", g).replace(",", ".")
+                raw = re.sub(r"\s+", "", g)
+                if not raw:
+                    continue
+                price = raw.replace(",", ".")
+                if "." in price and price.count(".") == 1 and len(price.split(".")[1]) == 3:
+                    price = price.replace(".", "")
                 try:
                     val = float(price)
                     if 50 <= val <= 50000:
-                        best = f"{val:.0f}"
+                        return f"{val:.0f}"
                 except ValueError:
                     continue
-    return best
+    return None
 
 
 def extract_area(text: str) -> Optional[str]:
