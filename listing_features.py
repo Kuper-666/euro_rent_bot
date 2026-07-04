@@ -27,10 +27,16 @@ POPULAR_CITIES = {
     "barcelona": {"name": "Барселона", "name_en": "Barcelona", "name_de": "Barcelona", "avg_price": 900, "emoji": "🇪🇸"},
     "madrid": {"name": "Мадрид", "name_en": "Madrid", "name_de": "Madrid", "avg_price": 750, "emoji": "🇪🇸"},
     "lisbon": {"name": "Лиссабон", "name_en": "Lisbon", "name_de": "Lissabon", "avg_price": 700, "emoji": "🇵🇹"},
+    "porto": {"name": "Порту", "name_en": "Porto", "name_de": "Porto", "avg_price": 600, "emoji": "🇵🇹"},
     "prague": {"name": "Прага", "name_en": "Prague", "name_de": "Praha", "avg_price": 650, "emoji": "🇨🇿"},
     "warsaw": {"name": "Варшава", "name_en": "Warsaw", "name_de": "Warszawa", "avg_price": 550, "emoji": "🇵🇱"},
+    "krakow": {"name": "Краков", "name_en": "Kraków", "name_de": "Krakau", "avg_price": 500, "emoji": "🇵🇱"},
     "paris": {"name": "Париж", "name_en": "Paris", "name_de": "Paris", "avg_price": 1300, "emoji": "🇫🇷"},
+    "lyon": {"name": "Лион", "name_en": "Lyon", "name_de": "Lyon", "avg_price": 800, "emoji": "🇫🇷"},
     "rome": {"name": "Рим", "name_en": "Rome", "name_de": "Roma", "avg_price": 850, "emoji": "🇮🇹"},
+    "milan": {"name": "Милан", "name_en": "Milan", "name_de": "Mailand", "avg_price": 900, "emoji": "🇮🇹"},
+    "dublin": {"name": "Дублин", "name_en": "Dublin", "name_de": "Dublin", "avg_price": 1400, "emoji": "🇮🇪"},
+    "budapest": {"name": "Будапешт", "name_en": "Budapest", "name_de": "Budapest", "avg_price": 500, "emoji": "🇭🇺"},
     "zurich": {"name": "Цюрих", "name_en": "Zurich", "name_de": "Zürich", "avg_price": 1500, "emoji": "🇨🇭"},
 }
 
@@ -109,6 +115,14 @@ def detect_city(text: str) -> Optional[str]:
             names.extend(["zuerich"])
         elif key == "vienna":
             names.extend(["wien"])
+        elif key == "lisbon":
+            names.extend(["lisboa", "lissabon"])
+        elif key == "milan":
+            names.extend(["milano"])
+        elif key == "krakow":
+            names.extend(["kraków", "krakau"])
+        elif key == "porto":
+            names.extend(["oporto"])
         for name in names:
             if name and name in text_lower:
                 return key
