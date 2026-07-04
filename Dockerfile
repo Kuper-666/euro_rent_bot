@@ -9,6 +9,5 @@ COPY *.py .
 COPY templates/ templates/
 COPY icons/ icons/
 COPY rent_scanner/ rent_scanner/
-COPY data/ data/
 
 CMD ["python", "bot.py"]
