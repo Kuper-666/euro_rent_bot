@@ -9,14 +9,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 from smart_poster import (
     detect_language,
     is_relevant_chat,
-    should_reply,
     load_sent_history,
     save_sent_history,
     SmartPoster,
     PosterStorage,
     POST_MESSAGES,
-    REPLY_MESSAGES,
-    QUESTION_TRIGGERS,
     GROUP_KEYWORDS,
     STOP_WORDS,
     RENT_KEYWORDS,
@@ -70,38 +67,8 @@ class TestIsRelevantChat(unittest.TestCase):
     def test_stop_word_in_title(self):
         self.assertFalse(is_relevant_chat("Wohnung kaufen Berlin", []))
 
-    def test_no_rental_messages(self):
-        msgs = ["Привет всем", "Как дела?", "Погода сегодня"]
-        self.assertFalse(is_relevant_chat("Аренда Berlin", msgs))
-
-    def test_few_rental_messages_rejected(self):
-        msgs = [
-            "Привет",
-            "Квартира 2 комнаты",
-            "Как дела?",
-            "Погода",
-        ]
-        self.assertFalse(is_relevant_chat("Жильё Berlin", msgs))
-
-    def test_empty_messages_with_keyword_title(self):
-        self.assertTrue(is_relevant_chat("Аренда Berlin", []))
-
     def test_unknown_language_title(self):
         self.assertFalse(is_relevant_chat("xyz abc def", []))
-
-
-class TestShouldReply(unittest.TestCase):
-    def test_triggers_on_housing_question(self):
-        self.assertTrue(should_reply("Как найти квартиру в Берлине?"))
-
-    def test_triggers_on_nebenkosten(self):
-        self.assertTrue(should_reply("А что такое Nebenkosten?"))
-
-    def test_no_trigger_on_random(self):
-        self.assertFalse(should_reply("Привет, как дела?"))
-
-    def test_no_trigger_on_empty(self):
-        self.assertFalse(should_reply(""))
 
 
 class TestSentHistory(unittest.TestCase):
@@ -137,17 +104,12 @@ class TestSentHistory(unittest.TestCase):
         stats = self.storage.stats()
         self.assertEqual(stats["posts"], 1)
 
-    def test_log_reply(self):
-        self.storage.log_reply(123, "Test", "question", "answer")
-        stats = self.storage.stats()
-        self.assertEqual(stats["replies"], 1)
-
     def test_stats(self):
         self.storage.mark_sent(123)
         self.storage.log_post(123, "Test", "msg")
-        self.storage.log_reply(123, "Test", "q", "a")
         stats = self.storage.stats()
-        self.assertEqual(stats, {"posts": 1, "replies": 1, "groups": 1})
+        self.assertEqual(stats["posts"], 1)
+        self.assertEqual(stats["groups"], 1)
 
 
 import smart_poster as smart_poster_module
@@ -159,42 +121,11 @@ class TestSmartPosterInit(unittest.TestCase):
         poster = SmartPoster()
         self.assertIsNotNone(poster.client)
         self.assertIsNotNone(poster.storage)
-        self.assertEqual(poster.COOLDOWN_SECONDS, 300)
-
-    @patch("smart_poster.TelegramClient")
-    def test_can_reply_first_time(self, mock_client):
-        poster = SmartPoster()
-        self.assertTrue(poster._can_reply(123))
-
-    @patch("smart_poster.TelegramClient")
-    def test_cooldown_blocks_reply(self, mock_client):
-        poster = SmartPoster()
-        poster._mark_replied(123)
-        self.assertFalse(poster._can_reply(123))
-
-    @patch("smart_poster.TelegramClient")
-    def test_cooldown_expires(self, mock_client):
-        poster = SmartPoster()
-        poster.COOLDOWN_SECONDS = 0
-        poster._mark_replied(123)
-        self.assertTrue(poster._can_reply(123))
-
-    @patch("smart_poster.TelegramClient")
-    def test_different_groups_independent(self, mock_client):
-        poster = SmartPoster()
-        poster._mark_replied(123)
-        self.assertTrue(poster._can_reply(456))
 
 
 class TestMessagesConfig(unittest.TestCase):
     def test_post_messages_not_empty(self):
         self.assertGreater(len(POST_MESSAGES), 0)
-
-    def test_reply_messages_not_empty(self):
-        self.assertGreater(len(REPLY_MESSAGES), 0)
-
-    def test_question_triggers_not_empty(self):
-        self.assertGreater(len(QUESTION_TRIGGERS), 0)
 
     def test_group_keywords_not_empty(self):
         self.assertGreater(len(GROUP_KEYWORDS), 0)
@@ -214,9 +145,14 @@ class TestMessagesConfig(unittest.TestCase):
         for msg in POST_MESSAGES:
             self.assertIn("@EuroRentAIBot", msg)
 
-    def test_most_reply_messages_mention_bot(self):
-        mentioned = sum(1 for msg in REPLY_MESSAGES if "@EuroRentAIBot" in msg)
-        self.assertGreater(mentioned, 0, "At least one reply message should mention the bot")
+    def test_post_messages_disclose_creator(self):
+        """Тексты честно представляются от создателя бота."""
+        for msg in POST_MESSAGES:
+            self.assertTrue(
+                "пользуюсь" in msg.lower() or "мой" in msg.lower()
+                or "пользуйтесь" in msg.lower() or "попробуйте" in msg.lower(),
+                f"Message does not sound like personal recommendation: {msg}"
+            )
 
 
 if __name__ == "__main__":

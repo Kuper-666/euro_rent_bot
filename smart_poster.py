@@ -64,24 +64,10 @@ RENT_KEYWORDS = [
 
 # ── Сообщения для постинга ────────────────────────────────────────
 POST_MESSAGES = [
-    "Привет! Я использую бота @EuroRentAIBot для проверки объявлений – он за 5 секунд находит скрытые платежи. Может, кому пригодится.",
-    "Кто ищет квартиру? Я нашел полезного бота – @EuroRentAIBot. Бесплатно 3 проверки.",
-    "Столкнулись с Nebenkosten? Бот @EuroRentAIBot помогает разобраться. Рекомендую.",
-    "Переезжаете? @EuroRentAIBot анализирует объявления и показывает реальную цену. Проверил на себе – работает!",
-]
-
-# ── Ответы на комментарии ─────────────────────────────────────────
-REPLY_MESSAGES = [
-    "Да, я тоже им пользуюсь, очень удобно. Просто кидаешь ссылку в @EuroRentAIBot.",
-    "Согласен! Этот бот реально экономит время на переводе и подсчетах.",
-    "Если нужно быстро проверить риски, @EuroRentAIBot помогает. Рекомендую.",
-]
-
-# ── Триггеры для ответов на вопросы ───────────────────────────────
-QUESTION_TRIGGERS = [
-    "как найти квартиру", "помогите с арендой", "immoscout",
-    "nebenkosten", "как проверить", "сколько стоит", "аренда в",
-    "ищу квартиру", "ищу жильё", "ищу жилье",
+    "Я пользуюсь ботом @EuroRentAIBot для проверки объявлений – за 5 секунд находит скрытые платежи и комиссии. Удобная штука, рекомендую.",
+    "Для тех, кто ищет жильё в Европе: я пользуюсь @EuroRentAIBot чтобы проверять объявления на скрытые платежи. Попробуйте – бесплатно 3 проверки.",
+    "Столкнулись с Nebenkosten или непонятными комиссиями? Я пользуюсь @EuroRentAIBot – разбирает объявление по косточкам.",
+    "Переезжаете в Европу? Я пользуюсь @EuroRentAIBot чтобы показать реальную стоимость аренды. Бесплатный тест – 3 проверки.",
 ]
 
 SENT_HISTORY_FILE = "sent_groups_history.txt"
@@ -238,25 +224,11 @@ def is_relevant_chat(title: str, recent_messages: list[str]) -> bool:
     return True
 
 
-def should_reply(text: str) -> bool:
-    """Проверяет, стоит ли отвечать на сообщение."""
-    text_lower = text.lower()
-    return any(trigger in text_lower for trigger in QUESTION_TRIGGERS)
-
 
 class SmartPoster:
     def __init__(self):
         self.client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
         self.storage = PosterStorage()
-        self._reply_cooldown: dict[int, float] = {}
-        self.COOLDOWN_SECONDS = 300
-
-    def _can_reply(self, chat_id: int) -> bool:
-        last = self._reply_cooldown.get(chat_id, 0)
-        return (datetime.now().timestamp() - last) >= self.COOLDOWN_SECONDS
-
-    def _mark_replied(self, chat_id: int):
-        self._reply_cooldown[chat_id] = datetime.now().timestamp()
 
     async def _get_recent_messages(self, chat_id: int, limit: int = 5) -> list[str]:
         texts = []
@@ -286,45 +258,6 @@ class SmartPoster:
 
         logger.info("Listener started. Waiting for comments...")
         await self.client.run_until_disconnected()
-
-    def _register_reply_listener(self):
-        @self.client.on(events.NewMessage)
-        async def reply_listener(event):
-            if event.out or event.is_private:
-                return
-
-            chat_id = event.chat_id
-            text = event.raw_text or ""
-            if not text.strip():
-                return
-
-            if event.reply_to_msg_id:
-                try:
-                    original_msg = await event.client.get_messages(
-                        chat_id, ids=event.reply_to_msg_id
-                    )
-                    if original_msg and original_msg.out:
-                        if not self._can_reply(chat_id):
-                            return
-                        await asyncio.sleep(random.uniform(5, 15))
-                        reply = random.choice(REPLY_MESSAGES)
-                        await event.reply(reply)
-                        self._mark_replied(chat_id)
-                        self.storage.log_reply(chat_id, event.chat.title or "", text[:100], reply)
-                        logger.info(f"Replied to comment in {event.chat.title}")
-                        return
-                except Exception as e:
-                    logger.warning(f"Error checking reply context: {e}")
-
-            if should_reply(text):
-                if not self._can_reply(chat_id):
-                    return
-                await asyncio.sleep(random.uniform(10, 20))
-                reply = random.choice(REPLY_MESSAGES) + " Попробуйте @EuroRentAIBot."
-                await event.reply(reply)
-                self._mark_replied(chat_id)
-                self.storage.log_reply(chat_id, event.chat.title or "", text[:100], reply)
-                logger.info(f"Replied to question in {event.chat.title}")
 
     async def scan_and_post(self):
         logger.info("Scanning dialogs for target groups and channels...")
