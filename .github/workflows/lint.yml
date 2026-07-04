@@ -1,0 +1,35 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check syntax
+        run: |
+          python -m py_compile bot.py
+          python -m py_compile utils.py
+          python -m py_compile smart_poster.py
+          python -m py_compile rent_scanner/app.py
+          python -m py_compile rent_scanner/storage.py
+          python -m py_compile rent_scanner/formatting.py
+          python -m py_compile rent_scanner/filters.py
+          python -m py_compile rent_scanner/sources.py

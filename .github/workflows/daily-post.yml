@@ -1,0 +1,30 @@
+name: Daily Post
+
+on:
+  schedule:
+    # Пн-Пт 10:00 UTC (13:00 MSK)
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-telegram-bot feedparser
+
+      - name: Run daily post
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          GROUP_ID: ${{ secrets.GROUP_ID }}
+        run: python daily_poster.py

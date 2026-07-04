@@ -1,73 +1,119 @@
-# Euro Rent AI Bot
+# EuroRent AI Bot
 
 Telegram bot for analyzing rental listings across Europe using AI.
 
 ## Features
 
-- Translate rental listings from any European language
-- Identify hidden costs and fees
-- Detect potential scams and risks
-- Provide country-specific documentation requirements
-- Give risk assessment scores (1-10)
+- AI-powered rental listing analysis (Groq LLaMA 3.3)
+- Multi-language: RU, UK, EN, DE, PL
+- Hidden fees & scam detection
+- PDF application generator (Mieterprofil)
+- VIP subscription with daily city digests
+- City filter with price trends
+- Referral program
+- Email newsletter
+- Rent scanner: monitors 22 Telegram channels across 9 countries
+- Smart poster: auto-posts in rental groups + replies to comments
 
 ## Setup
 
-1. **Get Telegram Bot Token**
-   - Go to @BotFather in Telegram
-   - Send `/newbot`
-   - Follow instructions to create your bot
-   - Copy the API token
+### 1. Clone & install
 
-2. **Get OpenAI API Key**
-   - Go to platform.openai.com
-   - Create an account
-   - Generate an API key
+```bash
+git clone https://github.com/Kuper-666/euro_rent_bot.git
+cd euro_rent_bot
+pip install -r requirements.txt
+```
 
-3. **Run the bot**
-   ```bash
-   pip install -r requirements.txt
-   python bot.py
-   ```
+### 2. Configure .env
 
-## Deployment
+```bash
+cp .env.example .env
+```
 
-### Render.com (Free)
-1. Push code to GitHub
-2. Create account on render.com
-3. Click "New +" and select "Web Service"
-4. Connect your GitHub repository
-5. Configure:
-   - Name: euro-rent-bot
-   - Region: Frankfurt (Germany)
-   - Runtime: Python
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python bot.py`
-6. Add environment variables:
-   - TELEGRAM_TOKEN
-   - OPENAI_API_KEY
-7. Deploy
+Required:
+```
+TELEGRAM_TOKEN=your_bot_token
+GROQ_API_KEY=your_groq_key
+```
 
-The bot includes a health check endpoint on port 10000 that responds to GET requests.
+Optional (for rent scanner):
+```
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE=+your_phone
+```
 
-### UptimeRobot (Free)
-- Keep your Render service awake
-- Check interval: 5 minutes
-- URL: https://your-bot-name.onrender.com
+### 3. Run
 
-## Environment Variables
+```bash
+# Main bot
+python bot.py
 
-- `TELEGRAM_TOKEN` - Your Telegram bot token
-- `OPENAI_API_KEY` - Your OpenAI API key
+# Rent scanner (separate terminal)
+python -m rent_scanner
+
+# Smart poster (separate terminal)
+python smart_poster.py
+```
+
+## GitHub Actions (Free)
+
+Set these secrets in GitHub → Settings → Secrets → Actions:
+
+| Secret | Description |
+|--------|-------------|
+| `TELEGRAM_TOKEN` | Bot token |
+| `GROUP_ID` | Your Telegram group ID |
+| `CHANNEL_ID` | Your channel ID |
+| `GROQ_API_KEY` | Groq API key |
+| `CITY_CHANNELS` | JSON `{"berlin": "-100xxx"}` |
+
+Workflows:
+- **Tests** — runs on every push/PR
+- **Daily Post** — Mon-Fri 10:00 UTC
+- **Channel Poster** — Tue/Thu/Sat 09:00 UTC
 
 ## Commands
 
-- `/start` - Start the bot
-- `/help` - Get usage instructions
+| Command | Description |
+|---------|-------------|
+| `/start` | Start the bot |
+| `/help` | Usage instructions |
+| `/balance` | Check remaining checks |
+| `/pay` | Buy checks |
+| `/pdf` | Generate PDF application |
+| `/vip` | VIP subscription |
+| `/ref` | Referral link |
+| `/lang` | Change language |
+| `/set_city` | Filter by city |
+| `/trend` | City price trends |
+| `/holygrail` | Best deals |
 
-## Usage
+## Architecture
 
-Simply send any rental listing text to the bot, and it will provide:
-1. Clean translation
-2. Price breakdown
-3. Required documents
-4. Hidden risks and recommendations
+```
+bot.py                 — Main Telegram bot (1379 lines)
+rent_scanner/
+  app.py               — Channel monitor + lead delivery
+  storage.py           — SQLite + metrics
+  filters.py           — Keyword matching (22 languages)
+  formatting.py        — Rich listing cards
+  sources.py           — 22 verified channels
+smart_poster.py        — Auto-poster + reply listener
+channel_poster.py      — AI-generated channel posts
+daily_poster.py        — Daily digest
+pdf_generator.py       — Mieterprofil PDF
+```
+
+## Tests
+
+```bash
+python -m pytest test_bot.py test_smart_poster.py test_bot_handlers.py -v
+```
+
+103 tests covering:
+- Message handlers & payment flow
+- Smart poster filtering
+- PDF validation
+- Price/area/rooms extraction
