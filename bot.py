@@ -66,8 +66,8 @@ def _save_pending_listings(data):
 
 def get_keyboard():
     keyboard = [
-        [KeyboardButton("Старт"), KeyboardButton("Помощь"), KeyboardButton("Оплата")],
-        [KeyboardButton("PDF"), KeyboardButton("VIP")],
+        [KeyboardButton("Старт"), KeyboardButton("Помощь"), KeyboardButton("Баланс")],
+        [KeyboardButton("PDF"), KeyboardButton("VIP"), KeyboardButton("Мой язык")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
@@ -251,6 +251,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "оплата": pay_command, "pay": pay_command, "оплатить": pay_command,
         "pdf": pdf_command, "пдф": pdf_command,
         "vip": vip_command, "вип": vip_command,
+        "баланс": balance_command, "balance": balance_command,
+        "мой язык": lang_command, "my lang": lang_command,
     }
     if text in btn_map:
         await btn_map[text](update, context)
@@ -476,6 +478,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif data_prefix == "copy":
             await query.answer("Скопируйте текст выше", show_alert=True)
 
+        # Кнопка "Язык"
+        elif data.startswith("lang_"):
+            new_lang = data.split("_", 1)[1]
+            user_id = str(query.from_user.id)
+            data_dict = load_data()
+            user = get_user_data(data_dict, user_id)
+            user["lang"] = new_lang
+            save_data(data_dict)
+            lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
+            await query.answer(f"Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
+
         # Кнопка "Поделиться"
         elif data_prefix == "share":
             bot_username = context.bot.username
@@ -606,6 +619,77 @@ async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton("Открыть Wise", url=AFFILIATE_WISE)],
     ]
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+    lang = get_lang(update)
+
+    if user.get("balance") == -1:
+        remaining = "∞ (безлимит)"
+    else:
+        remaining = calc_remaining(user)
+
+    vip_status = "✅ Активен" if user.get("vip") else "❌ Не активен"
+    pdf_status = "✅ Оплачен" if user.get("pdf_paid") else "❌ Не оплачен"
+    referrals = len(user.get("referrals", []))
+
+    text = (
+        f"📊 <b>Ваш баланс</b>\n\n"
+        f"🔍 Проверок: <b>{remaining}</b>\n"
+        f"💎 VIP: {vip_status}\n"
+        f"📄 PDF: {pdf_status}\n"
+        f"👥 Приглашено: {referrals} чел.\n"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def ref_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    user = get_user_data(data, user_id)
+
+    ref_code = user.get("ref_code")
+    if not ref_code:
+        ref_code = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
+        user["ref_code"] = ref_code
+        save_data(data)
+
+    bot_username = context.bot.username
+    ref_link = f"https://t.me/{bot_username}?start={ref_code}"
+    referrals = len(user.get("referrals", []))
+
+    text = (
+        f"👥 <b>Реферальная программа</b>\n\n"
+        f"Ваша ссылка:\n<code>{ref_link}</code>\n\n"
+        f"Приглашено: {referrals} чел.\n\n"
+        f"🎁 Награды:\n"
+        f"  1 друг → 1 проверка\n"
+        f"  3 друга → 3 проверки\n"
+        f"  5 друзей → 5 проверок\n"
+        f"  10 друзей → безлимит на месяц\n\n"
+        f"Отправьте ссылку друзьям — они тоже получат бота!"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+
+
+async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"),
+            InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_uk"),
+        ],
+        [
+            InlineKeyboardButton("🇬🇧 English", callback_data="lang_en"),
+            InlineKeyboardButton("🇩🇪 Deutsch", callback_data="lang_de"),
+        ],
+        [
+            InlineKeyboardButton("🇵🇱 Polski", callback_data="lang_pl"),
+        ],
+    ])
+    await update.message.reply_text("Выберите язык / Choose language:", reply_markup=keyboard)
 
 
 async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1235,6 +1319,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start, priv))
     application.add_handler(CommandHandler("help", help_command, priv))
     application.add_handler(CommandHandler("revolut", revolut_command, priv))
+    application.add_handler(CommandHandler("balance", balance_command, priv))
+    application.add_handler(CommandHandler("ref", ref_command, priv))
+    application.add_handler(CommandHandler("lang", lang_command, priv))
     application.add_handler(CommandHandler("pay", pay_command, priv))
     application.add_handler(CommandHandler("pdf", pdf_command, priv))
     application.add_handler(CommandHandler("pay_done_pdf", pay_done_pdf, priv))

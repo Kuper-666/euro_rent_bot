@@ -31,6 +31,16 @@ _last_groq_call = LimitedDict(max_size=100000)
 
 
 def get_lang(update: Update) -> str:
+    try:
+        from utils import load_data, get_user_data
+        user_id = str(update.effective_user.id)
+        data = load_data()
+        user = get_user_data(data, user_id)
+        saved = user.get("lang")
+        if saved and saved in MESSAGES:
+            return saved
+    except Exception:
+        pass
     lang_code = update.effective_user.language_code
     if lang_code:
         short = lang_code.split("-")[0].lower()
