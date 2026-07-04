@@ -14,10 +14,10 @@ async def main():
     api_hash = input("TELEGRAM_API_HASH: ").strip()
     phone = input("TELEGRAM_PHONE: ").strip()
 
-    client = StringSession()
-    await client.start(api_id=api_id, api_hash=api_hash, phone=phone)
+    client = TelegramClient(StringSession(), api_id, api_hash)
+    await client.start(phone=phone)
 
-    session_string = client.save()
+    session_string = client.session.save()
     print()
     print("=" * 60)
     print("Скопируй эту строку и добавь на Render как")
