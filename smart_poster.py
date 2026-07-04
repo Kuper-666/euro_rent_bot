@@ -46,11 +46,14 @@ API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 SESSION_NAME = os.getenv("USER_SESSION_PATH", "sessions/scanner_user")
 
 # ── Настройки фильтрации ──────────────────────────────────────────
-ALLOWED_LANGUAGES = {"ru", "en", "de"}
+ALLOWED_LANGUAGES = {"ru", "en", "de", "it", "pl", "cs"}
 GROUP_KEYWORDS = [
     "wohnung", "miete", "rent", "apartment",
     "аренда", "квартира", "жильё", "housing",
     "wg", "zimmer",
+    "affitto", "stanze", "appartament",
+    "wynajem", "mieszkanie", "pokoje",
+    "pronájem", "bydlení", "nemovitost",
 ]
 STOP_WORDS = ["kaufen", "verkauf", "sale", "buy", "купить", "продажа"]
 RENT_KEYWORDS = [
@@ -220,15 +223,17 @@ def is_relevant_chat(title: str, recent_messages: list[str]) -> bool:
 
     lang = detect_language(title)
     if lang not in ALLOWED_LANGUAGES:
+        for word in title.split():
+            if len(word) >= 3:
+                try:
+                    wlang = detect(word)
+                    if wlang in ALLOWED_LANGUAGES:
+                        lang = wlang
+                        break
+                except LangDetectException:
+                    continue
+    if lang not in ALLOWED_LANGUAGES:
         return False
-
-    if recent_messages:
-        rent_count = sum(
-            1 for msg in recent_messages
-            if msg and any(kw in msg.lower() for kw in RENT_KEYWORDS)
-        )
-        if rent_count < 2:
-            return False
 
     return True
 
@@ -253,7 +258,7 @@ class SmartPoster:
     def _mark_replied(self, chat_id: int):
         self._reply_cooldown[chat_id] = datetime.now().timestamp()
 
-    async def _get_recent_messages(self, chat_id: int, limit: int = 15) -> list[str]:
+    async def _get_recent_messages(self, chat_id: int, limit: int = 5) -> list[str]:
         texts = []
         try:
             async for msg in self.client.iter_messages(chat_id, limit=limit):
@@ -322,13 +327,14 @@ class SmartPoster:
                 logger.info(f"Replied to question in {event.chat.title}")
 
     async def scan_and_post(self):
-        logger.info("Scanning dialogs for target groups...")
-        eligible_groups = []
+        logger.info("Scanning dialogs for target groups and channels...")
+        eligible = []
 
         async for dialog in self.client.iter_dialogs():
             entity = dialog.entity
             if not isinstance(entity, (Chat, Channel)):
                 continue
+
             if isinstance(entity, Channel) and not entity.megagroup:
                 continue
 
@@ -338,19 +344,21 @@ class SmartPoster:
             if self.storage.is_sent(chat_id):
                 continue
 
-            recent = await self._get_recent_messages(chat_id)
+            title_lower = title.lower()
+            has_keyword = any(kw in title_lower for kw in GROUP_KEYWORDS)
+            has_stop = any(s in title_lower for s in STOP_WORDS)
 
-            if not is_relevant_chat(title, recent):
+            if has_stop or not has_keyword:
                 continue
 
-            eligible_groups.append(entity)
+            eligible.append(entity)
 
-        if not eligible_groups:
-            logger.info("No new suitable groups found after filtering.")
+        if not eligible:
+            logger.info("No new suitable targets found.")
             return
 
-        selected = random.sample(eligible_groups, min(3, len(eligible_groups)))
-        logger.info(f"Found {len(eligible_groups)} suitable groups, selected {len(selected)}.")
+        selected = random.sample(eligible, min(3, len(eligible)))
+        logger.info(f"Found {len(eligible)} eligible, posting to {len(selected)}.")
 
         for entity in selected:
             try:
@@ -359,9 +367,24 @@ class SmartPoster:
                 self.storage.mark_sent(entity.id, entity.title or "")
                 self.storage.log_post(entity.id, entity.title or "", msg)
                 logger.info(f"Posted to {entity.title}")
-                await asyncio.sleep(random.uniform(3, 6))
+                await asyncio.sleep(random.uniform(5, 10))
             except Exception as e:
                 logger.error(f"Error posting to {entity.title}: {e}")
+
+    async def scan_channels_with_comments(self):
+        """Находит каналы с комментариями и отвечает на вопросы в них."""
+        logger.info("Scanning channels with comments...")
+        channels_with_comments = []
+
+        async for dialog in self.client.iter_dialogs():
+            entity = dialog.entity
+            if not isinstance(entity, Channel):
+                continue
+            if not entity.megagroup and hasattr(entity, 'linked_chat') and entity.linked_chat:
+                channels_with_comments.append(entity)
+
+        logger.info(f"Found {len(channels_with_comments)} channels with comments")
+        return channels_with_comments
 
 
 if __name__ == "__main__":
