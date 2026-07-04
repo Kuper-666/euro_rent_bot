@@ -341,7 +341,7 @@ class RentScanner:
             LOGGER.warning("Найдено объявление, но нет подписанных чатов: %s", link)
             return
 
-        bot_username = os.getenv("BOT_USERNAME", "expat_rent_bot")
+        bot_username = "expat_rent_bot"
         body = format_lead(source, lead, bot_username)
         delivered = False
         for chat_id in subscribers:
