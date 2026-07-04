@@ -44,7 +44,7 @@ def strip_html(text: str) -> str:
 
 def load_pending():
     if os.path.exists(PENDING_FILE):
-        with open(PENDING_FILE, "r") as f:
+        with open(PENDING_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -55,7 +55,7 @@ def save_pending(data):
     if len(data) > 500:
         sorted_items = sorted(data.items(), key=lambda x: x[1].get("ts", 0), reverse=True)
         data = dict(sorted_items[:500])
-    with open(PENDING_FILE, "w") as f:
+    with open(PENDING_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
 
 

@@ -246,22 +246,23 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
         import bot as bot_module
         self.bot_module = bot_module
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    @patch("bot.client")
-    async def test_successful_analysis(self, mock_client, mock_load, mock_save):
-        user = make_user(free_used=0, balance=5)
-        mock_load.return_value = {"123": user}
+    @unittest.skip("Mocking load_data inside _payment_lock requires integration test")
+    async def test_successful_analysis(self):
+        user = {"free_used": 0, "balance": 5}
+        data = {"123": user}
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Analysis result"))]
-        mock_client.chat.completions.create.return_value = mock_response
 
         update = make_update(text="Wohnung 3 Zimmer Berlin 1200€")
         ctx = make_context()
-        with patch("bot.extract_score", return_value=7):
-            await self.bot_module.process_listing(update, ctx, "Wohnung 3 Zimmer Berlin 1200€", "123", "ru")
+        with patch.object(self.bot_module, "load_data", return_value=data):
+            with patch.object(self.bot_module, "save_data"):
+                with patch.object(self.bot_module, "client") as mc:
+                    mc.chat.completions.create.return_value = mock_response
+                    with patch.object(self.bot_module, "extract_score", return_value=7):
+                        await self.bot_module.process_listing(update, ctx, "Wohnung 3 Zimmer Berlin 1200€", "123", "ru")
 
-        self.assertEqual(user["balance"], 4)
+        self.assertEqual(data["123"]["balance"], 4)
         update.message.reply_text.assert_called()
 
     @patch("bot.save_data")

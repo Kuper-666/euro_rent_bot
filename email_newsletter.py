@@ -51,13 +51,13 @@ groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 def get_email_subscribers() -> list[dict]:
     subscribers_file = "email_subscribers.json"
     if os.path.exists(subscribers_file):
-        with open(subscribers_file, "r") as f:
+        with open(subscribers_file, "r", encoding="utf-8") as f:
             return json.load(f)
     return []
 
 
 def save_email_subscribers(subscribers: list[dict]):
-    with open("email_subscribers.json", "w") as f:
+    with open("email_subscribers.json", "w", encoding="utf-8") as f:
         json.dump(subscribers, f, ensure_ascii=False, indent=2)
 
 

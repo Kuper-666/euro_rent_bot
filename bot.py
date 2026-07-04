@@ -56,7 +56,7 @@ def log_referral_event(event_type: str, user_id: str, extra: dict = None):
     if extra:
         entry.update(extra)
     try:
-        with open(REFERRAL_LOG, "a") as f:
+        with open(REFERRAL_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass
@@ -68,13 +68,13 @@ PENDING_FILE = "pending_listings.json"
 
 def _load_pending_listings():
     if os.path.exists(PENDING_FILE):
-        with open(PENDING_FILE, "r") as f:
+        with open(PENDING_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 
 def _save_pending_listings(data):
-    with open(PENDING_FILE, "w") as f:
+    with open(PENDING_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
 
 
@@ -1337,7 +1337,7 @@ async def ref_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         from collections import Counter
         events = []
         if os.path.exists(REFERRAL_LOG):
-            with open(REFERRAL_LOG, "r") as f:
+            with open(REFERRAL_LOG, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:

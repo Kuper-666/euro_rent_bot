@@ -69,14 +69,14 @@ groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 def load_posted():
     if os.path.exists(POSTED_FILE):
-        with open(POSTED_FILE, "r") as f:
+        with open(POSTED_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {"urls": [], "last_run": ""}
 
 
 def save_posted(data):
     data["urls"] = data["urls"][-MAX_POSTED_HISTORY:]
-    with open(POSTED_FILE, "w") as f:
+    with open(POSTED_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
