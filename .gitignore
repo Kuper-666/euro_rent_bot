@@ -1,8 +1,36 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.env
-.env.local
-venv/
-.env.production
+*.egg-info/
+dist/
+build/
+
+# Data & sessions
+data/
 users_data.json
+pending_listings.json
+sent_groups_history.txt
+bot.log
+
+# Telethon sessions
+*.session
+*.session-journal
+sessions/
+rent_scanner/sessions/
+
+# Rent scanner data
+rent_scanner/data/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
