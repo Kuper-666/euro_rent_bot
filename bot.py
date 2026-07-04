@@ -701,6 +701,17 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    is_admin = update.effective_user.id == ADMIN_ID
+
+    if not is_admin and not user.get("vip") and not user.get("pdf_paid") and user.get("balance", 0) <= 0:
+        await update.message.reply_text(
+            "У вас пока нет активных услуг.\n\n"
+            "Начните с бесплатных проверок: просто отправьте ссылку на объявление!",
+            reply_markup=kb(update)
+        )
+        return
+
     if user.get("balance") == -1:
         remaining = "∞ (безлимит)"
     else:
