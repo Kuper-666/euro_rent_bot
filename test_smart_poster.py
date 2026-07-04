@@ -13,6 +13,7 @@ from smart_poster import (
     load_sent_history,
     save_sent_history,
     SmartPoster,
+    PosterStorage,
     POST_MESSAGES,
     REPLY_MESSAGES,
     QUESTION_TRIGGERS,
@@ -105,36 +106,48 @@ class TestShouldReply(unittest.TestCase):
 
 class TestSentHistory(unittest.TestCase):
     def setUp(self):
-        self.test_file = "test_sent_history.txt"
-        self._orig = smart_poster_module.SENT_HISTORY_FILE
+        self.test_db = "test_poster.db"
+        self.storage = PosterStorage(self.test_db)
 
     def tearDown(self):
-        if os.path.exists(self.test_file):
-            os.remove(self.test_file)
+        self.storage.close()
+        if os.path.exists(self.test_db):
+            os.remove(self.test_db)
 
-    def test_load_nonexistent(self):
-        import smart_poster as sp
-        with patch.object(sp, "SENT_HISTORY_FILE", self.test_file):
-            result = load_sent_history()
-            self.assertEqual(result, set())
+    def test_empty_database(self):
+        self.assertEqual(self.storage.get_sent_ids(), set())
 
-    def test_save_and_load(self):
-        import smart_poster as sp
-        with patch.object(sp, "SENT_HISTORY_FILE", self.test_file):
-            history = set()
-            save_sent_history(123, history)
-            save_sent_history(456, history)
-            loaded = load_sent_history()
-            self.assertEqual(loaded, {123, 456})
+    def test_mark_sent(self):
+        self.storage.mark_sent(123, "Test Group")
+        self.storage.mark_sent(456, "Another Group")
+        self.assertEqual(self.storage.get_sent_ids(), {123, 456})
 
     def test_no_duplicates(self):
-        import smart_poster as sp
-        with patch.object(sp, "SENT_HISTORY_FILE", self.test_file):
-            history = set()
-            save_sent_history(123, history)
-            save_sent_history(123, history)
-            loaded = load_sent_history()
-            self.assertEqual(loaded, {123})
+        self.storage.mark_sent(123, "Test")
+        self.storage.mark_sent(123, "Test")
+        self.assertEqual(self.storage.get_sent_ids(), {123})
+
+    def test_is_sent(self):
+        self.assertFalse(self.storage.is_sent(123))
+        self.storage.mark_sent(123)
+        self.assertTrue(self.storage.is_sent(123))
+
+    def test_log_post(self):
+        self.storage.log_post(123, "Test", "Hello world")
+        stats = self.storage.stats()
+        self.assertEqual(stats["posts"], 1)
+
+    def test_log_reply(self):
+        self.storage.log_reply(123, "Test", "question", "answer")
+        stats = self.storage.stats()
+        self.assertEqual(stats["replies"], 1)
+
+    def test_stats(self):
+        self.storage.mark_sent(123)
+        self.storage.log_post(123, "Test", "msg")
+        self.storage.log_reply(123, "Test", "q", "a")
+        stats = self.storage.stats()
+        self.assertEqual(stats, {"posts": 1, "replies": 1, "groups": 1})
 
 
 import smart_poster as smart_poster_module
@@ -145,7 +158,7 @@ class TestSmartPosterInit(unittest.TestCase):
     def test_init(self, mock_client):
         poster = SmartPoster()
         self.assertIsNotNone(poster.client)
-        self.assertIsInstance(poster.sent_history, set)
+        self.assertIsNotNone(poster.storage)
         self.assertEqual(poster.COOLDOWN_SECONDS, 300)
 
     @patch("smart_poster.TelegramClient")

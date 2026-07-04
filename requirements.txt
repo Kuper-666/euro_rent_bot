@@ -14,3 +14,5 @@ apscheduler
 pytz
 telethon
 langdetect
+pandas
+openpyxl

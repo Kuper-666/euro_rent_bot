@@ -19,8 +19,15 @@
 import os
 import asyncio
 import random
+import re
+import sqlite3
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
+from telethon import TelegramClient, events
+from telethon.tl.types import Channel, Chat
+from dotenv import load_dotenv
+from langdetect import detect, DetectorFactory
+from langdetect.lang_detect_exception import LangDetectException
 from typing import Optional
 
 from telethon import TelegramClient, events
@@ -75,20 +82,110 @@ QUESTION_TRIGGERS = [
 ]
 
 SENT_HISTORY_FILE = "sent_groups_history.txt"
+SMART_POSTER_DB = "data/smart_poster.db"
+
+
+class PosterStorage:
+    def __init__(self, db_path: str = SMART_POSTER_DB):
+        dirname = os.path.dirname(db_path)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        self._conn = sqlite3.connect(db_path)
+        self._conn.row_factory = sqlite3.Row
+        self._init_schema()
+
+    def _init_schema(self):
+        self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS sent_groups (
+                chat_id INTEGER PRIMARY KEY,
+                title TEXT,
+                sent_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                chat_title TEXT,
+                message_text TEXT,
+                post_type TEXT DEFAULT 'promo',
+                sent_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS replies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                chat_title TEXT,
+                trigger_text TEXT,
+                reply_text TEXT,
+                sent_at TEXT NOT NULL
+            );
+        """)
+        self._conn.commit()
+
+    def is_sent(self, chat_id: int) -> bool:
+        row = self._conn.execute("SELECT 1 FROM sent_groups WHERE chat_id = ?", (chat_id,)).fetchone()
+        return row is not None
+
+    def mark_sent(self, chat_id: int, title: str = ""):
+        self._conn.execute(
+            "INSERT OR IGNORE INTO sent_groups(chat_id, title, sent_at) VALUES(?, ?, ?)",
+            (chat_id, title, datetime.now(timezone.utc).isoformat())
+        )
+        self._conn.commit()
+
+    def get_sent_ids(self) -> set:
+        rows = self._conn.execute("SELECT chat_id FROM sent_groups").fetchall()
+        return {row["chat_id"] for row in rows}
+
+    def log_post(self, chat_id: int, title: str, text: str, post_type: str = "promo"):
+        self._conn.execute(
+            "INSERT INTO posts(chat_id, chat_title, message_text, post_type, sent_at) VALUES(?, ?, ?, ?, ?)",
+            (chat_id, title, text, post_type, datetime.now(timezone.utc).isoformat())
+        )
+        self._conn.commit()
+
+    def log_reply(self, chat_id: int, title: str, trigger: str, reply: str):
+        self._conn.execute(
+            "INSERT INTO replies(chat_id, chat_title, trigger_text, reply_text, sent_at) VALUES(?, ?, ?, ?, ?)",
+            (chat_id, title, trigger, reply, datetime.now(timezone.utc).isoformat())
+        )
+        self._conn.commit()
+
+    def stats(self) -> dict:
+        posts = self._conn.execute("SELECT COUNT(*) as c FROM posts").fetchone()["c"]
+        replies = self._conn.execute("SELECT COUNT(*) as c FROM replies").fetchone()["c"]
+        groups = self._conn.execute("SELECT COUNT(*) as c FROM sent_groups").fetchone()["c"]
+        return {"posts": posts, "replies": replies, "groups": groups}
+
+    def to_excel(self, path: str = "data/smart_poster_report.xlsx"):
+        import pandas as pd
+        posts_df = pd.read_sql("SELECT * FROM posts ORDER BY sent_at DESC", self._conn)
+        replies_df = pd.read_sql("SELECT * FROM replies ORDER BY sent_at DESC", self._conn)
+        groups_df = pd.read_sql("SELECT * FROM sent_groups ORDER BY sent_at DESC", self._conn)
+
+        with pd.ExcelWriter(path, engine="openpyxl") as writer:
+            if not posts_df.empty:
+                posts_df.to_excel(writer, sheet_name="Posts", index=False)
+            if not replies_df.empty:
+                replies_df.to_excel(writer, sheet_name="Replies", index=False)
+            if not groups_df.empty:
+                groups_df.to_excel(writer, sheet_name="Groups", index=False)
+        logger.info(f"Report exported to {path}")
+        return path
+
+    def close(self):
+        self._conn.close()
 
 
 def load_sent_history() -> set:
-    if os.path.exists(SENT_HISTORY_FILE):
-        with open(SENT_HISTORY_FILE, "r") as f:
-            return {int(line.strip()) for line in f if line.strip()}
-    return set()
+    storage = PosterStorage()
+    ids = storage.get_sent_ids()
+    storage.close()
+    return ids
 
 
 def save_sent_history(chat_id: int, history: set):
-    history.add(chat_id)
-    with open(SENT_HISTORY_FILE, "w") as f:
-        for cid in sorted(history):
-            f.write(f"{cid}\n")
+    storage = PosterStorage()
+    storage.mark_sent(chat_id)
+    storage.close()
 
 
 def detect_language(text: str) -> str:
@@ -145,9 +242,9 @@ def should_reply(text: str) -> bool:
 class SmartPoster:
     def __init__(self):
         self.client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
-        self.sent_history = load_sent_history()
+        self.storage = PosterStorage()
         self._reply_cooldown: dict[int, float] = {}
-        self.COOLDOWN_SECONDS = 300  # 5 минут между ответами в одну группу
+        self.COOLDOWN_SECONDS = 300
 
     def _can_reply(self, chat_id: int) -> bool:
         last = self._reply_cooldown.get(chat_id, 0)
@@ -168,8 +265,8 @@ class SmartPoster:
 
     async def run(self):
         await self.client.connect()
-        if not await self.client.is_user_authorised():
-            logger.error("Session not authorised. Run the scanner first.")
+        if not await self.client.is_user_authorized():
+            logger.error("Session not authorized. Run the scanner first.")
             await self.client.disconnect()
             return
 
@@ -178,6 +275,9 @@ class SmartPoster:
         await self.scan_and_post()
 
         self._register_reply_listener()
+
+        stats = self.storage.stats()
+        logger.info(f"Stats: {stats['posts']} posts, {stats['replies']} replies, {stats['groups']} groups")
 
         logger.info("Listener started. Waiting for comments...")
         await self.client.run_until_disconnected()
@@ -205,6 +305,7 @@ class SmartPoster:
                         reply = random.choice(REPLY_MESSAGES)
                         await event.reply(reply)
                         self._mark_replied(chat_id)
+                        self.storage.log_reply(chat_id, event.chat.title or "", text[:100], reply)
                         logger.info(f"Replied to comment in {event.chat.title}")
                         return
                 except Exception as e:
@@ -217,6 +318,7 @@ class SmartPoster:
                 reply = random.choice(REPLY_MESSAGES) + " Попробуйте @EuroRentAIBot."
                 await event.reply(reply)
                 self._mark_replied(chat_id)
+                self.storage.log_reply(chat_id, event.chat.title or "", text[:100], reply)
                 logger.info(f"Replied to question in {event.chat.title}")
 
     async def scan_and_post(self):
@@ -233,7 +335,7 @@ class SmartPoster:
             chat_id = entity.id
             title = entity.title or ""
 
-            if chat_id in self.sent_history:
+            if self.storage.is_sent(chat_id):
                 continue
 
             recent = await self._get_recent_messages(chat_id)
@@ -254,7 +356,8 @@ class SmartPoster:
             try:
                 msg = random.choice(POST_MESSAGES)
                 await self.client.send_message(entity, msg)
-                save_sent_history(entity.id, self.sent_history)
+                self.storage.mark_sent(entity.id, entity.title or "")
+                self.storage.log_post(entity.id, entity.title or "", msg)
                 logger.info(f"Posted to {entity.title}")
                 await asyncio.sleep(random.uniform(3, 6))
             except Exception as e:
@@ -262,12 +365,27 @@ class SmartPoster:
 
 
 if __name__ == "__main__":
+    import sys
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         level=logging.INFO,
     )
-    poster = SmartPoster()
-    try:
-        asyncio.run(poster.run())
-    except KeyboardInterrupt:
-        logger.info("Stopped by user.")
+
+    if "--export" in sys.argv:
+        storage = PosterStorage()
+        path = storage.to_excel()
+        stats = storage.stats()
+        print(f"Exported: {path}")
+        print(f"Posts: {stats['posts']}, Replies: {stats['replies']}, Groups: {stats['groups']}")
+        storage.close()
+    elif "--stats" in sys.argv:
+        storage = PosterStorage()
+        stats = storage.stats()
+        print(f"Posts: {stats['posts']}, Replies: {stats['replies']}, Groups: {stats['groups']}")
+        storage.close()
+    else:
+        poster = SmartPoster()
+        try:
+            asyncio.run(poster.run())
+        except KeyboardInterrupt:
+            logger.info("Stopped by user.")
