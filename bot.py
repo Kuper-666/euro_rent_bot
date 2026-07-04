@@ -1136,6 +1136,40 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text(f"📊 Email-подписчиков: {len(subs)}")
 
 
+async def metrics_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
+    try:
+        from rent_scanner.storage import Storage
+        from rent_scanner.config import RuntimeConfig
+        config = RuntimeConfig.from_env()
+        storage = Storage(config.database_path)
+        stats = storage.full_stats()
+
+        top = list(stats["by_source"].items())[:5]
+        top_text = "\n".join(f"  {src}: {cnt}" for src, cnt in top) if top else "  нет данных"
+        days = "\n".join(f"  {d}: {c}" for d, c in stats["by_day"].items()) if stats["by_day"] else "  нет данных"
+        today = stats["today"]
+
+        text = (
+            f"📊 <b>Метрики сканера</b>\n\n"
+            f"👥 Подписчиков: {stats['subscribers']}\n"
+            f"📋 Всего: {stats['total_leads']}\n"
+            f"📤 Доставлено: {stats['total_notified']}\n\n"
+            f"📅 <b>Сегодня:</b>\n"
+            f"  Найдено: {today['found']}\n"
+            f"  Доставлено: {today['delivered']}\n"
+            f"  Ошибок: {today['errors']}\n"
+            f"  Пропущено: {today['skipped']}\n\n"
+            f"🏆 <b>Топ каналов:</b>\n{top_text}\n\n"
+            f"📈 <b>7 дней:</b>\n{days}"
+        )
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
 async def post_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -1223,6 +1257,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("subscribe_email", subscribe_email, priv))
     application.add_handler(CommandHandler("unsubscribe_email", unsubscribe_email, priv))
     application.add_handler(CommandHandler("subscribers", subscribers_count, priv))
+    application.add_handler(CommandHandler("metrics", metrics_command, priv))
     application.add_handler(CommandHandler("post_now", post_now, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))

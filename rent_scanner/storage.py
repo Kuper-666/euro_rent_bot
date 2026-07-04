@@ -43,6 +43,13 @@ class Storage:
                 created_at TEXT NOT NULL,
                 UNIQUE(source, message_id)
             );
+            CREATE TABLE IF NOT EXISTS metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                value INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(date, metric)
+            );
         """)
         self._conn.commit()
 
@@ -81,3 +88,59 @@ class Storage:
     def mark_notified(self, source: str, message_id: int) -> None:
         self._conn.execute("UPDATE leads SET notified_at = ? WHERE source = ? AND message_id = ?", (utc_now(), source, message_id))
         self._conn.commit()
+
+    def inc_metric(self, metric: str, value: int = 1) -> None:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        self._conn.execute("""
+            INSERT INTO metrics(date, metric, value) VALUES(?, ?, ?)
+            ON CONFLICT(date, metric) DO UPDATE SET value = value + ?
+        """, (today, metric, value, value))
+        self._conn.commit()
+
+    def get_metric(self, metric: str, date: str = None) -> int:
+        if date is None:
+            date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        row = self._conn.execute("SELECT value FROM metrics WHERE date = ? AND metric = ?", (date, metric)).fetchone()
+        return row["value"] if row else 0
+
+    def full_stats(self) -> dict:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        subs = self._conn.execute("SELECT COUNT(*) as cnt FROM subscribers").fetchone()["cnt"]
+        total_leads = self._conn.execute("SELECT COUNT(*) as cnt FROM leads").fetchone()["cnt"]
+        notified = self._conn.execute("SELECT COUNT(*) as cnt FROM leads WHERE notified_at IS NOT NULL").fetchone()["cnt"]
+
+        by_source = {}
+        for row in self._conn.execute("SELECT source, COUNT(*) as cnt FROM leads GROUP BY source ORDER BY cnt DESC").fetchall():
+            by_source[row["source"]] = row["cnt"]
+
+        by_day = {}
+        for row in self._conn.execute("""
+            SELECT DATE(created_at) as day, COUNT(*) as cnt
+            FROM leads WHERE created_at >= DATE('now', '-7 days')
+            GROUP BY day ORDER BY day
+        """).fetchall():
+            by_day[row["day"]] = row["cnt"]
+
+        score_dist = {}
+        for row in self._conn.execute("SELECT score, COUNT(*) as cnt FROM leads GROUP BY score ORDER BY score").fetchall():
+            score_dist[row["score"]] = row["cnt"]
+
+        today_found = self.get_metric("found", today)
+        today_delivered = self.get_metric("delivered", today)
+        today_errors = self.get_metric("errors", today)
+        today_skipped = self.get_metric("skipped", today)
+
+        return {
+            "subscribers": subs,
+            "total_leads": total_leads,
+            "total_notified": notified,
+            "by_source": by_source,
+            "by_day": by_day,
+            "score_distribution": score_dist,
+            "today": {
+                "found": today_found,
+                "delivered": today_delivered,
+                "errors": today_errors,
+                "skipped": today_skipped,
+            },
+        }

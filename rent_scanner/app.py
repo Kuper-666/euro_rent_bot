@@ -90,10 +90,27 @@ class RentScanner:
 
         @self.bot_client.on(events.NewMessage(pattern=r"^/status"))
         async def status(event: events.NewMessage.Event) -> None:
-            stats = self.storage.stats()
-            await event.respond(
-                f"Статус:\n- источников: {len(self.sources)}\n- подписчиков: {stats['subscribers']}\n- объявлений в базе: {stats['leads']}"
+            stats = self.storage.full_stats()
+            top_sources = list(stats["by_source"].items())[:5]
+            top_lines = "\n".join(f"  {src}: {cnt}" for src, cnt in top_sources) if top_sources else "  нет данных"
+            day_lines = "\n".join(f"  {day}: {cnt}" for day, cnt in stats["by_day"].items()) if stats["by_day"] else "  нет данных"
+            today = stats["today"]
+
+            text = (
+                f"📊 <b>Статистика сканера</b>\n\n"
+                f"👥 Подписчиков: {stats['subscribers']}\n"
+                f"📋 Всего объявлений: {stats['total_leads']}\n"
+                f"📤 Доставлено: {stats['total_notified']}\n\n"
+                f"📅 <b>Сегодня:</b>\n"
+                f"  Найдено: {today['found']}\n"
+                f"  Доставлено: {today['delivered']}\n"
+                f"  Ошибок: {today['errors']}\n"
+                f"  Пропущено: {today['skipped']}\n\n"
+                f"🏆 <b>Топ каналов:</b>\n{top_lines}\n\n"
+                f"📈 <b>По дням (7д):</b>\n{day_lines}\n\n"
+                f"🔑 Источников: {len(self.sources)}"
             )
+            await event.respond(text, parse_mode="html")
 
     async def _register_source_handlers(self) -> list[tuple[Source, object]]:
         active: list[tuple[Source, object]] = []
@@ -135,6 +152,7 @@ class RentScanner:
 
         match = match_text(text)
         if not match.accepted:
+            self.storage.inc_metric("skipped")
             return
 
         link = f"https://t.me/{source.username}/{message.id}"
@@ -151,6 +169,8 @@ class RentScanner:
 
         if not self.storage.record_or_should_retry(lead):
             return
+
+        self.storage.inc_metric("found")
 
         subscribers = self.storage.subscribers()
         if not subscribers:
@@ -172,11 +192,14 @@ class RentScanner:
                     delivered = True
                 except RPCError as exc2:
                     LOGGER.warning("Не удалось доставить объявление в %s после retry: %s", chat_id, exc2)
+                    self.storage.inc_metric("errors")
             except RPCError as exc:
                 LOGGER.warning("Не удалось доставить объявление в %s: %s", chat_id, exc)
+                self.storage.inc_metric("errors")
 
         if delivered:
             self.storage.mark_notified(lead.source, lead.message_id)
+            self.storage.inc_metric("delivered")
             LOGGER.info("✅ Объявление доставлено из %s (ID: %s)", source.handle, message.id)
 
     async def _discover_channels(self, text: str) -> None:
