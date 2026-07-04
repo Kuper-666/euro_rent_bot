@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
+import os
 import re
 import signal
 from datetime import datetime, timezone
@@ -11,6 +13,7 @@ from typing import Iterable
 from telethon import TelegramClient, events
 from telethon.errors import RPCError, FloodWaitError
 from telethon.tl.custom.message import Message
+from telethon.tl.types import Channel, Chat
 
 from .config import RuntimeConfig
 from .filters import match_text
@@ -111,6 +114,61 @@ class RentScanner:
                 f"🔑 Источников: {len(self.sources)}"
             )
             await event.respond(text, parse_mode="html")
+
+        @self.bot_client.on(events.NewMessage(pattern=r"^/add (.+)"))
+        async def add_channel(event: events.NewMessage.Event) -> None:
+            handle = event.pattern_match.group(1).strip()
+            if not handle.startswith("@"):
+                handle = f"@{handle}"
+            if any(s.handle == handle for s in self.sources):
+                await event.respond(f"ℹ️ {handle} уже добавлен.")
+                return
+            try:
+                entity = await self.user_client.get_entity(handle)
+                if not hasattr(entity, 'title'):
+                    await event.respond("❌ Не удалось найти канал.")
+                    return
+                new_source = Source(
+                    handle=handle,
+                    title=entity.title,
+                    reason="Добавлен вручную",
+                    enabled=True,
+                )
+                self.sources.append(new_source)
+
+                @self.user_client.on(events.NewMessage(chats=entity))
+                async def new_handler(event: events.NewMessage.Event, src: Source = new_source) -> None:
+                    await self._process_message(src, event.message)
+
+                await event.respond(f"✅ Добавлен: {entity.title} ({handle})")
+                LOGGER.info("Manual add: %s (%s)", handle, entity.title)
+            except (ValueError, RPCError) as e:
+                await event.respond(f"❌ Ошибка: {str(e)[:100]}")
+
+        @self.bot_client.on(events.NewMessage(pattern=r"^/search (.+)"))
+        async def search_channels(event: events.NewMessage.Event) -> None:
+            query = event.pattern_match.group(1).strip()
+            await event.respond(f"🔍 Ищу: {query}...")
+            try:
+                results = await self.user_client.get_dialogs(limit=100)
+                found = []
+                async for dialog in results:
+                    entity = dialog.entity
+                    if not hasattr(entity, 'title'):
+                        continue
+                    title = (entity.title or "").lower()
+                    if query.lower() in title:
+                        handle = f"@{entity.username}" if hasattr(entity, 'username') and entity.username else None
+                        members = getattr(entity, 'participants_count', '?')
+                        found.append(f"  {entity.title} ({members} чел.) {handle or ''}")
+
+                if found:
+                    text = f"🔍 Найдено {len(found)}:\n" + "\n".join(found[:10])
+                else:
+                    text = f"❌ Ничего не найдено по запросу: {query}"
+                await event.respond(text)
+            except Exception as e:
+                await event.respond(f"❌ Ошибка поиска: {str(e)[:100]}")
 
     async def _register_source_handlers(self) -> list[tuple[Source, object]]:
         active: list[tuple[Source, object]] = []
