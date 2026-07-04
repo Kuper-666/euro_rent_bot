@@ -334,23 +334,19 @@ class RentScanner:
             LOGGER.warning("Найдено объявление, но нет подписанных чатов: %s", link)
             return
 
-        body = format_lead(source, lead)
         bot_username = os.getenv("BOT_USERNAME", "expat_rent_bot")
-        analyze_url = f"https://t.me/{bot_username}?start=analyze_{lead.link}"
-        buttons = [
-            [Button.url("🔍 Проверить скрытые платежи", analyze_url)]
-        ]
+        body = format_lead(source, lead, bot_username)
         delivered = False
         for chat_id in subscribers:
             try:
-                await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False, buttons=buttons)
+                await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
                 delivered = True
             except FloodWaitError as exc:
                 wait_seconds = min(exc.seconds, 300)
                 LOGGER.warning("Flood wait %ds, sleeping...", wait_seconds)
                 await asyncio.sleep(wait_seconds)
                 try:
-                    await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False, buttons=buttons)
+                    await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
                     delivered = True
                 except RPCError as exc2:
                     LOGGER.warning("Не удалось доставить объявление в %s после retry: %s", chat_id, exc2)

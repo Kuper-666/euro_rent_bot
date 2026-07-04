@@ -119,7 +119,7 @@ def extract_details(text: str) -> dict[str, Optional[str]]:
     }
 
 
-def format_lead(source: Source, lead: LeadRecord) -> str:
+def format_lead(source: Source, lead: LeadRecord, bot_username: str = "expat_rent_bot") -> str:
     contacts = extract_contacts(lead.text)
     contact_line = ", ".join(html.escape(item) for item in contacts) if contacts else "не найдены"
     keywords = ", ".join(html.escape(item) for item in lead.keywords[:5])
@@ -144,6 +144,8 @@ def format_lead(source: Source, lead: LeadRecord) -> str:
     link_line = f'\n<a href="{html.escape(lead.link)}">🔗 Перейти к объявлению</a>' if lead.link else ""
     excerpt = html.escape(truncate(lead.text, 500))
 
+    analyze_url = f"https://t.me/{bot_username}?start=analyze_{lead.link}" if lead.link else f"https://t.me/{bot_username}"
+
     lines = [
         f"🏠 <b>Новое объявление</b> · score {lead.score}",
         f"📌 <b>{html.escape(source.title)}</b> · {html.escape(date_text)}",
@@ -154,6 +156,6 @@ def format_lead(source: Source, lead: LeadRecord) -> str:
     lines.append(f"📞 <b>Контакты:</b> {contact_line}")
     lines.append(link_line)
     lines.append(f"\n{excerpt}")
-    lines.append(f"\n🤖 <i>Проверить скрытые платежи → </i>@expat_rent_bot")
+    lines.append(f'\n🔍 <a href="{html.escape(analyze_url)}">Проверить скрытые платежи</a> → @{html.escape(bot_username)}')
 
     return "\n".join(lines)
