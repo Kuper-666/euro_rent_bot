@@ -134,7 +134,7 @@ def format_lead(source: Source, lead: LeadRecord) -> str:
     if details["price"]:
         detail_parts.append(f"💰 {details['price']} EUR")
     if details["area"]:
-        detail_parts.append(f"📐 {details['area']} м²")
+        detail_parts.append(f"📐 {details['area']} м2")
     if details["rooms"]:
         detail_parts.append(f"🚪 {details['rooms']}")
     if details["bedrooms"]:
@@ -154,6 +154,6 @@ def format_lead(source: Source, lead: LeadRecord) -> str:
     lines.append(f"📞 <b>Контакты:</b> {contact_line}")
     lines.append(link_line)
     lines.append(f"\n{excerpt}")
-    lines.append(f"\n🤖 <i>Проверить скрытые платежи → </i>@EuroRentAIBot")
+    lines.append(f"\n🤖 <i>Проверить скрытые платежи → </i>@expat_rent_bot")
 
     return "\n".join(lines)

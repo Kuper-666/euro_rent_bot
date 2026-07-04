@@ -143,7 +143,7 @@ class TestMessagesConfig(unittest.TestCase):
 
     def test_all_post_messages_mention_bot(self):
         for msg in POST_MESSAGES:
-            self.assertIn("@EuroRentAIBot", msg)
+            self.assertIn("@expat_rent_bot", msg)
 
     def test_post_messages_disclose_creator(self):
         """Тексты честно представляются от создателя бота."""
