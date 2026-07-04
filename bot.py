@@ -575,8 +575,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.answer("Скопируйте текст выше", show_alert=True)
 
         # Кнопка "Язык"
-        elif data.startswith("lang_"):
-            new_lang = data.split("_", 1)[1]
+        elif data_prefix.startswith("lang_"):
+            new_lang = data_prefix.split("_", 1)[1]
             user_id = str(query.from_user.id)
             data_dict = load_data()
             user = get_user_data(data_dict, user_id)
