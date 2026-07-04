@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import os
 import re
 import secrets
@@ -11,6 +12,8 @@ from urllib.parse import quote
 
 from .sources import Source
 from .storage import LeadRecord
+
+logger = logging.getLogger(__name__)
 
 CONTACT_RE = re.compile(
     r"(?P<username>@[A-Za-z0-9_]{5,32})|(?P<email>[\w.+-]+@[\w-]+\.[\w.-]+)|(?P<url>https?://\S+)"
@@ -66,8 +69,8 @@ def create_url_token(url: str) -> str:
             token = secrets.token_urlsafe(6)[:8]
             sb.table(TOKEN_TABLE).insert({"token": token, "url": url}).execute()
             return token
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Supabase create_url_token failed, falling back to local file: {e}")
     return _create_url_token_local(url)
 
 
@@ -78,8 +81,8 @@ def resolve_url_token(token: str) -> str:
             result = sb.table(TOKEN_TABLE).select("url").eq("token", token).execute()
             if result.data:
                 return result.data[0]["url"]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Supabase resolve_url_token failed, falling back to local file: {e}")
     return _resolve_url_token_local(token)
 
 
