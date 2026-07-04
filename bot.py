@@ -1188,10 +1188,15 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     lang = get_lang(update)
-    deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+
+    if is_url:
+        listing_url = text.strip().split()[0]
+        deep_link = f"https://t.me/{bot_username}?start=analyze_{listing_url}"
+    else:
+        deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Проанализировать в боте", url=deep_link)]
+        [InlineKeyboardButton("🔍 Проверить скрытые платежи", url=deep_link)]
     ])
 
     await update.message.reply_text(
