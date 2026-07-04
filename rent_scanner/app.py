@@ -150,17 +150,39 @@ class RentScanner:
             query = event.pattern_match.group(1).strip()
             await event.respond(f"🔍 Ищу: {query}...")
             try:
-                results = await self.user_client.get_dialogs(limit=100)
+                from telethon.tl.functions.messages import SearchRequest
+                from telethon.tl.types import InputMessagesFilterEmpty
+
+                result = await self.user_client(SearchRequest(
+                    q=query,
+                    filter=InputMessagesFilterEmpty(),
+                    offset_date=None,
+                    offset_id=0,
+                    offset_peer=None,
+                    limit=20,
+                ))
+
                 found = []
-                async for dialog in results:
-                    entity = dialog.entity
-                    if not hasattr(entity, 'title'):
+                seen = set()
+                for msg in result.messages:
+                    if not hasattr(msg, 'peer_id') or not msg.peer_id:
                         continue
-                    title = (entity.title or "").lower()
-                    if query.lower() in title:
+                    chat_id = msg.peer_id.channel_id if hasattr(msg.peer_id, 'channel_id') else (
+                        msg.peer_id.chat_id if hasattr(msg.peer_id, 'chat_id') else None
+                    )
+                    if not chat_id or chat_id in seen:
+                        continue
+                    seen.add(chat_id)
+                    try:
+                        entity = await self.user_client.get_entity(chat_id)
+                        if not hasattr(entity, 'title'):
+                            continue
+                        title = entity.title
                         handle = f"@{entity.username}" if hasattr(entity, 'username') and entity.username else None
                         members = getattr(entity, 'participants_count', '?')
-                        found.append(f"  {entity.title} ({members} чел.) {handle or ''}")
+                        found.append(f"  {title} ({members} чел.) {handle or ''}")
+                    except Exception:
+                        continue
 
                 if found:
                     text = f"🔍 Найдено {len(found)}:\n" + "\n".join(found[:10])
