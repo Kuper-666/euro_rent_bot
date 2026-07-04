@@ -26,6 +26,7 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from config import TELEGRAM_TOKEN, GROQ_API_KEY
 from utils import clean_text
 from urllib.parse import quote
+from rent_scanner.formatting import create_url_token
 from listing_features import (
     POPULAR_CITIES, detect_city, extract_price,
     record_listing, is_holy_grail, format_holy_grail_alert,
@@ -171,7 +172,7 @@ async def post_to_channel(chat_id: int, text: str, bot_username: str, listing_ur
     if not bot or not chat_id:
         return False
 
-    analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(listing_url, safe='')}"
+    analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(listing_url)}"
     keyboard = [
         [InlineKeyboardButton("🔍 Полный анализ", url=analyze_url)],
         [InlineKeyboardButton("🤖 Начать с ботом", url=f"https://t.me/{bot_username}")],
@@ -202,7 +203,7 @@ async def send_holy_grail_alert(entry: dict, bot_username: str):
     if city in CITY_CHANNELS:
         channel_ids.add(CITY_CHANNELS[city])
 
-    analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}"
+    analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(entry['url'])}"
     keyboard = [
         [InlineKeyboardButton("⚡ ЗАБРАТЬ!", url=analyze_url)],
         [InlineKeyboardButton("🤖 Анализ в боте", url=f"https://t.me/{bot_username}")],

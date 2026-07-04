@@ -134,9 +134,10 @@ def analyze_for_digest(title: str, summary: str) -> str | None:
 
 
 def build_digest_html(entries: list[dict], analyses: list[str], bot_username: str) -> str:
+    from rent_scanner.formatting import create_url_token
     listings_html = ""
     for entry, analysis in zip(entries, analyses):
-        analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}"
+        analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(entry['url'])}"
         listings_html += f"""
         <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:12px;border-left:4px solid #4CAF50;">
             <h3 style="margin:0 0 8px 0;color:#333;">{entry['title']}</h3>
@@ -172,13 +173,14 @@ def build_digest_html(entries: list[dict], analyses: list[str], bot_username: st
 
 
 def build_digest_plain(entries: list[dict], analyses: list[str], bot_username: str) -> str:
+    from rent_scanner.formatting import create_url_token
     text = "🏠 EuroRent AI — Дайджест недели\n\n"
     text += "Лучшие объявления об аренде:\n\n"
     for i, (entry, analysis) in enumerate(zip(entries, analyses), 1):
         text += f"{i}. {entry['title']}\n"
         text += f"   {analysis}\n"
         text += f"   Объявление: {entry['url']}\n"
-        text += f"   Анализ: https://t.me/{bot_username}?start=analyze_{quote(entry['url'], safe='')}\n\n"
+        text += f"   Анализ: https://t.me/{bot_username}?start=an_{create_url_token(entry['url'])}\n\n"
     text += f"\n---\nБот: https://t.me/{bot_username}\nОтписаться: https://t.me/{bot_username}?start=unsubscribe_email\n"
     return text
 

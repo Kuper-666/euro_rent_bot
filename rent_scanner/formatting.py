@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import html
+import json
+import os
 import re
+import secrets
 from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
@@ -37,6 +40,32 @@ BEDROOMS_RE = re.compile(
     r"\b(?:Double|Triple|Single)\s+(?:Room|Bed|En)",
     re.IGNORECASE,
 )
+
+# Токены для коротких deep links
+TOKEN_FILE = os.getenv("URL_TOKENS_PATH", "url_tokens.json")
+
+
+def _load_tokens() -> dict:
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _save_tokens(data: dict):
+    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def create_url_token(url: str) -> str:
+    tokens = _load_tokens()
+    for token, stored_url in tokens.items():
+        if stored_url == url:
+            return token
+    token = secrets.token_urlsafe(6)[:8]
+    tokens[token] = url
+    _save_tokens(tokens)
+    return token
 
 
 def truncate(text: str, limit: int = 1600) -> str:
@@ -145,7 +174,7 @@ def format_lead(source: Source, lead: LeadRecord, bot_username: str = "expat_ren
     link_line = f'\n<a href="{html.escape(lead.link)}">🔗 Перейти к объявлению</a>' if lead.link else ""
     excerpt = html.escape(truncate(lead.text, 500))
 
-    analyze_url = f"https://t.me/{bot_username}?start=analyze_{quote(lead.link, safe='')}" if lead.link else f"https://t.me/{bot_username}"
+    analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(lead.link)}" if lead.link else f"https://t.me/{bot_username}"
 
     lines = [
         f"🏠 <b>Новое объявление</b> · score {lead.score}",

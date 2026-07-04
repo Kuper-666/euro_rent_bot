@@ -66,6 +66,41 @@ def log_referral_event(event_type: str, user_id: str, extra: dict = None):
 _pending_listings = {}
 PENDING_FILE = "pending_listings.json"
 
+# Токены для коротких deep links (токен -> url)
+_url_tokens = {}
+TOKEN_FILE = "url_tokens.json"
+
+
+def _load_url_tokens():
+    global _url_tokens
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+            _url_tokens = json.load(f)
+    return _url_tokens
+
+
+def _save_url_tokens(data):
+    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
+def create_url_token(url: str) -> str:
+    import secrets
+    _load_url_tokens()
+    # Проверяем, есть ли уже токен для этого URL
+    for token, stored_url in _url_tokens.items():
+        if stored_url == url:
+            return token
+    token = secrets.token_urlsafe(6)[:8]
+    _url_tokens[token] = url
+    _save_url_tokens(_url_tokens)
+    return token
+
+
+def resolve_url_token(token: str) -> str:
+    _load_url_tokens()
+    return _url_tokens.get(token, "")
+
 
 def _load_pending_listings():
     if os.path.exists(PENDING_FILE):
@@ -635,7 +670,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if context.args and len(context.args) > 0:
         payload = context.args[0]
-        if payload.startswith("analyze_"):
+        if payload.startswith("an_"):
+            # Новый формат: короткий токен
+            token = payload[len("an_"):]
+            url = resolve_url_token(token)
+            if url and is_url(url):
+                await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
+                listing_text = fetch_url_text(url)
+                if listing_text.startswith("ERROR"):
+                    await update.message.reply_text(
+                        "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
+                        "Скопируйте текст объявления и отправьте его сюда.",
+                        reply_markup=kb(update)
+                    )
+                    return
+                try:
+                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
+                except Exception as e:
+                    logging.error(f"process_listing (start token) error for user {user_id}: {e}")
+                    try:
+                        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+                    except Exception:
+                        pass
+                return
+            else:
+                await update.message.reply_text("❌ Ссылка устарела. Отправьте объявление напрямую.", reply_markup=kb(update))
+                return
+        elif payload.startswith("analyze_"):
+            # Старый формат: полный URL (для обратной совместимости)
             url = unquote(payload[len("analyze_"):])
             if is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
@@ -1195,9 +1257,9 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     lang = get_lang(update)
 
     if is_url:
-        from urllib.parse import quote
         listing_url = text.strip().split()[0]
-        deep_link = f"https://t.me/{bot_username}?start=analyze_{quote(listing_url, safe='')}"
+        token = create_url_token(listing_url)
+        deep_link = f"https://t.me/{bot_username}?start=an_{token}"
     else:
         deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
 
