@@ -251,12 +251,9 @@ class SmartPoster:
 
         await self.scan_and_post()
 
-        self._register_reply_listener()
-
         stats = self.storage.stats()
-        logger.info(f"Stats: {stats['posts']} posts, {stats['replies']} replies, {stats['groups']} groups")
+        logger.info(f"Stats: {stats['posts']} posts, {stats['groups']} groups")
 
-        logger.info("Listener started. Waiting for comments...")
         await self.client.run_until_disconnected()
 
     async def scan_and_post(self):
@@ -303,21 +300,6 @@ class SmartPoster:
                 await asyncio.sleep(random.uniform(5, 10))
             except Exception as e:
                 logger.error(f"Error posting to {entity.title}: {e}")
-
-    async def scan_channels_with_comments(self):
-        """Находит каналы с комментариями и отвечает на вопросы в них."""
-        logger.info("Scanning channels with comments...")
-        channels_with_comments = []
-
-        async for dialog in self.client.iter_dialogs():
-            entity = dialog.entity
-            if not isinstance(entity, Channel):
-                continue
-            if not entity.megagroup and hasattr(entity, 'linked_chat') and entity.linked_chat:
-                channels_with_comments.append(entity)
-
-        logger.info(f"Found {len(channels_with_comments)} channels with comments")
-        return channels_with_comments
 
 
 if __name__ == "__main__":
