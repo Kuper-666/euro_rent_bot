@@ -41,31 +41,73 @@ BEDROOMS_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Токены для коротких deep links
-TOKEN_FILE = os.getenv("URL_TOKENS_PATH", "url_tokens.json")
+# Токены для коротких deep links — хранятся в Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+TOKEN_TABLE = "UrlTokens"
+_supabase = None
 
 
-def _load_tokens() -> dict:
-    if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def _save_tokens(data: dict):
-    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+def _get_supabase():
+    global _supabase
+    if _supabase is None and SUPABASE_URL and SUPABASE_KEY:
+        from supabase import create_client
+        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _supabase
 
 
 def create_url_token(url: str) -> str:
-    tokens = _load_tokens()
-    for token, stored_url in tokens.items():
-        if stored_url == url:
+    sb = _get_supabase()
+    if sb:
+        try:
+            result = sb.table(TOKEN_TABLE).select("token").eq("url", url).execute()
+            if result.data:
+                return result.data[0]["token"]
+            token = secrets.token_urlsafe(6)[:8]
+            sb.table(TOKEN_TABLE).insert({"token": token, "url": url}).execute()
             return token
+        except Exception:
+            pass
+    return _create_url_token_local(url)
+
+
+def resolve_url_token(token: str) -> str:
+    sb = _get_supabase()
+    if sb:
+        try:
+            result = sb.table(TOKEN_TABLE).select("url").eq("token", token).execute()
+            if result.data:
+                return result.data[0]["url"]
+        except Exception:
+            pass
+    return _resolve_url_token_local(token)
+
+
+# Локальный fallback для dev/тестов
+TOKEN_FILE = "url_tokens.json"
+
+
+def _create_url_token_local(url: str) -> str:
+    tokens = {}
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+            tokens = json.load(f)
+    for t, u in tokens.items():
+        if u == url:
+            return t
     token = secrets.token_urlsafe(6)[:8]
     tokens[token] = url
-    _save_tokens(tokens)
+    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(tokens, f, ensure_ascii=False)
     return token
+
+
+def _resolve_url_token_local(token: str) -> str:
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
+            tokens = json.load(f)
+        return tokens.get(token, "")
+    return ""
 
 
 def truncate(text: str, limit: int = 1600) -> str:

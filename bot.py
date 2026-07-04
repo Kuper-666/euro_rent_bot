@@ -66,40 +66,8 @@ def log_referral_event(event_type: str, user_id: str, extra: dict = None):
 _pending_listings = {}
 PENDING_FILE = "pending_listings.json"
 
-# Токены для коротких deep links (токен -> url)
-_url_tokens = {}
-TOKEN_FILE = "url_tokens.json"
-
-
-def _load_url_tokens():
-    global _url_tokens
-    if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
-            _url_tokens = json.load(f)
-    return _url_tokens
-
-
-def _save_url_tokens(data):
-    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def create_url_token(url: str) -> str:
-    import secrets
-    _load_url_tokens()
-    # Проверяем, есть ли уже токен для этого URL
-    for token, stored_url in _url_tokens.items():
-        if stored_url == url:
-            return token
-    token = secrets.token_urlsafe(6)[:8]
-    _url_tokens[token] = url
-    _save_url_tokens(_url_tokens)
-    return token
-
-
-def resolve_url_token(token: str) -> str:
-    _load_url_tokens()
-    return _url_tokens.get(token, "")
+# Токены для коротких deep links — используют общий модуль из rent_scanner
+from rent_scanner.formatting import create_url_token, resolve_url_token
 
 
 def _load_pending_listings():
@@ -293,8 +261,9 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         remaining_text = "∞" if user["balance"] == -1 else html.escape(str(remaining))
         admin_note = html.escape("\n\nАдмин: проверка бесплатная") if is_admin else ""
         safe_balance = html.escape(f"\n\nОсталось проверок: ") + remaining_text
-        share_url = f"https://t.me/{context.bot.username}?start=ref_{user_id}"
-        safe_share = f"\n\n{html.escape(get_msg(lang, 'share_text'))}\n<a href=\"{share_url}\">Поделиться с другом</a>"
+        ref_code = user.get("ref_code", "")
+        share_url = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+        safe_share = f"\n\n{html.escape(get_msg(lang, 'share_text'))}\n<a href=\"{share_url}\">Поделиться с другом</a>" if share_url else ""
 
         full_text = safe_result + city_note + safe_footer + admin_note + safe_balance + safe_share
         parts = split_message(full_text)
