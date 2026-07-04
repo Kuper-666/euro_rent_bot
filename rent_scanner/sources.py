@@ -37,7 +37,7 @@ SOURCES: list[Source] = [
     Source("@mieszkania_warszawa_creative", "Mieszkania Warszawa Creative", "Польские аренды Варшава"),
     Source("@moreEtate", "more Estate Warszawa", "Аренды Варшава"),
     Source("@rentapartaments_waw", "Rent Apartments Warszawa", "Аренды Варшава"),
-    Source("@krakow_mieszkania", "Mieszkania Kraków", "Польские аренды Краков"),
+    Source("@krakow_mieszkania", "Mieszkania Kraków", "Польские аренды Краков", enabled=False),
     # IT Italy
     Source("@appartamentiaffittoMilano", "Affitto Milano", "Итальянские аренды Милан"),
     Source("@appartamentiRoma_SBG", "Affitto Roma", "Итальянские аренды Рим"),
@@ -48,27 +48,27 @@ SOURCES: list[Source] = [
     Source("@camereeappartamentiamilano", "Affitto Milano Stanze", "Комнаты в Милане"),
     # ES Spain
     Source("@realestateabaru", "Недвижимость Барселона", "Аренды Барселона"),
-    Source("@alquilerpiso_madrid", "Alquiler Madrid", "Аренды Мадрид"),
+    Source("@alquilerpiso_madrid", "Alquiler Madrid", "Аренды Мадрид", enabled=False),
     # PT Portugal
-    Source("@lisbonapartments", "Lisbon Apartments", "Аренды Лиссабон"),
-    Source("@portoapartments", "Porto Apartments", "Аренды Порту"),
-    Source("@arrend_lisboa", "Arrendamento Lisboa", "Португальские аренды Лиссабон"),
+    Source("@lisbonapartments", "Lisbon Apartments", "Аренды Лиссабон", enabled=False),
+    Source("@portoapartments", "Porto Apartments", "Аренды Порту", enabled=False),
+    Source("@arrend_lisboa", "Arrendamento Lisboa", "Португальские аренды Лиссабон", enabled=False),
     # NL Netherlands
     Source("@amsterdamapartments", "Amsterdam Apartments", "Аренды Амстердам"),
-    Source("@woning_amsterdam", "Woning Amsterdam", "Голландские аренды Амстердам"),
+    Source("@woning_amsterdam", "Woning Amsterdam", "Голландские аренды Амстердам", enabled=False),
     # FR France
-    Source("@paris_appartements", "Appartements Paris", "Аренды Париж"),
-    Source("@lyon_appartements", "Appartements Lyon", "Аренды Лион"),
+    Source("@paris_appartements", "Appartements Paris", "Аренды Париж", enabled=False),
+    Source("@lyon_appartements", "Appartements Lyon", "Аренды Лион", enabled=False),
     # IE Ireland
-    Source("@dublin_rentals", "Dublin Rentals", "Аренды Дублин"),
+    Source("@dublin_rentals", "Dublin Rentals", "Аренды Дублин", enabled=False),
     # HU Hungary
     Source("@budapest_apartments", "Budapest Apartments", "Аренды Будапешт"),
     # GR Greece
-    Source("@athens_rentals", "Athens Rentals", "Аренды Афины"),
+    Source("@athens_rentals", "Athens Rentals", "Аренды Афины", enabled=False),
     # UK United Kingdom
     Source("@SpacesLondon", "London Rentals", "Лондон аренды (рус)"),
     Source("@LondonRentHub", "London Rentals & Rooms", "Лондон аренды"),
-    Source("@manchester_rentals", "Manchester Rentals", "Аренды Манчестер"),
+    Source("@manchester_rentals", "Manchester Rentals", "Аренды Манчестер", enabled=False),
 ]
 
 def enabled_sources() -> list[Source]:
