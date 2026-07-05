@@ -258,7 +258,9 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                     log_referral_event("5check_trigger_shown", user_id, {"total_checks": total_checks})
 
         remaining = calc_remaining(user)
-        safe_result = html.escape(result)
+        # Убираем HTML-теги из ответа AI и экранируем спецсимволы
+        clean_result = re.sub(r'<[^>]+>', '', result)
+        safe_result = html.escape(clean_result)
         safe_footer = html.escape(get_msg(lang, "affiliate_footer"))
         remaining_text = "∞" if user["balance"] == -1 else html.escape(str(remaining))
         admin_note = html.escape("\n\nАдмин: проверка бесплатная") if is_admin else ""

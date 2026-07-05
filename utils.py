@@ -15,19 +15,41 @@ from storage import load_data, save_data
 
 
 class LimitedDict(OrderedDict):
-    def __init__(self, max_size=100000):
+    def __init__(self, max_size=10000, ttl=3600):
         super().__init__()
         self.max_size = max_size
+        self.ttl = ttl
 
     def __setitem__(self, key, value):
         if key in self:
             del self[key]
         elif len(self) >= self.max_size:
-            self.popitem(last=False)
-        super().__setitem__(key, value)
+            self._cleanup()
+            if len(self) >= self.max_size:
+                self.popitem(last=False)
+        super().__setitem__(key, (value, time.time()))
+
+    def __getitem__(self, key):
+        value, ts = super().__getitem__(key)
+        if self.ttl and time.time() - ts > self.ttl:
+            del self[key]
+            raise KeyError(key)
+        return value
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def _cleanup(self):
+        now = time.time()
+        stale = [k for k, (_, ts) in self.items() if now - ts > self.ttl]
+        for k in stale:
+            del self[k]
 
 
-_last_groq_call = LimitedDict(max_size=100000)
+_last_groq_call = LimitedDict(max_size=10000, ttl=3600)
 
 
 def get_lang(update: Update) -> str:

@@ -345,21 +345,24 @@ class RentScanner:
         body = format_lead(source, lead, bot_username)
         delivered = False
         for chat_id in subscribers:
-            try:
-                await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
-                delivered = True
-            except FloodWaitError as exc:
-                wait_seconds = min(exc.seconds, 300)
-                LOGGER.warning("Flood wait %ds, sleeping...", wait_seconds)
-                await asyncio.sleep(wait_seconds)
+            retry_count = 0
+            max_retries = 3
+            while retry_count < max_retries:
                 try:
                     await self.bot_client.send_message(chat_id, body, parse_mode="html", link_preview=False)
                     delivered = True
-                except RPCError as exc2:
-                    LOGGER.warning("Не удалось доставить объявление в %s после retry: %s", chat_id, exc2)
+                    break
+                except FloodWaitError as exc:
+                    wait_seconds = min(exc.seconds, 600)
+                    retry_count += 1
+                    backoff = wait_seconds * (2 ** (retry_count - 1))
+                    LOGGER.warning("Flood wait %ds (attempt %d/%d), sleeping...", backoff, retry_count, max_retries)
+                    await asyncio.sleep(backoff)
+                except RPCError as exc:
+                    LOGGER.warning("RPC error delivering to %s: %s", chat_id, exc)
                     self.storage.inc_metric("errors")
-            except RPCError as exc:
-                LOGGER.warning("Не удалось доставить объявление в %s: %s", chat_id, exc)
+                    break
+            else:
                 self.storage.inc_metric("errors")
 
         if delivered:

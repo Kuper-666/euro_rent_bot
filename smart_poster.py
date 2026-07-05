@@ -215,6 +215,14 @@ def is_relevant_chat(title: str, recent_messages: list[str]) -> bool:
     if lang not in ALLOWED_LANGUAGES:
         return False
 
+    # Проверяем содержимое последних сообщений на ключевые слова аренды
+    if recent_messages:
+        combined = " ".join(recent_messages).lower()
+        has_rent_keyword = any(kw in combined for kw in RENT_KEYWORDS)
+        has_price = any(symbol in combined for symbol in ["€", "eur", "евро", "zł", "pln"])
+        if not has_rent_keyword and not has_price:
+            return False
+
     return True
 
 
