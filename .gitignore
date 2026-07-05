@@ -20,6 +20,7 @@ bot.log
 listing_history.json
 price_trends.json
 referral_events.jsonl
+url_tokens.json
 
 # Telethon sessions
 *.session
