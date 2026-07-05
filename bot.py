@@ -558,21 +558,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif data_prefix in ("analyze_ad", "analyze_rss"):
             await query.edit_message_reply_markup(reply_markup=None)
 
-            short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
+            token_or_short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
             bot_username = context.bot.username
 
-            # Пытаемся получить URL из Supabase (через daily_poster)
-            rss_url = ""
-            try:
-                from daily_poster import get_listing
-                listing = get_listing(short_id)
-                rss_url = listing.get("url", "")
-            except Exception:
-                pass
+            # Сначала пробуем resolve как token из UrlTokens
+            rss_url = resolve_url_token(token_or_short_id)
+
+            # Если не нашли — пробуем как short_id из PendingListings
+            if not rss_url:
+                try:
+                    from daily_poster import get_listing
+                    listing = get_listing(token_or_short_id)
+                    rss_url = listing.get("url", "")
+                except Exception:
+                    pass
 
             if rss_url and is_url(rss_url):
-                token = create_url_token(rss_url)
-                analyze_url = f"https://t.me/{bot_username}?start=an_{token}"
+                new_token = create_url_token(rss_url)
+                analyze_url = f"https://t.me/{bot_username}?start=an_{new_token}"
             else:
                 analyze_url = f"https://t.me/{bot_username}"
 
@@ -1303,13 +1306,13 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     if is_url:
         listing_url = text.strip().split()[0]
         token = create_url_token(listing_url)
-        deep_link = f"https://t.me/{bot_username}?start=an_{token}"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Проверить скрытые платежи", callback_data=f"analyze_ad:{token}")]
+        ])
     else:
-        deep_link = f"https://t.me/{bot_username}"
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Проверить скрытые платежи", url=deep_link)]
-    ])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Открыть бота в личке", url=f"https://t.me/{bot_username}")]
+        ])
 
     await update.message.reply_text(
         get_msg(lang, "group_redirect"),
