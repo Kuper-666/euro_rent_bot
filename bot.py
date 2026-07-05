@@ -21,6 +21,7 @@ from groq import Groq
 
 from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT, PDF_PRICE, VIP_PRICE
 from messages import get_msg
+from storage import save_user, get_user
 from utils import (
     load_data, save_data, get_lang, get_user_data,
     can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
@@ -182,55 +183,57 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         if is_admin:
             save_data(data)
         else:
-            async with _payment_lock:
-                data = load_data()
-                user = get_user_data(data, user_id)
-                if not can_use(user):
-                    ref_code = user.get("ref_code", "")
-                    ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
-                    await update.message.reply_text(
-                        get_msg(lang, "limit_reached").format(ref_link),
-                        reply_markup=kb(update)
-                    )
-                    log_referral_event("limit_ref_shown", user_id)
-                    return
-                use_check(user)
-                if user.get("free_used", 0) == 1 and user.get("referred_by"):
-                    referrer_id = user["referred_by"]
-                    referrer = data.setdefault(referrer_id, {"free_used": 0, "balance": 0})
-                    referrals = referrer.setdefault("referrals", [])
-                    if user_id not in referrals:
-                        referrals.append(user_id)
-                        reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
-                        if reward == -1:
-                            referrer["balance"] = -1
-                            referrer["last_paid_at"] = time.time()
-                        elif reward > 0:
-                            referrer["balance"] = referrer.get("balance", 0) + reward
-                        save_data(data)
-                        try:
-                            n = len(referrals)
-                            progress = ""
-                            if n < 3:
-                                progress = f"Ещё {3 - n} друга до +3 проверок!"
-                            elif n < 5:
-                                progress = f"Ещё {5 - n} друзей до +5 проверок!"
-                            elif n < 10:
-                                progress = f"Ещё {10 - n} друзей до безлимита!"
-                            else:
-                                progress = "🎉 Безлимит активирован!"
-                            ref_code = referrer.get("ref_code", "")
-                            ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
-                            await context.bot.send_message(
-                                chat_id=referrer_id,
-                                text=f"🎉 Ваш друг сделал первую проверку!\n"
-                                     f"Приглашено: {n} чел.\n\n"
-                                     f"📊 {progress}\n\n"
-                                     f"Ваша ссылка: {ref_link}"
-                            )
-                            log_referral_event("referral_confirmed", referrer_id, {"referred": user_id, "total": n})
-                        except Exception:
-                            pass
+            # Атомарное обновление пользователя
+            user = get_user(user_id)
+            if not can_use(user):
+                ref_code = user.get("ref_code", "")
+                ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                await update.message.reply_text(
+                    get_msg(lang, "limit_reached").format(ref_link),
+                    reply_markup=kb(update)
+                )
+                log_referral_event("limit_ref_shown", user_id)
+                return
+            use_check(user)
+            save_user(user_id, user)
+
+            # Обработка реферала
+            if user.get("free_used", 0) == 1 and user.get("referred_by"):
+                referrer_id = user["referred_by"]
+                referrer = get_user(referrer_id)
+                referrals = referrer.setdefault("referrals", [])
+                if user_id not in referrals:
+                    referrals.append(user_id)
+                    reward = {1: 1, 3: 3, 5: 5, 10: -1}.get(len(referrals), 0)
+                    if reward == -1:
+                        referrer["balance"] = -1
+                        referrer["last_paid_at"] = time.time()
+                    elif reward > 0:
+                        referrer["balance"] = referrer.get("balance", 0) + reward
+                    save_user(referrer_id, referrer)
+                    try:
+                        n = len(referrals)
+                        progress = ""
+                        if n < 3:
+                            progress = f"Ещё {3 - n} друга до +3 проверок!"
+                        elif n < 5:
+                            progress = f"Ещё {5 - n} друзей до +5 проверок!"
+                        elif n < 10:
+                            progress = f"Ещё {10 - n} друзей до безлимита!"
+                        else:
+                            progress = "🎉 Безлимит активирован!"
+                        ref_code = referrer.get("ref_code", "")
+                        ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+                        await context.bot.send_message(
+                            chat_id=referrer_id,
+                            text=f"🎉 Ваш друг сделал первую проверку!\n"
+                                 f"Приглашено: {n} чел.\n\n"
+                                 f"📊 {progress}\n\n"
+                                 f"Ваша ссылка: {ref_link}"
+                        )
+                        log_referral_event("referral_confirmed", referrer_id, {"referred": user_id, "total": n})
+                    except Exception:
+                        pass
                     user.pop("referred_by", None)
                 save_data(data)
                 if user.get("free_used", 0) == 1:
@@ -1129,54 +1132,53 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = str(update.effective_user.id)
     payload = update.message.successful_payment.invoice_payload
 
-    async with _payment_lock:
-        data = load_data()
-        user = get_user_data(data, user_id)
+    # Атомарное обновление пользователя
+    user = get_user(user_id)
 
-        if payload == "pay_stars_3":
-            user["balance"] = user.get("balance", 0) + 3
-            user["last_paid_at"] = time.time()
-            save_data(data)
-            remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-            await update.message.reply_text(
-                f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
-                reply_markup=kb(update)
-            )
-        elif payload == "pay_stars_9":
-            user["balance"] = user.get("balance", 0) + 10
-            user["last_paid_at"] = time.time()
-            save_data(data)
-            remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-            await update.message.reply_text(
-                f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
-                reply_markup=kb(update)
-            )
-        elif payload == "pay_stars_19":
-            user["balance"] = -1
-            user["last_paid_at"] = time.time()
-            save_data(data)
-            await update.message.reply_text(
-                "Оплата подтверждена! Безлимит на месяц активирован!",
-                reply_markup=kb(update)
-            )
-        elif payload == "pay_stars_pdf":
-            user["pdf_paid"] = True
-            user["pdf_state"] = "awaiting_data"
-            user["pdf_started_at"] = time.time()
-            save_data(data)
-            await update.message.reply_text(
-                "Оплата PDF подтверждена! Отправьте данные для заявления.",
-                reply_markup=kb(update)
-            )
-        elif payload == "pay_stars_vip":
-            user["vip"] = True
-            user["vip_state"] = "awaiting_criteria"
-            user["last_paid_at"] = time.time()
-            save_data(data)
-            await update.message.reply_text(
-                "Оплата VIP подтверждена! Отправьте критерии поиска (город, бюджет, район).",
-                reply_markup=kb(update)
-            )
+    if payload == "pay_stars_3":
+        user["balance"] = user.get("balance", 0) + 3
+        user["last_paid_at"] = time.time()
+        save_user(user_id, user)
+        remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
+        await update.message.reply_text(
+            f"Оплата подтверждена! Добавлены 3 проверки. Осталось: {remaining}",
+            reply_markup=kb(update)
+        )
+    elif payload == "pay_stars_9":
+        user["balance"] = user.get("balance", 0) + 10
+        user["last_paid_at"] = time.time()
+        save_user(user_id, user)
+        remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
+        await update.message.reply_text(
+            f"Оплата подтверждена! Добавлено 10 проверок. Осталось: {remaining}",
+            reply_markup=kb(update)
+        )
+    elif payload == "pay_stars_19":
+        user["balance"] = -1
+        user["last_paid_at"] = time.time()
+        save_user(user_id, user)
+        await update.message.reply_text(
+            "Оплата подтверждена! Безлимит на месяц активирован!",
+            reply_markup=kb(update)
+        )
+    elif payload == "pay_stars_pdf":
+        user["pdf_paid"] = True
+        user["pdf_state"] = "awaiting_data"
+        user["pdf_started_at"] = time.time()
+        save_user(user_id, user)
+        await update.message.reply_text(
+            "Оплата PDF подтверждена! Отправьте данные для заявления.",
+            reply_markup=kb(update)
+        )
+    elif payload == "pay_stars_vip":
+        user["vip"] = True
+        user["vip_state"] = "awaiting_criteria"
+        user["last_paid_at"] = time.time()
+        save_user(user_id, user)
+        await update.message.reply_text(
+            "Оплата VIP подтверждена! Отправьте критерии поиска (город, бюджет, район).",
+            reply_markup=kb(update)
+        )
 
 
 def run_flask():
