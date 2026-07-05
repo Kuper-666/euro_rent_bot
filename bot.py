@@ -1293,6 +1293,20 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     if greeting_pattern.match(text.strip()):
         return
 
+    # Проверка: только админ/создатель группы может использовать анализ
+    is_group_admin = False
+    try:
+        member = await context.bot.get_chat_member(
+            update.effective_chat.id, update.effective_user.id
+        )
+        if member.status in ["administrator", "creator"]:
+            is_group_admin = True
+    except Exception:
+        pass
+
+    if not is_group_admin:
+        return
+
     bot_username = context.bot.username
 
     is_url = text.strip().startswith(("http://", "https://", "t.me/"))
