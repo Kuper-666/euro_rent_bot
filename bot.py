@@ -1536,10 +1536,51 @@ async def post_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         from scheduler import send_group_digest
         await send_group_digest()
-        await update.message.reply_text("✅ Дайджест отправлен! Проверьте группу.")
+        await update.message.reply_text("✅ Дайджест отправлен!")
     except Exception as e:
-        logging.error(f"/post_now error: {e}")
         await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    data = load_data()
+    total_users = len(data)
+    total_free = sum(u.get("free_used", 0) for u in data.values())
+    total_balance = sum(max(0, u.get("balance", 0)) for u in data.values())
+    total_paid = sum(1 for u in data.values() if u.get("last_paid_at", 0) > 0)
+    total_vip = sum(1 for u in data.values() if u.get("vip"))
+    total_pdf = sum(1 for u in data.values() if u.get("pdf_paid"))
+    total_checks = sum(u.get("total_checks", 0) for u in data.values())
+    unlimited = sum(1 for u in data.values() if u.get("balance") == -1)
+
+    top_users = sorted(
+        [(uid, u.get("total_checks", 0), u.get("free_used", 0), u.get("balance", 0))
+         for uid, u in data.items()],
+        key=lambda x: x[1], reverse=True
+    )[:10]
+
+    top_text = ""
+    for uid, checks, free, bal in top_users:
+        if checks > 0:
+            status = "∞" if bal == -1 else f"{bal}"
+            top_text += f"  {uid}: {checks} проверок (баланс: {status})\n"
+
+    text = (
+        f"📊 <b>Статистика бота</b>\n\n"
+        f"👥 Всего пользователей: <b>{total_users}</b>\n"
+        f"🔍 Всего проверок: <b>{total_checks}</b>\n"
+        f"🆓 Потрачено бесплатных: <b>{total_free}</b>\n"
+        f"💰 Остатокpaid балансов: <b>{total_balance}</b>\n"
+        f"♾️ Безлимитных: <b>{unlimited}</b>\n\n"
+        f"💳 Оплачивали: <b>{total_paid}</b>\n"
+        f"💎 VIP: <b>{total_vip}</b>\n"
+        f"📄 PDF: <b>{total_pdf}</b>\n\n"
+        f"🏆 <b>Топ пользователей:</b>\n{top_text if top_text else '  Нет данных'}"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
 
 
 async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1622,6 +1663,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("metrics", metrics_command, priv))
     application.add_handler(CommandHandler("ref_stats", ref_stats_command, priv))
     application.add_handler(CommandHandler("post_now", post_now, priv))
+    application.add_handler(CommandHandler("stats", stats_command, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
     application.add_handler(CommandHandler("remove_city", cmd_remove_city, priv))
