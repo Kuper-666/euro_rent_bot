@@ -206,3 +206,40 @@ def is_pdf_state_expired(user: dict, timeout_seconds: int = 1800) -> bool:
 
 def hash_user_id(user_id: str, salt: str = "eurorent2024") -> str:
     return hashlib.sha256(f"{user_id}{salt}".encode()).hexdigest()[:16]
+
+
+def extract_listing_attributes(text: str) -> dict:
+    """Извлекает атрибуты объявления: мебель, питомцы, парковка."""
+    text_lower = text.lower()
+
+    furnished_patterns = [
+        r'\b(?:m[öo]bliert|furnished|meublé|amueblado|meublato|umeblowane)\b',
+        r'\b(?:komplett möbliert|fully furnished)\b',
+    ]
+    furnished = any(re.search(p, text_lower) for p in furnished_patterns)
+
+    pets_patterns = [
+        r'\b(?:haustier|pet|animal|animaux|mascota|zwierzęce)\b.*\b(?:erlaubt|allowed|autorisé|permitido|dozwolone)\b',
+        r'\b(?:keine haustiere|no pets|pas d.animaux|no mascotas)\b',
+    ]
+    pets_allowed = False
+    pets_blocked = False
+    for p in pets_patterns:
+        m = re.search(p, text_lower)
+        if m:
+            if "keine" in m.group() or "no" in m.group() or "pas" in m.group():
+                pets_blocked = True
+            else:
+                pets_allowed = True
+
+    parking_patterns = [
+        r'\b(?:garage|parkplatz|parking|parkeerplaats|estacionamiento|parking)\b',
+        r'\b(?:tiefgarage|underground parking|souterrain|aparcamiento)\b',
+    ]
+    parking = any(re.search(p, text_lower) for p in parking_patterns)
+
+    return {
+        "furnished": furnished,
+        "pets_allowed": pets_allowed and not pets_blocked,
+        "parking": parking,
+    }

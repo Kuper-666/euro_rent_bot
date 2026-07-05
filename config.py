@@ -31,5 +31,11 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai>")
 
+# Travel time calculator (OpenStreetMap OSRM)
+OSRM_URL = os.getenv("OSRM_URL", "http://router.project-osrm.org")
+
+# Web scanner interval (hours)
+WEB_SCANNER_INTERVAL = int(os.getenv("WEB_SCANNER_INTERVAL", "1"))
+
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")
