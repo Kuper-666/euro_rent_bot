@@ -139,7 +139,10 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
     user = get_user_data(data, user_id)
 
     is_admin = False
-    if update.effective_chat.type in ["group", "supergroup"]:
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if update.effective_user and update.effective_user.id == ADMIN_ID:
+        is_admin = True
+    if not is_admin and update.effective_chat.type in ["group", "supergroup"]:
         try:
             member = await context.bot.get_chat_member(update.effective_chat.id, update.effective_user.id)
             if member.status in ["administrator", "creator"]:
