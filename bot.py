@@ -286,7 +286,17 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         share_url = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
         safe_share = f"\n\n{html.escape(get_msg(lang, 'share_text'))}\n<a href=\"{share_url}\">Поделиться с другом</a>" if share_url else ""
 
-        full_text = safe_result + city_note + safe_footer + admin_note + safe_balance + safe_share
+        # Travel time calculation
+        work_address = user.get("work_address", "")
+        travel_note = ""
+        if work_address and city_key and city_key in POPULAR_CITIES:
+            from travel_time import calc_travel_time
+            city_name = POPULAR_CITIES[city_key].get("name", city_key)
+            travel = calc_travel_time(work_address, city_name)
+            if travel:
+                travel_note = f"\n\n🚗 <b>До работы:</b> {travel['text']}"
+
+        full_text = safe_result + city_note + travel_note + safe_footer + admin_note + safe_balance + safe_share
         parts = split_message(full_text)
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
