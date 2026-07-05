@@ -1573,7 +1573,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"👥 Всего пользователей: <b>{total_users}</b>\n"
         f"🔍 Всего проверок: <b>{total_checks}</b>\n"
         f"🆓 Потрачено бесплатных: <b>{total_free}</b>\n"
-        f"💰 Остатокpaid балансов: <b>{total_balance}</b>\n"
+        f"💰 Остаток балансов: <b>{total_balance}</b>\n"
         f"♾️ Безлимитных: <b>{unlimited}</b>\n\n"
         f"💳 Оплачивали: <b>{total_paid}</b>\n"
         f"💎 VIP: <b>{total_vip}</b>\n"
