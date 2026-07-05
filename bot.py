@@ -9,7 +9,6 @@ import asyncio
 import html
 from urllib.parse import unquote
 from io import BytesIO
-from telegram.helpers import escape_markdown
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
@@ -45,6 +44,8 @@ _payment_lock = asyncio.Lock()
 _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
 _last_flood_cleanup = 0
+_greeting_cooldown = {}  # user_id -> last_greeting_time
+GREETING_COOLDOWN = 3600  # 1 час
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -665,7 +666,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         save_data(data)
 
     if context.args and len(context.args) > 0:
-        payload = context.args[0]
+        payload = context.args[0][:512]  # Ограничение длины payload
         if payload.startswith("an_"):
             # Новый формат: короткий токен
             token = payload[len("an_"):]
@@ -694,7 +695,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return
         elif payload.startswith("analyze_"):
             # Старый формат: полный URL (для обратной совместимости)
-            url = unquote(payload[len("analyze_"):])
+            try:
+                url = unquote(payload[len("analyze_"):])
+            except Exception:
+                url = ""
             if is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
                 listing_text = fetch_url_text(url)
@@ -1198,8 +1202,8 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         msg = await update.effective_chat.send_message(welcome_text)
         try:
             await msg.pin()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to pin welcome message: {e}")
 
 
 async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1237,7 +1241,16 @@ async def group_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat.type in ["group", "supergroup"]:
-        first_name = update.effective_user.first_name
+        user_id = str(update.effective_user.id) if update.effective_user else None
+        now = time.time()
+
+        # Cooldown: не чаще 1 раза в час на пользователя
+        if user_id and _greeting_cooldown.get(user_id, 0) > now - GREETING_COOLDOWN:
+            return
+        if user_id:
+            _greeting_cooldown[user_id] = now
+
+        first_name = update.effective_user.first_name if update.effective_user else "друг"
         await update.message.reply_text(
             f"Привет, {first_name}! 👋\n\n"
             f"Я EuroRent AI — бот для анализа объявлений об аренде в Европе.\n\n"

@@ -30,12 +30,6 @@ from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from typing import Optional
 
-from telethon import TelegramClient, events
-from telethon.tl.types import Channel, Chat
-from dotenv import load_dotenv
-from langdetect import detect, DetectorFactory
-from langdetect.lang_detect_exception import LangDetectException
-
 DetectorFactory.seed = 0
 load_dotenv()
 
