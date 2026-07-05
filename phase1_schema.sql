@@ -1,7 +1,6 @@
--- Phase 1 SQL: Favorites, ApplicationTracker, UserProfiles, AlertSubscriptions, Filters
 -- Выполни в Supabase SQL Editor
 
--- Избранное
+-- 1. Favorites
 CREATE TABLE IF NOT EXISTS "Favorites" (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -11,7 +10,7 @@ CREATE TABLE IF NOT EXISTS "Favorites" (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Трекер заявок
+-- 2. ApplicationTracker
 CREATE TABLE IF NOT EXISTS "ApplicationTracker" (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -23,7 +22,7 @@ CREATE TABLE IF NOT EXISTS "ApplicationTracker" (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Профиль пользователя (для писем)
+-- 3. UserProfiles
 CREATE TABLE IF NOT EXISTS "UserProfiles" (
   user_id TEXT PRIMARY KEY,
   full_name TEXT DEFAULT '',
@@ -37,7 +36,7 @@ CREATE TABLE IF NOT EXISTS "UserProfiles" (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Подписки на алерты
+-- 4. AlertSubscriptions
 CREATE TABLE IF NOT EXISTS "AlertSubscriptions" (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -50,7 +49,7 @@ CREATE TABLE IF NOT EXISTS "AlertSubscriptions" (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Веб-листинги (для скана сайтов)
+-- 5. WebListings
 CREATE TABLE IF NOT EXISTS "WebListings" (
   id SERIAL PRIMARY KEY,
   portal TEXT NOT NULL,
@@ -61,13 +60,13 @@ CREATE TABLE IF NOT EXISTS "WebListings" (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Колонки фильтров в Users
+-- 6. Новые колонки в Users
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS filter_furnished BOOLEAN DEFAULT FALSE;
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS filter_pets BOOLEAN DEFAULT FALSE;
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS filter_parking BOOLEAN DEFAULT FALSE;
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS work_address TEXT DEFAULT '';
 
--- RLS policies для новых таблиц
+-- 7. RLS policies
 ALTER TABLE "Favorites" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ApplicationTracker" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "UserProfiles" ENABLE ROW LEVEL SECURITY;
@@ -75,16 +74,7 @@ ALTER TABLE "AlertSubscriptions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "WebListings" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Service role full access on Favorites" ON "Favorites" FOR ALL USING (auth.role() = 'service_role');
-CREATE POLICY "Anon read on Favorites" ON "Favorites" FOR SELECT USING (true);
-
 CREATE POLICY "Service role full access on ApplicationTracker" ON "ApplicationTracker" FOR ALL USING (auth.role() = 'service_role');
-CREATE POLICY "Anon read on ApplicationTracker" ON "ApplicationTracker" FOR SELECT USING (true);
-
 CREATE POLICY "Service role full access on UserProfiles" ON "UserProfiles" FOR ALL USING (auth.role() = 'service_role');
-CREATE POLICY "Anon read on UserProfiles" ON "UserProfiles" FOR SELECT USING (true);
-
 CREATE POLICY "Service role full access on AlertSubscriptions" ON "AlertSubscriptions" FOR ALL USING (auth.role() = 'service_role');
-CREATE POLICY "Anon read on AlertSubscriptions" ON "AlertSubscriptions" FOR SELECT USING (true);
-
 CREATE POLICY "Service role full access on WebListings" ON "WebListings" FOR ALL USING (auth.role() = 'service_role');
-CREATE POLICY "Anon read on WebListings" ON "WebListings" FOR SELECT USING (true);
