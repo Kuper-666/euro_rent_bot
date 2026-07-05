@@ -1076,6 +1076,60 @@ async def group_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
+async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда /faq [вопрос] — ответ через Groq в группе."""
+    if update.effective_chat.type not in ["group", "supergroup"]:
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "📖 Использование: /faq ваш вопрос\n\n"
+            "Пример: /faq какие документы нужны для аренды в Германии?"
+        )
+        return
+
+    question = " ".join(context.args)
+    await update.message.reply_text("🤔 Думаю...")
+
+    try:
+        system_prompt = (
+            "Ты — эксперт по аренде жилья в Европе. Отвечай на вопросы экспатов "
+            "кратко и по делу на русском языке. Максимум 200 слов. "
+            "Если вопрос не про аренду — вежливо перенаправляй на тему."
+        )
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question}
+            ],
+            max_tokens=400,
+        )
+        answer = response.choices[0].message.content.strip()
+        await update.message.reply_text(answer)
+    except Exception as e:
+        logger.error(f"FAQ error: {e}")
+        await update.message.reply_text("❌ Не удалось ответить. Попробуйте позже.")
+
+
+async def group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда /rules — правила группы."""
+    if update.effective_chat.type not in ["group", "supergroup"]:
+        return
+
+    await update.message.reply_text(
+        "📜 <b>Правила группы ExpatRent Community:</b>\n\n"
+        "1️⃣ Без спама и рекламы\n"
+        "2️⃣ Только вопросы по аренде жилья в Европе\n"
+        "3️⃣ Уважайте друг друга\n"
+        "4️⃣ Используйте /faq для вопросов боту\n"
+        "5️⃣ Не отправляйте личные данные в общий чат\n\n"
+        "🔍 Для анализа объявления — отправьте ссылку, "
+        "я перенаправлю вас в личку с ботом!",
+        parse_mode="HTML"
+    )
+
+
 async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat.type not in ["group", "supergroup"]:
         return
@@ -1312,6 +1366,8 @@ if __name__ == "__main__":
     groups = filters.ChatType.GROUPS
     application.add_handler(CommandHandler("start", group_start, groups))
     application.add_handler(CommandHandler("help", group_help, groups))
+    application.add_handler(CommandHandler("faq", group_faq, groups))
+    application.add_handler(CommandHandler("rules", group_rules, groups))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
     application.add_handler(CallbackQueryHandler(handle_callback))

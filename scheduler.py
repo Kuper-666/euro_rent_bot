@@ -4,6 +4,7 @@
 - Напоминание о последней бесплатной проверке
 - Еженедельный email-дайджест
 - Посты в группу в 10:00 и 18:00 по Берлину
+- Сканирование порталов недвижимости (каждый час)
 
 Запуск: python scheduler.py (или интегрирован в bot.py как фоновый поток)
 """
@@ -158,7 +159,22 @@ async def weekly_email_digest():
 
 
 # ============================================================================
-# 5. ПОСТЫ В ГРУППУ (10:00 и 18:00 по Берлину)
+# 5. СКАНИРОВАНИЕ ПОРТАЛОВ (каждый час)
+# ============================================================================
+
+async def scan_web_portals():
+    """Сканирует порталы недвижимости и отправляет алерты подписчикам."""
+    try:
+        from web_scanner.alerts import run_web_scan
+        new_count = run_web_scan(city="berlin", max_price=2000)
+        if new_count > 0:
+            logger.info("Web scan: %d new listings found", new_count)
+    except Exception as e:
+        logger.error("Web scan error: %s", e)
+
+
+# ============================================================================
+# 6. ПОСТЫ В ГРУППУ (10:00 и 18:00 по Берлину)
 # ============================================================================
 
 GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
@@ -260,6 +276,7 @@ def run_scheduler():
 
     # --- Личные задачи (каждые N часов) ---
     import schedule as sched_lib
+    sched_lib.every(1).hours.do(lambda: _run_async(scan_web_portals()))
     sched_lib.every(1).hours.do(lambda: _run_async(remind_last_free_check()))
     sched_lib.every(6).hours.do(lambda: _run_async(return_inactive_users()))
     sched_lib.every().monday.at("10:00").do(lambda: _run_async(weekly_email_digest()))
