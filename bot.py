@@ -29,6 +29,13 @@ from utils import (
     calc_remaining, check_rate_limit, sanitize_pdf_input,
     is_pdf_state_expired, validate_pdf_data
 )
+from user_features import (
+    add_favorite, get_favorites, remove_favorite,
+    add_tracker_entry, get_tracker_entries, update_tracker_status, remove_tracker_entry, STATUSES,
+    get_profile, save_profile, PROFILE_FIELDS,
+    get_user_filters, save_user_filters,
+)
+from letter_generator import generate_letter
 from pdf_generator import generate_mieterprofil_pdf
 from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
 from listing_features import (
@@ -158,6 +165,9 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
             messages=[{"role": "user", "content": full_prompt}]
         )
         result = response.choices[0].message.content
+
+        # Сохраняем URL для /favorite
+        _last_analyzed_url[user_id] = listing_text[:200] if is_url(listing_text) else listing_text[:200]
 
         # Определяем город и цену для трендов
         city_key = detect_city(listing_text)
@@ -419,6 +429,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
+    # Состояние заполнения профиля
+    profile_state = user.get("profile_state")
+    if profile_state == "awaiting_profile":
+        user.pop("profile_state", None)
+        save_user(user_id, user)
+        lines = [line.strip() for line in update.message.text.strip().split("\n") if line.strip()]
+        fields = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets"]
+        profile_data = {}
+        for i, field in enumerate(fields):
+            if i < len(lines):
+                profile_data[field] = lines[i].lstrip("0123456789. ")
+        if profile_data:
+            save_profile(user_id, profile_data)
+            await update.message.reply_text(
+                "✅ Профиль сохранён!\n\n"
+                "Теперь вы можете:\n"
+                "• Проанализировать объявление и нажать /favorite\n"
+                "• Использовать /generate_letter для письма\n"
+                "• Настроить фильтры: /filters",
+                reply_markup=kb(update)
+            )
+        else:
+            await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
+        return
+
     if not can_use(user):
         ref_code = user.get("ref_code", "")
         ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
@@ -652,6 +687,55 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 text=get_msg(lang, msg_key),
                 reply_markup=kb(update, chat_type="private"),
             )
+
+        # Фильтры: переключение
+        elif data_prefix == "filter":
+            filter_type = query.data.split(":")[1] if ":" in query.data else ""
+            if filter_type in ("furnished", "pets", "parking"):
+                filters = get_user_filters(user_id)
+                field = f"filter_{filter_type}"
+                new_val = not filters.get(field, False)
+                filters[field] = new_val
+                save_user_filters(
+                    user_id,
+                    furnished=filters.get("filter_furnished", False),
+                    pets=filters.get("filter_pets", False),
+                    parking=filters.get("filter_parking", False),
+                )
+                icon = "✅" if new_val else "❌"
+                label = {"furnished": "Мебель", "pets": "Питомцы", "parking": "Парковка"}[filter_type]
+                await query.answer(f"{label}: {icon}", show_alert=False)
+                # Обновляем клавиатуру
+                filters = get_user_filters(user_id)
+                furnished = "✅" if filters.get("filter_furnished") else "❌"
+                pets_f = "✅" if filters.get("filter_pets") else "❌"
+                parking = "✅" if filters.get("filter_parking") else "❌"
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton(f"🪑 Мебель: {furnished}", callback_data="filter:furnished")],
+                    [InlineKeyboardButton(f"🐾 Питомцы: {pets_f}", callback_data="filter:pets")],
+                    [InlineKeyboardButton(f"🅿️ Парковка: {parking}", callback_data="filter:parking")],
+                ])
+                await query.edit_message_reply_markup(reply_markup=keyboard)
+
+        # Удаление из избранного
+        elif data_prefix == "fav_del":
+            fav_id = int(query.data.split(":")[1]) if ":" in query.data else 0
+            if fav_id and remove_favorite(user_id, fav_id):
+                await query.answer("Удалено из избранного", show_alert=False)
+                await query.edit_message_reply_markup(reply_markup=None)
+            else:
+                await query.answer("Ошибка удаления", show_alert=True)
+
+        # Смена статуса в трекере
+        elif data_prefix == "track":
+            parts = query.data.split(":")
+            if len(parts) == 3:
+                entry_id = int(parts[1])
+                new_status = parts[2]
+                if update_tracker_status(user_id, entry_id, new_status):
+                    await query.answer(f"Статус: {STATUSES.get(new_status, new_status)}", show_alert=False)
+                else:
+                    await query.answer("Ошибка", show_alert=True)
 
     except Exception as e:
         logger.error(f"handle_callback error: {e}", exc_info=True)
@@ -1541,6 +1625,323 @@ async def post_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
 
+# ═══════════════════════════════════════════════════════════════
+# НОВЫЕ ФИЧИ: Избранное, Трекер, Профиль, Фильтры, Письмо
+# ═══════════════════════════════════════════════════════════════
+
+# Временное хранилище последнего проанализированного URL для текущего пользователя
+_last_analyzed_url = {}
+
+
+async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Сохраняет последнее проанализированное объявление в избранное."""
+    user_id = str(update.effective_user.id)
+    last_url = _last_analyzed_url.get(user_id, "")
+
+    if not last_url:
+        await update.message.reply_text(
+            "⭐ Сначала проанализируйте объявление, а потом нажмите /favorite.",
+            reply_markup=kb(update)
+        )
+        return
+
+    ok = add_favorite(user_id, last_url, title="Из анализа")
+    if ok:
+        await update.message.reply_text(
+            f"⭐ Объявление добавлено в избранное!\n\nПосмотреть: /favorites",
+            reply_markup=kb(update)
+        )
+    else:
+        await update.message.reply_text("❌ Ошибка сохранения. Попробуйте позже.", reply_markup=kb(update))
+
+
+async def favorites_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает список избранных объявлений."""
+    user_id = str(update.effective_user.id)
+    favs = get_favorites(user_id)
+
+    if not favs:
+        await update.message.reply_text(
+            "⭐ У вас пока нет избранных объявлений.\n\n"
+            "Проанализируйте объявление и нажмите /favorite, чтобы сохранить.",
+            reply_markup=kb(update)
+        )
+        return
+
+    text = f"⭐ <b>Избранное</b> ({len(favs)}):\n\n"
+    buttons = []
+    for f in favs[:10]:
+        title = f.get("listing_title", "") or f.get("listing_url", "")[:50]
+        price = f.get("price", "")
+        price_str = f" — {price}" if price else ""
+        text += f"• {title}{price_str}\n"
+        if f.get("listing_url"):
+            text += f"  🔗 {f['listing_url'][:60]}\n"
+        buttons.append([InlineKeyboardButton(
+            f"❌ {title[:30]}", callback_data=f"fav_del:{f['id']}"
+        )])
+
+    kb_fav = InlineKeyboardMarkup(buttons) if buttons else None
+    await update.message.reply_text(text, reply_markup=kb_fav, parse_mode="HTML")
+
+
+# ── Трекер заявок ──────────────────────────────────────────────
+
+async def track_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Добавляет объявление в трекер заявок."""
+    user_id = str(update.effective_user.id)
+
+    if not context.args:
+        await update.message.reply_text(
+            "📋 Использование: /track ссылка\n\n"
+            "Пример: /track https://www.immobilienscout24.de/expose/12345",
+            reply_markup=kb(update)
+        )
+        return
+
+    url = context.args[0]
+    if not is_url(url):
+        await update.message.reply_text("❌ Это не ссылка. Отправьте URL объявления.", reply_markup=kb(update))
+        return
+
+    entry_id = add_tracker_entry(user_id, url, title=url[:80])
+    if entry_id:
+        await update.message.reply_text(
+            f"📋 Заявка #{entry_id} добавлена в трекер!\n\n"
+            f"Статус: 💾 Сохранено\n"
+            f"Ссылка: {url[:80]}\n\n"
+            f"Изменить статус: /track_status {entry_id} applied",
+            reply_markup=kb(update)
+        )
+    else:
+        await update.message.reply_text("❌ Ошибка сохранения.", reply_markup=kb(update))
+
+
+async def mytracks_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает все заявки в трекере."""
+    user_id = str(update.effective_user.id)
+    entries = get_tracker_entries(user_id)
+
+    if not entries:
+        await update.message.reply_text(
+            "📋 У вас пока нет заявок.\n\n"
+            "Добавьте: /track ссылка",
+            reply_markup=kb(update)
+        )
+        return
+
+    text = f"📋 <b>Мои заявки</b> ({len(entries)}):\n\n"
+    buttons = []
+    for e in entries[:10]:
+        status = STATUSES.get(e.get("status", "saved"), "💾 Сохранено")
+        title = e.get("listing_title", "")[:40]
+        entry_id = e.get("id", 0)
+        text += f"#{entry_id} {status} — {title}\n"
+
+        row = []
+        for s in ["applied", "viewed", "interview", "accepted", "rejected"]:
+            row.append(InlineKeyboardButton(
+                STATUSES[s][:3], callback_data=f"track:{entry_id}:{s}"
+            ))
+        buttons.append(row)
+
+    kb_track = InlineKeyboardMarkup(buttons) if buttons else None
+    await update.message.reply_text(text, reply_markup=kb_track, parse_mode="HTML")
+
+
+async def track_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда /track_status id status."""
+    user_id = str(update.effective_user.id)
+
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "📋 Использование: /track_status ID статус\n\n"
+            f"Статусы: {', '.join(STATUSES.keys())}",
+            reply_markup=kb(update)
+        )
+        return
+
+    try:
+        entry_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("❌ ID должен быть числом.", reply_markup=kb(update))
+        return
+
+    status = context.args[1]
+    if update_tracker_status(user_id, entry_id, status):
+        await update.message.reply_text(
+            f"✅ Заявка #{entry_id} обновлена: {STATUSES.get(status, status)}",
+            reply_markup=kb(update)
+        )
+    else:
+        await update.message.reply_text("❌ Ошибка. Проверьте ID и статус.", reply_markup=kb(update))
+
+
+# ── Профиль (для писем) ────────────────────────────────────────
+
+async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Устанавливает профиль пользователя для генерации писем."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    current = "\n".join(f"  {field}: {profile.get(field, '')}" for field in PROFILE_FIELDS if profile.get(field))
+    current_str = f"\n\nТекущий профиль:\n{current}" if current else ""
+
+    await update.message.reply_text(
+        f"📝 <b>Ваш профиль</b>{current_str}\n\n"
+        f"Отправьте данные построчно (каждое поле с новой строки):\n"
+        f"1. Имя Фамилия\n"
+        f"2. Профессия\n"
+        f"3. Доход\n"
+        f"4. Работодатель\n"
+        f"5. Дата переезда\n"
+        f"6. Количество жильцов\n"
+        f"7. Питомцы\n\n"
+        f"Или нажмите /skip_profile",
+        reply_markup=kb(update),
+        parse_mode="HTML"
+    )
+    user = get_user(user_id)
+    user["profile_state"] = "awaiting_profile"
+    save_user(user_id, user)
+
+
+async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отмена заполнения профиля."""
+    user_id = str(update.effective_user.id)
+    user = get_user(user_id)
+    user.pop("profile_state", None)
+    save_user(user_id, user)
+    await update.message.reply_text("❌ Заполнение профиля отменено.", reply_markup=kb(update))
+
+
+async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает текущий профиль."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    fields_ru = {
+        "full_name": "Имя",
+        "profession": "Профессия",
+        "income": "Доход",
+        "employer": "Работодатель",
+        "move_in_date": "Дата переезда",
+        "occupants": "Жильцы",
+        "pets": "Питомцы",
+    }
+
+    text = "📝 <b>Ваш профиль</b>:\n\n"
+    for field, label in fields_ru.items():
+        value = profile.get(field, "")
+        text += f"  {label}: {value or '—'}\n"
+
+    text += "\nИзменить: /set_profile"
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
+
+
+# ── Фильтры ────────────────────────────────────────────────────
+
+async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает и переключает фильтры."""
+    user_id = str(update.effective_user.id)
+    filters = get_user_filters(user_id)
+
+    furnished = "✅" if filters.get("filter_furnished") else "❌"
+    pets = "✅" if filters.get("filter_pets") else "❌"
+    parking = "✅" if filters.get("filter_parking") else "❌"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🪑 Мебель: {furnished}", callback_data="filter:furnished")],
+        [InlineKeyboardButton(f"🐾 Питомцы: {pets}", callback_data="filter:pets")],
+        [InlineKeyboardButton(f"🅿️ Парковка: {parking}", callback_data="filter:parking")],
+    ])
+
+    await update.message.reply_text(
+        "🔧 <b>Фильтры объявлений</b>\n\n"
+        "Нажмите для переключения. При анализе бот будет отмечать, "
+        "соответствует ли объявление вашим фильтрам.",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+# ── Рабочий адрес (для travel time) ────────────────────────────
+
+async def set_work_address_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Устанавливает адрес работы/университета."""
+    user_id = str(update.effective_user.id)
+
+    if not context.args:
+        await update.message.reply_text(
+            "📍 Использование: /set_work_address адрес\n\n"
+            "Пример: /set_work_address Friedrichstraße 100, Berlin\n\n"
+            "Удалить: /set_work_address clear",
+            reply_markup=kb(update)
+        )
+        return
+
+    address = " ".join(context.args)
+    if address.lower() == "clear":
+        user = get_user(user_id)
+        user["work_address"] = ""
+        save_user(user_id, user)
+        await update.message.reply_text("📍 Адрес работы удалён.", reply_markup=kb(update))
+        return
+
+    user = get_user(user_id)
+    user["work_address"] = address
+    save_user(user_id, user)
+    await update.message.reply_text(
+        f"📍 Адрес работы сохранён: {address}\n\n"
+        f"При анализе объявлений бот покажет время в пути.",
+        reply_markup=kb(update)
+    )
+
+
+# ── Генерация письма ───────────────────────────────────────────
+
+async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Генерирует мотивационное письмо арендодателю."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    # Проверяем заполненность профиля
+    filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
+    if filled < 2:
+        await update.message.reply_text(
+            "📝 Для генерации письма заполните профиль.\n\n"
+            "Используйте: /set_profile",
+            reply_markup=kb(update)
+        )
+        return
+
+    last_url = _last_analyzed_url.get(user_id, "")
+    if not last_url:
+        await update.message.reply_text(
+            "📝 Сначала проанализируйте объявление, а потом нажмите /generate_letter.",
+            reply_markup=kb(update)
+        )
+        return
+
+    await update.message.reply_text("📝 Генерирую письмо...", reply_markup=kb(update))
+
+    lang = get_lang(update)
+    letter_lang = "de" if lang in ("ru", "de") else "en"
+    letter = generate_letter(profile, last_url, lang=letter_lang)
+
+    if letter:
+        await update.message.reply_text(
+            f"📝 <b>Мотивационное письмо:</b>\n\n{letter}",
+            reply_markup=kb(update),
+            parse_mode="HTML"
+        )
+    else:
+        await update.message.reply_text(
+            "❌ Не удалось сгенерировать письмо. Попробуйте позже.",
+            reply_markup=kb(update)
+        )
+
+
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -1664,6 +2065,19 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("ref_stats", ref_stats_command, priv))
     application.add_handler(CommandHandler("post_now", post_now, priv))
     application.add_handler(CommandHandler("stats", stats_command, priv))
+
+    # Phase 1: Новые фичи
+    application.add_handler(CommandHandler("favorite", favorite_command, priv))
+    application.add_handler(CommandHandler("favorites", favorites_command, priv))
+    application.add_handler(CommandHandler("track", track_command, priv))
+    application.add_handler(CommandHandler("mytracks", mytracks_command, priv))
+    application.add_handler(CommandHandler("track_status", track_status_command, priv))
+    application.add_handler(CommandHandler("set_profile", set_profile_command, priv))
+    application.add_handler(CommandHandler("skip_profile", skip_profile_command, priv))
+    application.add_handler(CommandHandler("profile", profile_command, priv))
+    application.add_handler(CommandHandler("filters", filters_command, priv))
+    application.add_handler(CommandHandler("set_work_address", set_work_address_command, priv))
+    application.add_handler(CommandHandler("generate_letter", generate_letter_command, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
     application.add_handler(CommandHandler("remove_city", cmd_remove_city, priv))

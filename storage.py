@@ -68,6 +68,10 @@ def _user_to_row(uid: str, info: dict) -> dict:
         "created_at": info.get("created_at", ""),
         "total_checks": info.get("total_checks", 0),
         "email": info.get("email", ""),
+        "filter_furnished": info.get("filter_furnished", False),
+        "filter_pets": info.get("filter_pets", False),
+        "filter_parking": info.get("filter_parking", False),
+        "work_address": info.get("work_address", ""),
     }
 
 
@@ -84,6 +88,10 @@ def _row_to_user(row: dict) -> dict:
         "vip": False,
         "ref_code": "",
         "referrals": [],
+        "filter_furnished": row.get("filter_furnished", False),
+        "filter_pets": row.get("filter_pets", False),
+        "filter_parking": row.get("filter_parking", False),
+        "work_address": row.get("work_address", ""),
     }
 
 
