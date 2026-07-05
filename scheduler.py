@@ -13,21 +13,29 @@ import time
 import asyncio
 import logging
 import random
-import schedule
 import pytz
 from datetime import datetime, timezone, timedelta
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.events import EVENT_JOB_ERROR
-from telegram import Bot
-
-from config import TELEGRAM_TOKEN
-from storage import load_data, save_data
-from email_newsletter import get_active_subscribers, run_weekly_digest
 
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
+# Модульный bot создаётся лениво
+_bot = None
+_app_loop = None
+
+
+def set_bot(bot_instance, app_loop=None):
+    """Устанавливает bot и event loop из основного приложения."""
+    global _bot, _app_loop
+    _bot = bot_instance
+    _app_loop = app_loop
+
+
+def _run_async(coro):
+    """Запускает корутину на основном event loop (безопасно из потока)."""
+    if _app_loop and _app_loop.is_running():
+        asyncio.run_coroutine_threadsafe(coro, _app_loop)
+    else:
+        logger.warning("No event loop available, skipping async task")
 
 
 # ============================================================================
@@ -36,9 +44,10 @@ bot = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
 
 async def return_inactive_users():
     """Если юзер оплатил, но не писал 7 дней — напомнить."""
-    if not bot:
+    if not _bot:
         return
 
+    from storage import load_data, save_data
     data = load_data()
     now = time.time()
     seven_days = 7 * 86400
@@ -49,7 +58,6 @@ async def return_inactive_users():
         last_paid = user.get("last_paid_at", 0)
         last_activity = user.get("last_activity", 0)
 
-        # Только для платящих, у кого нет активности 7+ дней
         if balance <= 0 or not last_paid:
             continue
         if last_paid < now - seven_days:
@@ -61,7 +69,7 @@ async def return_inactive_users():
 
         remaining = user.get("balance", 0)
         try:
-            await bot.send_message(
+            await _bot.send_message(
                 chat_id=int(user_id),
                 text=(
                     f"👋 Привет! Давно не виделись.\n\n"
@@ -87,11 +95,12 @@ async def return_inactive_users():
 
 async def remind_last_free_check():
     """Напомнить тем, у кого осталась 1 бесплатная проверка."""
-    if not bot:
+    if not _bot:
         return
 
-    data = load_data()
+    from storage import load_data, save_data
     from config import FREE_LIMIT
+    data = load_data()
     sent = 0
 
     for user_id, user in data.items():
@@ -103,7 +112,7 @@ async def remind_last_free_check():
             continue
 
         try:
-            await bot.send_message(
+            await _bot.send_message(
                 chat_id=int(user_id),
                 text=(
                     f"⚠️ Осталась последняя бесплатная проверка!\n\n"
@@ -131,6 +140,7 @@ async def remind_last_free_check():
 
 def update_last_activity(user_id: str):
     """Вызывается при каждом сообщении пользователя."""
+    from storage import load_data, save_data
     data = load_data()
     if user_id in data:
         data[user_id]["last_activity"] = time.time()
@@ -143,6 +153,7 @@ def update_last_activity(user_id: str):
 
 async def weekly_email_digest():
     """Отправляет еженедельный email-дайджест."""
+    from email_newsletter import run_weekly_digest
     await run_weekly_digest()
 
 
@@ -155,8 +166,8 @@ GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 async def send_group_digest():
     """Отправляет дайджест в основную группу."""
-    logger.info(f"send_group_digest called. bot={bool(bot)}, GROUP_ID={GROUP_ID}")
-    if not bot:
+    logger.info(f"send_group_digest called. bot={bool(_bot)}, GROUP_ID={GROUP_ID}")
+    if not _bot:
         logger.error("send_group_digest: bot is None, skipping")
         return
     if not GROUP_ID:
@@ -169,16 +180,6 @@ async def send_group_digest():
         logger.info("send_group_digest: send_daily_post completed")
     except Exception as e:
         logger.error(f"Failed to send group digest: {e}", exc_info=True)
-
-
-def _run_group_digest():
-    """Обёртка для APScheduler — запускает async-функцию."""
-    logger.info("APScheduler: triggering group digest...")
-    try:
-        asyncio.run(send_group_digest())
-        logger.info("APScheduler: group digest completed")
-    except Exception as e:
-        logger.error(f"APScheduler: group digest failed: {e}")
 
 
 # ============================================================================
@@ -223,11 +224,11 @@ PROMO_MESSAGES = [
 
 
 async def send_promo_to_group():
-    if not bot or not GROUP_ID:
+    if not _bot or not GROUP_ID:
         return
     text = random.choice(PROMO_MESSAGES)
     try:
-        await bot.send_message(chat_id=GROUP_ID, text=text, parse_mode="Markdown")
+        await _bot.send_message(chat_id=GROUP_ID, text=text, parse_mode="Markdown")
         logger.info("Promo sent to group")
     except Exception as e:
         logger.error(f"Failed to send promo: {e}")
@@ -244,36 +245,26 @@ def _job_error_handler(job, exception):
 
 def run_scheduler():
     """Запускает планировщик в фоновом потоке."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.events import EVENT_JOB_ERROR
+
     # --- Группа: 10:00 и 18:00 по Берлину (APScheduler) ---
     apscheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Berlin"))
-    apscheduler.add_job(_run_group_digest, CronTrigger(hour=10, minute=0), name="group_digest_10")
-    apscheduler.add_job(_run_group_digest, CronTrigger(hour=18, minute=0), name="group_digest_18")
-    apscheduler.add_job(lambda: asyncio.run(send_promo_to_group()), CronTrigger(hour=15, minute=0), name="promo_15")
+    apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=10, minute=0), name="group_digest_10")
+    apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=18, minute=0), name="group_digest_18")
+    apscheduler.add_job(lambda: _run_async(send_promo_to_group()), CronTrigger(hour=15, minute=0), name="promo_15")
     apscheduler.add_listener(_job_error_handler, EVENT_JOB_ERROR)
     apscheduler.start()
     logger.info("APScheduler: group posts at 10:00, 18:00, promo at 15:00 Berlin time")
 
-    # --- Личные задачи (schedule) ---
-    schedule.every(1).hours.do(lambda: asyncio.run(remind_last_free_check()))
-    schedule.every(6).hours.do(lambda: asyncio.run(return_inactive_users()))
-    schedule.every().monday.at("10:00").do(lambda: asyncio.run(weekly_email_digest()))
+    # --- Личные задачи (каждые N часов) ---
+    import schedule as sched_lib
+    sched_lib.every(1).hours.do(lambda: _run_async(remind_last_free_check()))
+    sched_lib.every(6).hours.do(lambda: _run_async(return_inactive_users()))
+    sched_lib.every().monday.at("10:00").do(lambda: _run_async(weekly_email_digest()))
 
     logger.info("Scheduler started")
     while True:
-        schedule.run_pending()
+        sched_lib.run_pending()
         time.sleep(60)
-
-
-if __name__ == "__main__":
-    import threading
-
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
-    logger.info("Scheduler running in background")
-
-    # Keep alive
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Scheduler stopped")

@@ -36,7 +36,7 @@ from listing_features import (
     format_holy_grail_alert, extract_price, record_price, extract_score,
     POPULAR_CITIES, list_cities, set_user_city
 )
-from scheduler import update_last_activity, run_scheduler
+from scheduler import update_last_activity, run_scheduler, set_bot
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -1591,6 +1591,10 @@ if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logging.info("Flask started in background")
+
+    # Передаём bot в scheduler ДО запуска polling
+    from scheduler import set_bot
+    set_bot(application.bot)
 
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
