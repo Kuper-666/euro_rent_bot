@@ -293,49 +293,53 @@ class TestSuccessfulPayment(unittest.IsolatedAsyncioTestCase):
         import bot as bot_module
         self.bot_module = bot_module
 
-    @patch("bot.save_user")
-    @patch("bot.get_user")
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
     async def test_pay_3(self, mock_get, mock_save):
         user = make_user()
         mock_get.return_value = user
         update = make_update()
         update.message.successful_payment = MagicMock(invoice_payload="pay_stars_3")
         ctx = make_context()
-        await self.bot_module.successful_payment(update, ctx)
+        from handlers.payments import successful_payment
+        await successful_payment(update, ctx)
         self.assertEqual(user["balance"], 3)
         self.assertIn("last_paid_at", user)
 
-    @patch("bot.save_user")
-    @patch("bot.get_user")
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
     async def test_pay_9(self, mock_get, mock_save):
         user = make_user()
         mock_get.return_value = user
         update = make_update()
         update.message.successful_payment = MagicMock(invoice_payload="pay_stars_9")
         ctx = make_context()
-        await self.bot_module.successful_payment(update, ctx)
+        from handlers.payments import successful_payment
+        await successful_payment(update, ctx)
         self.assertEqual(user["balance"], 10)
 
-    @patch("bot.save_user")
-    @patch("bot.get_user")
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
     async def test_pay_19_unlimited(self, mock_get, mock_save):
         user = make_user()
         mock_get.return_value = user
         update = make_update()
         update.message.successful_payment = MagicMock(invoice_payload="pay_stars_19")
         ctx = make_context()
-        await self.bot_module.successful_payment(update, ctx)
+        from handlers.payments import successful_payment
+        await successful_payment(update, ctx)
         self.assertEqual(user["balance"], -1)
 
-    @patch("bot.save_user")
-    @patch("bot.get_user")
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
     async def test_pay_pdf(self, mock_get, mock_save):
         user = make_user()
         mock_get.return_value = user
         update = make_update()
         update.message.successful_payment = MagicMock(invoice_payload="pay_stars_pdf")
         ctx = make_context()
-        await self.bot_module.successful_payment(update, ctx)
+        from handlers.payments import successful_payment
+        await successful_payment(update, ctx)
         self.assertTrue(user["pdf_paid"])
         self.assertEqual(user["pdf_state"], "awaiting_data")
         self.assertIn("pdf_started_at", user)
@@ -360,22 +364,23 @@ class TestPayDoneAdminOnly(unittest.IsolatedAsyncioTestCase):
         update.message.reply_text.assert_not_called()
         self.assertEqual(user["balance"], 0)
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    async def test_pay_done_3_admin_works(self, mock_load, mock_save):
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
+    async def test_pay_done_3_admin_works(self, mock_get, mock_save):
         user = make_user()
-        mock_load.return_value = {"111": user}
+        mock_get.return_value = user
         update = make_update(user_id=111)
         ctx = make_context()
         with patch.dict(os.environ, {"ADMIN_ID": "111"}):
-            await self.bot_module.pay_done_3(update, ctx)
+            from handlers.payments import pay_done_3
+            await pay_done_3(update, ctx)
         self.assertEqual(user["balance"], 3)
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    async def test_pay_done_vip_non_admin_silently_ignored(self, mock_load, mock_save):
+    @patch("handlers.payments.save_user")
+    @patch("handlers.payments.get_user")
+    async def test_pay_done_vip_non_admin_silently_ignored(self, mock_get, mock_save):
         user = make_user()
-        mock_load.return_value = {"123": user}
+        mock_get.return_value = user
         update = make_update(user_id=999)
         ctx = make_context()
         with patch.dict(os.environ, {"ADMIN_ID": "111"}):
