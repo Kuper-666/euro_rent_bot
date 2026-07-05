@@ -20,7 +20,7 @@ from telegram.ext import (
 )
 from groq import Groq
 
-from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT
+from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT, PDF_PRICE, VIP_PRICE
 from messages import get_msg
 from utils import (
     load_data, save_data, get_lang, get_user_data,
@@ -44,6 +44,7 @@ client = Groq(api_key=GROQ_API_KEY)
 _payment_lock = asyncio.Lock()
 _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
+_last_flood_cleanup = 0
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -316,10 +317,20 @@ def check_followups(user: dict, lang: str) -> str:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global _last_flood_cleanup
     if not update.effective_user:
         return
     user_id = str(update.effective_user.id)
     now = time.time()
+
+    # Очистка старых записей каждые 10 минут
+    if now - _last_flood_cleanup > 600:
+        _last_flood_cleanup = now
+        cutoff = now - 120
+        stale = [uid for uid, (_, ws) in _flood_tracker.items() if ws < cutoff]
+        for uid in stale:
+            del _flood_tracker[uid]
+
     count, window_start = _flood_tracker.get(user_id, (0, now))
     if now - window_start > 60:
         count = 0
@@ -916,7 +927,7 @@ async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         payload="pay_stars_pdf",
         provider_token="",
         currency="XTR",
-        prices=[LabeledPrice(label="PDF заявление", amount=500)],
+        prices=[LabeledPrice(label="PDF заявление", amount=PDF_PRICE * 100)],
         need_name=False,
         need_phone_number=False,
         need_email=False,
@@ -971,7 +982,7 @@ async def pay_stars_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             payload="pay_stars_vip",
             provider_token="",
             currency="XTR",
-            prices=[LabeledPrice(label="VIP/мес", amount=1500)],
+            prices=[LabeledPrice(label="VIP/мес", amount=VIP_PRICE * 100)],
             need_name=False,
         )
     except Exception:
