@@ -109,19 +109,19 @@ def save_data(data):
     if _get_mode() == "supabase":
         try:
             sb = _get_supabase()
-            # Получаем существующие user_id → id маппинг
-            existing = {}
-            result = sb.table(SUPABASE_TABLE).select("id,user_id").execute()
+            # Получаем существующие user_id
+            existing = set()
+            result = sb.table(SUPABASE_TABLE).select("user_id").execute()
             for row in result.data:
                 uid = str(row.get("user_id", ""))
                 if uid:
-                    existing[uid] = row["id"]
+                    existing.add(uid)
 
             # Обновляем или вставляем каждого пользователя
             for uid, info in data.items():
                 row_data = _user_to_row(uid, info)
                 if uid in existing:
-                    sb.table(SUPABASE_TABLE).update(row_data).eq("id", existing[uid]).execute()
+                    sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", uid).execute()
                 else:
                     sb.table(SUPABASE_TABLE).insert(row_data).execute()
             return
