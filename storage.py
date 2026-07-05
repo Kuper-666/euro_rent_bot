@@ -135,10 +135,10 @@ def save_user(user_id: str, user_data: dict):
     if _get_mode() == "supabase":
         try:
             sb = _get_supabase()
-            result = sb.table(SUPABASE_TABLE).select("id").eq("user_id", user_id).execute()
+            result = sb.table(SUPABASE_TABLE).select("user_id").eq("user_id", user_id).execute()
             row_data = _user_to_row(user_id, user_data)
             if result.data:
-                sb.table(SUPABASE_TABLE).update(row_data).eq("id", result.data[0]["id"]).execute()
+                sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", user_id).execute()
             else:
                 sb.table(SUPABASE_TABLE).insert(row_data).execute()
             return
