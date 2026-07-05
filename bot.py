@@ -1942,6 +1942,98 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
+# ── Подписки на алерты ─────────────────────────────────────────
+
+async def subscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Подписка на алерты: /subscribe_alert [город] [макс.цена]"""
+    user_id = str(update.effective_user.id)
+
+    if not context.args:
+        await update.message.reply_text(
+            "🔔 <b>Подписка на алерты</b>\n\n"
+            "Использование:\n"
+            "/subscribe_alert berlin 1500\n"
+            "/subscribe_alert amsterdam\n\n"
+            "Без цены — все объявления в городе.\n"
+            "С ценой — только до указанной суммы.\n\n"
+            "Отписка: /unsubscribe_alert",
+            reply_markup=kb(update),
+            parse_mode="HTML"
+        )
+        return
+
+    city = context.args[0].lower()
+    max_price = int(context.args[1]) if len(context.args) > 1 and context.args[1].isdigit() else 0
+
+    sb = _get_sb()
+    if sb:
+        try:
+            sb.table("AlertSubscriptions").insert({
+                "user_id": user_id,
+                "city": city,
+                "max_price": max_price,
+                "active": True,
+            }).execute()
+            price_str = f" до {max_price} EUR" if max_price else ""
+            await update.message.reply_text(
+                f"✅ Подписка на алерты создана!\n\n"
+                f"🏙 Город: {city}\n"
+                f"💰 Макс. цена: {price_str or 'любая'}\n\n"
+                f"Вы будете получать уведомления о новых объявлениях.",
+                reply_markup=kb(update)
+            )
+        except Exception as e:
+            logger.error("subscribe_alert error: %s", e)
+            await update.message.reply_text("❌ Ошибка подписки.", reply_markup=kb(update))
+    else:
+        await update.message.reply_text("❌ Сервис алертов недоступен.", reply_markup=kb(update))
+
+
+async def unsubscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отписка от алертов."""
+    user_id = str(update.effective_user.id)
+
+    sb = _get_sb()
+    if sb:
+        try:
+            sb.table("AlertSubscriptions").update({"active": False}).eq("user_id", user_id).execute()
+            await update.message.reply_text("✅ Вы отписаны от алертов.", reply_markup=kb(update))
+        except Exception as e:
+            logger.error("unsubscribe_alert error: %s", e)
+            await update.message.reply_text("❌ Ошибка.", reply_markup=kb(update))
+
+
+async def my_alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает активные подписки на алерты."""
+    user_id = str(update.effective_user.id)
+
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table("AlertSubscriptions").select("*").eq("user_id", user_id).eq("active", True).execute()
+            subs = result.data or []
+
+            if not subs:
+                await update.message.reply_text(
+                    "🔔 У вас нет активных подписок.\n\n"
+                    "Создайте: /subscribe_alert город",
+                    reply_markup=kb(update)
+                )
+                return
+
+            text = "🔔 <b>Ваши подписки:</b>\n\n"
+            for s in subs:
+                city = s.get("city", "?")
+                price = s.get("max_price", 0)
+                price_str = f"до {price:.0f} EUR" if price else "все"
+                text += f"• {city} — {price_str}\n"
+
+            await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
+        except Exception as e:
+            logger.error("my_alerts error: %s", e)
+            await update.message.reply_text("❌ Ошибка.", reply_markup=kb(update))
+
+
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -2078,6 +2170,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("filters", filters_command, priv))
     application.add_handler(CommandHandler("set_work_address", set_work_address_command, priv))
     application.add_handler(CommandHandler("generate_letter", generate_letter_command, priv))
+    application.add_handler(CommandHandler("subscribe_alert", subscribe_alert_command, priv))
+    application.add_handler(CommandHandler("unsubscribe_alert", unsubscribe_alert_command, priv))
+    application.add_handler(CommandHandler("my_alerts", my_alerts_command, priv))
     application.add_handler(CommandHandler("timezone", set_timezone, priv))
     application.add_handler(CommandHandler("set_city", cmd_set_city, priv))
     application.add_handler(CommandHandler("remove_city", cmd_remove_city, priv))
