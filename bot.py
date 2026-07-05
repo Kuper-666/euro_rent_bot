@@ -1223,7 +1223,6 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     bot_username = context.bot.username
-    user_id = str(update.effective_user.id)
 
     is_url = text.strip().startswith(("http://", "https://", "t.me/"))
     is_long_text = len(text.strip()) > 30
@@ -1238,7 +1237,7 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
         token = create_url_token(listing_url)
         deep_link = f"https://t.me/{bot_username}?start=an_{token}"
     else:
-        deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+        deep_link = f"https://t.me/{bot_username}"
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔍 Проверить скрытые платежи", url=deep_link)]

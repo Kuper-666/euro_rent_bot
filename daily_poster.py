@@ -54,8 +54,31 @@ def strip_html(text: str) -> str:
     return clean.strip()
 
 
+PENDING_FILE_FALLBACK = "pending_listings.json"
+
+
+def _load_local_pending() -> dict:
+    if os.path.exists(PENDING_FILE_FALLBACK):
+        try:
+            with open(PENDING_FILE_FALLBACK, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_local_pending(data: dict):
+    now = time.time()
+    data = {k: v for k, v in data.items() if now - v.get("ts", 0) < 3600}
+    if len(data) > 500:
+        sorted_items = sorted(data.items(), key=lambda x: x[1].get("ts", 0), reverse=True)
+        data = dict(sorted_items[:500])
+    with open(PENDING_FILE_FALLBACK, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+
 def store_listing(url: str, title: str = "") -> str:
-    """Сохраняет ссылку в Supabase и возвращает короткий ID для callback_data."""
+    """Сохраняет ссылку в Supabase (с локальным fallback) и возвращает короткий ID для callback_data."""
     sb = _get_supabase()
     short_id = secrets.token_urlsafe(6)[:8]
     if sb:
@@ -68,12 +91,16 @@ def store_listing(url: str, title: str = "") -> str:
             }).execute()
             return short_id
         except Exception as e:
-            logger.warning(f"Supabase store_listing failed: {e}")
+            logger.warning(f"Supabase store_listing failed, falling back to local file: {e}")
+
+    pending = _load_local_pending()
+    pending[short_id] = {"url": url, "title": title, "ts": time.time()}
+    _save_local_pending(pending)
     return short_id
 
 
 def get_listing(short_id: str) -> dict:
-    """Получает ссылку из Supabase по короткому ID."""
+    """Получает ссылку из Supabase (с локальным fallback) по короткому ID."""
     sb = _get_supabase()
     if sb:
         try:
@@ -81,8 +108,9 @@ def get_listing(short_id: str) -> dict:
             if result.data:
                 return result.data[0]
         except Exception as e:
-            logger.warning(f"Supabase get_listing failed: {e}")
-    return {}
+            logger.warning(f"Supabase get_listing failed, falling back to local file: {e}")
+
+    return _load_local_pending().get(short_id, {})
 
 
 async def send_daily_post():
