@@ -533,23 +533,31 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "Проанализировать" из группы — открываем бота в личке
         elif data_prefix in ("analyze_ad", "analyze_rss"):
             await query.edit_message_reply_markup(reply_markup=None)
-            data = load_data()
-            user = get_user_data(data, user_id)
 
             short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
-            pending = _load_pending_listings()
-            listing = pending.get(short_id, {})
-            rss_url = listing.get("url", "")
             bot_username = context.bot.username
 
+            # Пытаемся получить URL из Supabase (через daily_poster)
+            rss_url = ""
+            try:
+                from daily_poster import get_listing
+                listing = get_listing(short_id)
+                rss_url = listing.get("url", "")
+            except Exception:
+                pass
+
             if rss_url and is_url(rss_url):
-                analyze_url = f"https://t.me/{bot_username}?start=analyze_{unquote(rss_url)}"
+                token = create_url_token(rss_url)
+                analyze_url = f"https://t.me/{bot_username}?start=an_{token}"
             else:
                 analyze_url = f"https://t.me/{bot_username}"
 
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
             ])
+
+            data = load_data()
+            user = get_user_data(data, user_id)
 
             if not can_use(user):
                 await query.message.reply_text(
