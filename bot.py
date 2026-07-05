@@ -316,6 +316,8 @@ def check_followups(user: dict, lang: str) -> str:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_user:
+        return
     user_id = str(update.effective_user.id)
     now = time.time()
     count, window_start = _flood_tracker.get(user_id, (0, now))
@@ -459,6 +461,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_user:
+        return
     user_id = str(update.effective_user.id)
     lang = get_lang(update)
     data = load_data()
@@ -507,6 +511,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
+        if not update.effective_user:
+            return
         query = update.callback_query
         await query.answer()
         lang = get_lang(update)
@@ -632,6 +638,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_user:
+        return
     lang = get_lang(update)
 
     user_id = str(update.effective_user.id)
@@ -955,6 +963,21 @@ async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=kb(update))
 
 
+async def pay_stars_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await update.message.reply_invoice(
+            title="VIP-подписка",
+            description="Безлимитные проверки + приоритетная обработка на 1 месяц.",
+            payload="pay_stars_vip",
+            provider_token="",
+            currency="XTR",
+            prices=[LabeledPrice(label="VIP/мес", amount=1500)],
+            need_name=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт. Проверьте баланс Stars.", reply_markup=kb(update))
+
+
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
     if update.effective_user.id != ADMIN_ID:
@@ -1126,6 +1149,15 @@ async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE)
             save_data(data)
             await update.message.reply_text(
                 "Оплата PDF подтверждена! Отправьте данные для заявления.",
+                reply_markup=kb(update)
+            )
+        elif payload == "pay_stars_vip":
+            user["vip"] = True
+            user["vip_state"] = "awaiting_criteria"
+            user["last_paid_at"] = time.time()
+            save_data(data)
+            await update.message.reply_text(
+                "Оплата VIP подтверждена! Отправьте критерии поиска (город, бюджет, район).",
                 reply_markup=kb(update)
             )
 
@@ -1383,7 +1415,7 @@ async def metrics_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"🏆 <b>Топ каналов:</b>\n{top_text}\n\n"
             f"📈 <b>7 дней:</b>\n{days}"
         )
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_text(text, parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
@@ -1521,6 +1553,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_stars_9", pay_stars_9, priv))
     application.add_handler(CommandHandler("pay_stars_19", pay_stars_19, priv))
     application.add_handler(CommandHandler("pay_stars_pdf", pay_stars_pdf, priv))
+    application.add_handler(CommandHandler("pay_stars_vip", pay_stars_vip, priv))
     application.add_handler(CommandHandler("pay_3", pay_3, priv))
     application.add_handler(CommandHandler("pay_9", pay_9, priv))
     application.add_handler(CommandHandler("pay_19", pay_19, priv))
