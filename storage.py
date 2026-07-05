@@ -77,6 +77,10 @@ def _user_to_row(uid: str, info: dict) -> dict:
         "ref_code": info.get("ref_code", ""),
         "referrals": info.get("referrals", []),
         "timezone": info.get("timezone", ""),
+        "lang": info.get("lang", ""),
+        "created_at": info.get("created_at", ""),
+        "total_checks": info.get("total_checks", 0),
+        "email": info.get("email", ""),
     }
 
 
@@ -98,6 +102,10 @@ def _row_to_user(row: dict) -> dict:
         "ref_code": row.get("ref_code", ""),
         "referrals": row.get("referrals", []),
         "timezone": row.get("timezone", ""),
+        "lang": row.get("lang", ""),
+        "created_at": row.get("created_at", ""),
+        "total_checks": row.get("total_checks", 0),
+        "email": row.get("email", ""),
     }
 
 

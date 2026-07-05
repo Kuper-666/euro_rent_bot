@@ -93,11 +93,13 @@ def can_use(user: dict) -> bool:
 
 def use_check(user: dict):
     if user["balance"] == -1:
+        user["total_checks"] = user.get("total_checks", 0) + 1
         return
     if user["balance"] > 0:
         user["balance"] -= 1
     else:
         user["free_used"] += 1
+    user["total_checks"] = user.get("total_checks", 0) + 1
 
 
 def is_url(text: str) -> bool:
