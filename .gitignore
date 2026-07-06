@@ -22,6 +22,8 @@ listing_history.json
 price_trends.json
 referral_events.jsonl
 url_tokens.json
+cities_config.json
+posted_listings.json
 
 # Telethon sessions
 *.session
