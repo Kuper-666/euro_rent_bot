@@ -248,30 +248,149 @@ async def set_work_address_command(update: Update, context: ContextTypes.DEFAULT
     await update.message.reply_text(msg, reply_markup=kb(update))
 
 
+# ── Профиль (расширенный) ─────────────────────────────────────
+
+PROFILE_FIELDS = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets", "rental_duration", "preferred_letter_lang"]
+PROFILE_LABELS = {
+    "full_name": "Имя Фамилия",
+    "profession": "Профессия",
+    "income": "Доход (нетто/мес)",
+    "employer": "Работодатель",
+    "move_in_date": "Дата переезда",
+    "occupants": "Кол-во жильцов",
+    "pets": "Питомцы",
+    "rental_duration": "Желаемый срок аренды (мес)",
+    "preferred_letter_lang": "Язык письма (de/en)",
+}
+
+
+async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Устанавливает профиль пользователя для генерации писем."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    fields_text = "\n".join(
+        f"  {i+1}. {PROFILE_LABELS.get(f, f)}: {profile.get(f, '')}"
+        for i, f in enumerate(PROFILE_FIELDS)
+    )
+
+    await update.message.reply_text(
+        f"📝 <b>Ваш профиль</b>:\n{fields_text}\n\n"
+        f"Отправьте данные построчно (каждое поле с новой строки):\n"
+        f"1. Имя Фамилия\n"
+        f"2. Профессия\n"
+        f"3. Доход (нетто/мес)\n"
+        f"4. Работодатель\n"
+        f"5. Дата переезда\n"
+        f"6. Кол-во жильцов\n"
+        f"7. Питомцы\n"
+        f"8. Срок аренды (мес)\n"
+        f"9. Язык письма (de/en)\n\n"
+        f"/skip_profile — отмена",
+        reply_markup=kb(update), parse_mode="HTML"
+    )
+    user = get_user(user_id)
+    user["profile_state"] = "awaiting_profile"
+    save_user(user_id, user)
+
+
+async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отмена заполнения профиля."""
+    user_id = str(update.effective_user.id)
+    user = get_user(user_id)
+    user.pop("profile_state", None)
+    save_user(user_id, user)
+    await update.message.reply_text("❌ Отменено.", reply_markup=kb(update))
+
+
+async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает текущий профиль."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    text = "📝 <b>Профиль</b>:\n\n"
+    for field, label in PROFILE_LABELS.items():
+        text += f"  {label}: {profile.get(field, '') or '—'}\n"
+    text += "\nИзменить: /set_profile"
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
+
+
+# ── Фильтры ────────────────────────────────────────────────────
+
+async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Показывает и переключает фильтры."""
+    user_id = str(update.effective_user.id)
+    filters = get_user_filters(user_id)
+    f = "✅" if filters.get("filter_furnished") else "❌"
+    p = "✅" if filters.get("filter_pets") else "❌"
+    pk = "✅" if filters.get("filter_parking") else "❌"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🪑 Мебель: {f}", callback_data="filter:furnished")],
+        [InlineKeyboardButton(f"🐾 Питомцы: {p}", callback_data="filter:pets")],
+        [InlineKeyboardButton(f"🅿️ Парковка: {pk}", callback_data="filter:parking")],
+    ])
+    await update.message.reply_text(
+        "🔧 <b>Фильтры</b>\n\nБот отмечает соответствие при анализе.",
+        reply_markup=keyboard, parse_mode="HTML"
+    )
+
+
 # ── Письмо ─────────────────────────────────────────────────────
 
 async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Генерирует мотивационное письмо арендодателю."""
     user_id = str(update.effective_user.id)
     profile = get_profile(user_id)
 
     filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
     if filled < 2:
-        await update.message.reply_text("📝 Заполните профиль: /set_profile", reply_markup=kb(update))
+        await update.message.reply_text(
+            "📝 Для генерации письма заполните профиль.\n\n"
+            "Используйте: /set_profile",
+            reply_markup=kb(update)
+        )
         return
 
     last_url = get_last_url(user_id)
     if not last_url:
-        await update.message.reply_text("📝 Сначала проанализируйте объявление.", reply_markup=kb(update))
+        await update.message.reply_text(
+            "📝 Сначала проанализируйте объявление, потом /generate_letter.",
+            reply_markup=kb(update)
+        )
         return
 
     await update.message.reply_text("📝 Генерирую письмо...", reply_markup=kb(update))
+
     lang = get_lang(update)
-    letter = generate_letter(profile, last_url, lang="de" if lang in ("ru", "de") else "en")
+    # Используем предпочтительный язык из профиля, если указан
+    letter_lang = profile.get("preferred_letter_lang", "")
+    if letter_lang not in ("de", "en"):
+        letter_lang = "de" if lang in ("ru", "de") else "en"
+
+    letter = generate_letter(profile, last_url, lang=letter_lang)
 
     if letter:
-        await update.message.reply_text(f"📝 <b>Письмо:</b>\n\n{letter}", reply_markup=kb(update), parse_mode="HTML")
+        # Кнопка для копирования и PDF
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
+            [InlineKeyboardButton("📄 Скачать PDF", callback_data="pdf_letter")],
+        ])
+        await update.message.reply_text(
+            f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{letter}",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        # Сохраняем письмо для PDF
+        user = get_user(user_id)
+        user["last_letter"] = letter
+        save_user(user_id, user)
     else:
-        await update.message.reply_text("❌ Ошибка генерации.", reply_markup=kb(update))
+        await update.message.reply_text(
+            "❌ Не удалось сгенерировать письмо. Попробуйте позже.",
+            reply_markup=kb(update)
+        )
+        return
 
 
 # ── Алерты ─────────────────────────────────────────────────────
@@ -351,7 +470,7 @@ def handle_profile_state(user_id: str, text: str) -> tuple[bool, str]:
     save_user(user_id, user)
 
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
-    fields = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets"]
+    fields = list(PROFILE_LABELS.keys())
     profile_data = {}
     for i, field in enumerate(fields):
         if i < len(lines):

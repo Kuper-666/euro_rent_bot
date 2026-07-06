@@ -11,48 +11,46 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 LETTER_PROMPTS = {
-    "de": """Du bist ein Experte für die Erstellung von Mietanträgen (Bewerbungsschreiben) in Deutschland.
-Erstelle ein professionelles, höfliches Anschreiben auf Deutsch für eine Mietwohnung.
+    "de": """Ты — профессиональный помощник по аренде жилья в Европе. Твоя задача — написать убедительное, тёплое и структурированное мотивационное письмо арендодателю на НЕМЕЦКОМ языке.
 
-Adressat: Vermieter / Hausverwaltung
-Thema: Bewerbung um die Wohnung
+Учитывай культурные особенности Германии: формальность и аккуратность.
 
-Struktur:
-1. Anrede
-2. Vorstellung (Name, Beruf, Einkommen)
-3. Warum diese Wohnung (Lage, Größe passen)
-4. Mietsicherheit (Stabilität, Kaution)
-5. Verfügbarkeit / Einzugstermin
-6. Grußformel
-
-Stil: Professionell, aber herzlich. Keine Floskeln. Maximal 200 Wörter.
-
-Daten des Bewerbers:
+Используй следующие данные арендатора:
 {profile}
 
-Details der Wohnung:
-{listing}""",
-    "en": """You are an expert at writing rental application cover letters in English.
-Write a professional, friendly cover letter for a rental apartment.
+Также используй информацию о самом объявлении:
+{listing}
 
-Addressee: Landlord / Property Manager
-Subject: Rental Application
+Инструкции к написанию:
+1. Начни с вежливого приветствия арендодателя (Sehr geehrte Damen und Herren).
+2. Кратко представься (имя и профессия).
+3. Объясни, почему тебя заинтересовала именно эта квартира.
+4. Укажи стабильный доход и ответственность.
+5. Упомяни долгосрочный срок аренды и готовность сразу заехать.
+6. Заверши предложением связаться для просмотра.
 
-Structure:
-1. Greeting
-2. Introduction (name, profession, income)
-3. Why this apartment (location, size suit me)
-4. Rental security (stability, deposit)
-5. Availability / move-in date
-6. Closing
+Длина: 150–200 слов. Язык: строго немецкий.
+Не используй шаблонных фраз. Пиши персонализированно.
+Отправь только текст письма, без комментариев.""",
+    "en": """You are a professional rental assistant in Europe. Write a convincing, warm and structured cover letter to a landlord in ENGLISH.
 
-Style: Professional but warm. No clichés. Max 200 words.
-
-Applicant details:
+Use the following tenant data:
 {profile}
 
-Apartment details:
-{listing}""",
+And the apartment listing information:
+{listing}
+
+Instructions:
+1. Start with a polite greeting to the landlord.
+2. Briefly introduce yourself (name and profession).
+3. Explain why this apartment interests you.
+4. Mention stable income and responsibility.
+5. Mention long-term rental intent and readiness to move in immediately.
+6. Close with an offer to arrange a viewing.
+
+Length: 150-200 words. Language: strictly English.
+Do not use template phrases. Write personalized content.
+Send only the letter text, no comments or introductions.""",
 }
 
 
@@ -63,14 +61,34 @@ def generate_letter(profile: dict, listing_text: str, lang: str = "de") -> str |
 
     prompt_template = LETTER_PROMPTS.get(lang, LETTER_PROMPTS["de"])
 
-    profile_text = "\n".join(f"- {k}: {v}" for k, v in profile.items() if v and k not in ("user_id", "created_at", "cover_letter"))
-    prompt = prompt_template.format(profile=profile_text, listing=listing_text[:1000])
+    field_labels = {
+        "full_name": "Имя / Name",
+        "profession": "Профессия / Occupation",
+        "income": "Доход (нетто/мес) / Monthly net income",
+        "employer": "Работодатель / Employer",
+        "move_in_date": "Дата переезда / Move-in date",
+        "occupants": "Жильцы / Occupants",
+        "pets": "Питомцы / Pets",
+        "rental_duration": "Срок аренды / Rental duration",
+        "preferred_letter_lang": "Язык письма / Language",
+    }
+    profile_lines = []
+    for k, v in profile.items():
+        if v and k in field_labels:
+            profile_lines.append(f"- {field_labels[k]}: {v}")
+    profile_text = "\n".join(profile_lines) if profile_lines else "Данные не указаны"
+
+    prompt = prompt_template.format(
+        profile=profile_text,
+        listing=listing_text[:1500],
+        preferred_language=lang,
+    )
 
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=800,
+            max_tokens=1000,
             temperature=0.7,
         )
         return response.choices[0].message.content.strip()

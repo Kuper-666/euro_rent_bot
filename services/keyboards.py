@@ -44,11 +44,15 @@ def kb(update, chat_type=None):
 def get_analysis_inline_buttons():
     keyboard = [
         [
-            InlineKeyboardButton("📋 Скопировать перевод", callback_data="copy"),
-            InlineKeyboardButton("🔍 Ещё одно объявление", callback_data="new"),
+            InlineKeyboardButton("📋 Скопировать", callback_data="copy"),
+            InlineKeyboardButton("🔍 Ещё одно", callback_data="new"),
         ],
         [
-            InlineKeyboardButton("📄 Получить PDF", callback_data="pdf"),
+            InlineKeyboardButton("📝 Письмо", callback_data="gen_letter"),
+            InlineKeyboardButton("📄 PDF", callback_data="pdf"),
+        ],
+        [
+            InlineKeyboardButton("⭐ В избранное", callback_data="fav_save"),
             InlineKeyboardButton("🌐 Поделиться", callback_data="share"),
         ],
     ]
