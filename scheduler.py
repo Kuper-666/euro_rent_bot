@@ -174,6 +174,28 @@ async def scan_web_portals():
 
 
 # ============================================================================
+# 5.1 СКАНИРОВАНИЕ TELEGRAM КАНАЛОВ (каждый час)
+# ============================================================================
+
+async def scan_telegram_channels():
+    """Сканирует Telegram каналы на наличие объявлений об аренде."""
+    try:
+        from rent_scanner.channel_scanner import run_channel_scan
+        # Используем user_client из rent_scanner если доступен
+        try:
+            from rent_scanner.app import RentScanner
+            from rent_scanner.config import RuntimeConfig
+            config = RuntimeConfig.from_env()
+            scanner = RentScanner(config)
+            stats = await run_channel_scan(scanner.user_client, _bot)
+            logger.info("Telegram channel scan: %s", stats)
+        except Exception as e:
+            logger.debug("RentScanner not available for channel scan: %s", e)
+    except Exception as e:
+        logger.error("Telegram channel scan error: %s", e)
+
+
+# ============================================================================
 # 6. ПОСТЫ В ГРУППУ (10:00 и 18:00 по Берлину)
 # ============================================================================
 
@@ -292,6 +314,7 @@ def run_scheduler():
     # --- Личные задачи (каждые N часов) ---
     import schedule as sched_lib
     sched_lib.every(1).hours.do(lambda: _run_async(scan_web_portals()))
+    sched_lib.every(1).hours.do(lambda: _run_async(scan_telegram_channels()))
     sched_lib.every(1).hours.do(lambda: _run_async(remind_last_free_check()))
     sched_lib.every(6).hours.do(lambda: _run_async(return_inactive_users()))
     sched_lib.every().monday.at("10:00").do(lambda: _run_async(weekly_email_digest()))

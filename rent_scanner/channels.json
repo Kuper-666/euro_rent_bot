@@ -1,0 +1,40 @@
+{
+  "channels": [
+    {"name": "Berlin Apartments", "username": "berlin_apartments", "city": "berlin", "lang": "de", "active": true},
+    {"name": "Wohnung Berlin", "username": "wohnung_berlin", "city": "berlin", "lang": "de", "active": true},
+    {"name": "Berlin Rent", "username": "berlin_rent", "city": "berlin", "lang": "en", "active": true},
+    {"name": "Berlin Expats", "username": "berlin_expats", "city": "berlin", "lang": "en", "active": true},
+    {"name": "Muenchen Wohnungen", "username": "muenchen_wohnungen", "city": "munich", "lang": "de", "active": true},
+    {"name": "Munich Apartments", "username": "munich_apartments", "city": "munich", "lang": "en", "active": true},
+    {"name": "Hamburg Wohnungen", "username": "hamburg_wohnungen", "city": "hamburg", "lang": "de", "active": true},
+    {"name": "Hamburg Apartments", "username": "hamburg_apartments", "city": "hamburg", "lang": "en", "active": true},
+    {"name": "Wien Wohnungen", "username": "wien_wohnungen", "city": "vienna", "lang": "de", "active": true},
+    {"name": "Vienna Apartments", "username": "vienna_apartments", "city": "vienna", "lang": "en", "active": true},
+    {"name": "Amsterdam Apartments", "username": "amsterdam_apartments", "city": "amsterdam", "lang": "en", "active": true},
+    {"name": "Pararius Updates", "username": "pararius_updates", "city": "amsterdam", "lang": "nl", "active": true},
+    {"name": "London Flats", "username": "london_flats", "city": "london", "lang": "en", "active": true},
+    {"name": "Rightmove Updates", "username": "rightmove_updates", "city": "london", "lang": "en", "active": true},
+    {"name": "Prague Apartments", "username": "prague_apartments", "city": "prague", "lang": "en", "active": true},
+    {"name": "Warsaw Rentals", "username": "warsaw_rentals", "city": "warsaw", "lang": "pl", "active": true},
+    {"name": "Barcelona Apartments", "username": "barcelona_apartments", "city": "barcelona", "lang": "es", "active": true},
+    {"name": "Paris Apartments", "username": "paris_apartments", "city": "paris", "lang": "fr", "active": true}
+  ],
+  "scan_keywords": [
+    "квартира", "аренда", "съем", "снять",
+    "wohnung", "miete", "mieten", "zimmer",
+    "apartment", "rent", "flat", "let",
+    "appartement", "huur", "verhuur",
+    "apartamento", "alquiler", "alquiler",
+    "appartement", "location", "louer",
+    "€", "EUR", "eur", "muebles", "möbliert"
+  ],
+  "price_patterns": [
+    "(\\d[\\d.,]*)\\s*(?:€|EUR|евро)",
+    "(\\d[\\d.,]*)\\s*(?:pro\\s*Monat|monatlich|monthly|par\\s*mois)",
+    "(?:Kaltmiete|Warmmiete|rent|huur|alquiler|loyer):?\\s*(\\d[\\d.,]*)"
+  ],
+  "exclude_keywords": [
+    "купить", "продажа", "kaufen", "verkauf", "buy", "sale",
+    "вторичка", "novostroy", "new build"
+  ]
+}
