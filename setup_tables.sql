@@ -33,3 +33,41 @@ CREATE POLICY "Service role full access on UserProfiles" ON "UserProfiles" FOR A
 CREATE POLICY "Service role full access on AlertSubscriptions" ON "AlertSubscriptions" FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on WebListings" ON "WebListings" FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on UrlTokens" ON "UrlTokens" FOR ALL USING (auth.role() = 'service_role');
+
+-- Listing history (for trends and holy grail tracking)
+CREATE TABLE IF NOT EXISTS "ListingHistory" (
+  id SERIAL PRIMARY KEY,
+  url TEXT DEFAULT '',
+  city TEXT DEFAULT '',
+  price NUMERIC DEFAULT 0,
+  score INTEGER DEFAULT 0,
+  timestamp NUMERIC DEFAULT 0,
+  is_holy_grail BOOLEAN DEFAULT FALSE,
+  grail_reason TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "ListingHistory" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access on ListingHistory" ON "ListingHistory" FOR ALL USING (auth.role() = 'service_role');
+
+-- Price trends per city
+CREATE TABLE IF NOT EXISTS "PriceTrends" (
+  id SERIAL PRIMARY KEY,
+  city TEXT UNIQUE NOT NULL,
+  prices JSONB DEFAULT '[]',
+  avg NUMERIC DEFAULT 0,
+  trend TEXT DEFAULT 'stable',
+  trend_pct NUMERIC DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "PriceTrends" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access on PriceTrends" ON "PriceTrends" FOR ALL USING (auth.role() = 'service_role');
+
+-- User city filters
+CREATE TABLE IF NOT EXISTS "UserCities" (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT UNIQUE NOT NULL,
+  city TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "UserCities" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access on UserCities" ON "UserCities" FOR ALL USING (auth.role() = 'service_role');

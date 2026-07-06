@@ -1,5 +1,6 @@
 """
 Фильтр по городу, детектор трендов, уведомления о "святых граалях".
+Синхронизация с Supabase + fallback на локальные JSON-файлы.
 """
 
 import os
@@ -15,6 +16,25 @@ logger = logging.getLogger(__name__)
 CITIES_FILE = "cities_config.json"
 TRENDS_FILE = "price_trends.json"
 HISTORY_FILE = "listing_history.json"
+
+# Supabase tables
+_TABLE_HISTORY = "ListingHistory"
+_TABLE_TRENDS = "PriceTrends"
+_TABLE_CITIES = "UserCities"
+
+
+def _get_sb():
+    """Возвращает Supabase client или None."""
+    try:
+        import dns_fix  # noqa
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        if url and key:
+            return create_client(url, key)
+    except Exception as e:
+        logger.debug("Supabase not available: %s", e)
+    return None
 
 POPULAR_CITIES = {
     "berlin": {"name": "Берлин", "name_en": "Berlin", "name_de": "Berlin", "avg_price": 850, "emoji": "🇩🇪"},
@@ -58,7 +78,15 @@ def _save_json(path: str, data):
 # ============================================================================
 
 def get_user_city(user_id: str) -> Optional[str]:
-    """Возвращает ключ города пользователя (например 'berlin')"""
+    """Возвращает ключ города пользователя"""
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(_TABLE_CITIES).select("city").eq("user_id", user_id).limit(1).execute()
+            if result.data:
+                return result.data[0].get("city")
+        except Exception as e:
+            logger.debug("Supabase get_user_city failed: %s", e)
     cities = _load_json(CITIES_FILE)
     return cities.get(user_id)
 
@@ -68,6 +96,17 @@ def set_user_city(user_id: str, city_key: str) -> bool:
     city_key = city_key.lower().strip()
     if city_key not in POPULAR_CITIES:
         return False
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(_TABLE_CITIES).select("user_id").eq("user_id", user_id).limit(1).execute()
+            if result.data:
+                sb.table(_TABLE_CITIES).update({"city": city_key}).eq("user_id", user_id).execute()
+            else:
+                sb.table(_TABLE_CITIES).insert({"user_id": user_id, "city": city_key}).execute()
+            return True
+        except Exception as e:
+            logger.debug("Supabase set_user_city failed: %s", e)
     cities = _load_json(CITIES_FILE)
     cities[user_id] = city_key
     _save_json(CITIES_FILE, cities)
@@ -76,6 +115,13 @@ def set_user_city(user_id: str, city_key: str) -> bool:
 
 def remove_user_city(user_id: str) -> bool:
     """Удаляет фильтр города"""
+    sb = _get_sb()
+    if sb:
+        try:
+            sb.table(_TABLE_CITIES).delete().eq("user_id", user_id).execute()
+            return True
+        except Exception as e:
+            logger.debug("Supabase remove_user_city failed: %s", e)
     cities = _load_json(CITIES_FILE)
     if user_id in cities:
         del cities[user_id]
@@ -183,21 +229,66 @@ def extract_score(text: str) -> int:
 
 def record_price(city_key: str, price: int, url: str = ""):
     """Записывает цену для отслеживания тренда"""
+    sb = _get_sb()
+    if sb:
+        try:
+            # Загружаем текущий тренд
+            result = sb.table(_TABLE_TRENDS).select("*").eq("city", city_key).limit(1).execute()
+            if result.data:
+                city_data = result.data[0]
+                prices = city_data.get("prices", [])
+            else:
+                city_data = None
+                prices = []
+
+            entry = {"price": price, "timestamp": time.time(), "url": url}
+            prices.append(entry)
+            prices = prices[-200:]  # Храним только последние 200
+
+            # Пересчитываем среднее и тренд
+            price_vals = [p["price"] for p in prices]
+            avg = round(sum(price_vals) / len(price_vals)) if price_vals else 0
+            trend = "stable"
+            trend_pct = 0
+
+            if len(price_vals) >= 5:
+                recent = price_vals[-5:]
+                older = price_vals[-15:-5] if len(price_vals) >= 15 else price_vals[:len(price_vals)//2]
+                if older:
+                    recent_avg = sum(recent) / len(recent)
+                    older_avg = sum(older) / len(older)
+                    change_pct = ((recent_avg - older_avg) / older_avg) * 100
+                    if change_pct > 10:
+                        trend = "rising"
+                    elif change_pct < -10:
+                        trend = "falling"
+                    trend_pct = round(change_pct, 1)
+
+            row = {
+                "city": city_key,
+                "prices": prices,
+                "avg": avg,
+                "trend": trend,
+                "trend_pct": trend_pct,
+            }
+
+            if city_data and city_data.get("id"):
+                sb.table(_TABLE_TRENDS).update(row).eq("id", city_data["id"]).execute()
+            else:
+                sb.table(_TABLE_TRENDS).insert(row).execute()
+            return
+        except Exception as e:
+            logger.debug("Supabase record_price failed: %s", e)
+
+    # Fallback: локальный JSON
     trends = _load_json(TRENDS_FILE)
     if city_key not in trends:
         trends[city_key] = {"prices": [], "avg": 0, "trend": "stable"}
 
-    entry = {
-        "price": price,
-        "timestamp": time.time(),
-        "url": url,
-    }
+    entry = {"price": price, "timestamp": time.time(), "url": url}
     trends[city_key]["prices"].append(entry)
-
-    # Храним только последние 200 записей
     trends[city_key]["prices"] = trends[city_key]["prices"][-200:]
 
-    # Пересчитываем среднее и тренд
     prices = [p["price"] for p in trends[city_key]["prices"]]
     trends[city_key]["avg"] = round(sum(prices) / len(prices)) if prices else 0
 
@@ -210,19 +301,33 @@ def record_price(city_key: str, price: int, url: str = ""):
             change_pct = ((recent_avg - older_avg) / older_avg) * 100
             if change_pct > 10:
                 trends[city_key]["trend"] = "rising"
-                trends[city_key]["trend_pct"] = round(change_pct, 1)
             elif change_pct < -10:
                 trends[city_key]["trend"] = "falling"
-                trends[city_key]["trend_pct"] = round(change_pct, 1)
             else:
                 trends[city_key]["trend"] = "stable"
-                trends[city_key]["trend_pct"] = round(change_pct, 1)
+            trends[city_key]["trend_pct"] = round(change_pct, 1)
 
     _save_json(TRENDS_FILE, trends)
 
 
 def get_trend(city_key: str) -> dict:
     """Получает тренд по городу"""
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(_TABLE_TRENDS).select("*").eq("city", city_key).limit(1).execute()
+            if result.data:
+                city_data = result.data[0]
+                return {
+                    "city": city_key,
+                    "avg_price": city_data.get("avg", 0),
+                    "trend": city_data.get("trend", "unknown"),
+                    "trend_pct": city_data.get("trend_pct", 0),
+                    "data_points": len(city_data.get("prices", [])),
+                }
+        except Exception as e:
+            logger.debug("Supabase get_trend failed: %s", e)
+
     trends = _load_json(TRENDS_FILE)
     city_data = trends.get(city_key, {})
     return {
@@ -279,11 +384,39 @@ def is_good_deal(city_key: str, price: int) -> bool:
 # ============================================================================
 
 def _load_history() -> dict:
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(_TABLE_HISTORY).select("*").order("timestamp", desc=True).limit(500).execute()
+            listings = result.data or []
+            # Считаем alerts_sent
+            alerts = sum(1 for l in listings if l.get("is_holy_grail"))
+            return {"listings": listings, "alerts_sent": alerts}
+        except Exception as e:
+            logger.debug("Supabase load history failed: %s", e)
     return _load_json(HISTORY_FILE, {"listings": [], "alerts_sent": 0})
 
 
 def _save_history(data: dict):
     data["listings"] = data["listings"][-500:]
+    sb = _get_sb()
+    if sb:
+        try:
+            # Сохраняем новые записи (без id — Supabase сгенерирует)
+            for entry in data["listings"]:
+                if not entry.get("id"):
+                    sb.table(_TABLE_HISTORY).insert({
+                        "url": entry.get("url", ""),
+                        "city": entry.get("city", ""),
+                        "price": entry.get("price", 0),
+                        "score": entry.get("score", 0),
+                        "timestamp": entry.get("timestamp", 0),
+                        "is_holy_grail": entry.get("is_holy_grail", False),
+                        "grail_reason": entry.get("grail_reason", ""),
+                    }).execute()
+            return
+        except Exception as e:
+            logger.debug("Supabase save history failed: %s", e)
     _save_json(HISTORY_FILE, data)
 
 
