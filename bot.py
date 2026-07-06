@@ -20,7 +20,7 @@ from telegram.ext import (
 )
 from groq import Groq
 
-from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT, PDF_PRICE, VIP_PRICE
+from config import TELEGRAM_TOKEN, GROQ_API_KEY, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT, PDF_PRICE, VIP_PRICE
 from messages import get_msg
 from storage import save_user, get_user
 from user_features import save_profile, get_profile
@@ -30,14 +30,14 @@ from user_features import (
 )
 from utils import (
     load_data, save_data, get_lang, get_user_data,
-    can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
+    can_use, use_check, is_url, fetch_url_text, fetch_url_text_async, ocr_from_photo,
     calc_remaining, check_rate_limit, sanitize_pdf_input,
     is_pdf_state_expired, validate_pdf_data, expire_unlimited_if_needed
 )
 from pdf_generator import generate_mieterprofil_pdf
 from letter_generator import generate_letter
 from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
-from services.keyboards import kb, get_keyboard, get_analysis_inline_buttons, split_message, _load_pending_listings, _save_pending_listings
+from services.keyboards import kb, get_keyboard, get_analysis_inline_buttons, split_message
 from handlers.user_features import (
     favorite_command, favorites_command,
     track_command, mytracks_command, track_status_command,
@@ -82,8 +82,7 @@ REFERRAL_TABLE = "ReferralEvents"
 
 def log_referral_event(event_type: str, user_id: str, extra: dict = None):
     """Логирует реферальное событие в Supabase или JSONL."""
-    import time as _time
-    ts = _time.time()
+    ts = time.time()
     entry = {"ts": ts, "type": event_type, "user_id": user_id}
     if extra:
         entry.update(extra)
@@ -109,10 +108,6 @@ def log_referral_event(event_type: str, user_id: str, extra: dict = None):
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass
-
-# Словарь для хранения ссылок из постов (message_id -> url)
-_pending_listings = {}
-PENDING_FILE = "pending_listings.json"
 
 # Токены для коротких deep links — используют общий модуль из rent_scanner
 from rent_scanner.formatting import create_url_token, resolve_url_token
@@ -461,7 +456,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if user_text and is_url(user_text):
         await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
-        listing_text = fetch_url_text(user_text)
+        listing_text = await fetch_url_text_async(user_text)
         if listing_text.startswith("ERROR"):
             await update.message.reply_text(
                 "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
@@ -870,7 +865,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             url = resolve_url_token(token)
             if url and is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
-                listing_text = fetch_url_text(url)
+                listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
                     await update.message.reply_text(
                         "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
@@ -903,7 +898,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 url = ""
             if is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
-                listing_text = fetch_url_text(url)
+                listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
                     await update.message.reply_text(
                         "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"

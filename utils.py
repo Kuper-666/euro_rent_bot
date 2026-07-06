@@ -151,6 +151,13 @@ def fetch_url_text(url: str) -> str:
         return f"ERROR: {e}"
 
 
+async def fetch_url_text_async(url: str) -> str:
+    """Async версия fetch_url_text — не блокирует event loop."""
+    import asyncio
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, fetch_url_text, url)
+
+
 def ocr_from_photo(photo_bytes: bytes) -> str:
     try:
         image = Image.open(BytesIO(photo_bytes))

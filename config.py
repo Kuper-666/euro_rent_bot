@@ -5,7 +5,6 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -33,9 +32,6 @@ NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai
 
 # Travel time calculator (OpenStreetMap OSRM)
 OSRM_URL = os.getenv("OSRM_URL", "http://router.project-osrm.org")
-
-# Web scanner interval (hours)
-WEB_SCANNER_INTERVAL = int(os.getenv("WEB_SCANNER_INTERVAL", "1"))
 
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
     raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")

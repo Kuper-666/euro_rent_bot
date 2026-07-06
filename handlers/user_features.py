@@ -1,6 +1,7 @@
 """
 Хендлеры Phase 1-3: Избранное, Трекер, Профиль, Фильтры, Письма, Алерты.
 """
+import html
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -311,7 +312,7 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
             [InlineKeyboardButton("📄 Скачать PDF", callback_data="pdf_letter")],
         ])
         await update.message.reply_text(
-            f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{letter}",
+            f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{html.escape(letter)}",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
@@ -372,7 +373,7 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
         ])
         await update.message.reply_text(
-            f"💬 <b>Ответ арендодателю ({reply_lang.upper()}):</b>\n\n{reply_text}",
+            f"💬 <b>Ответ арендодателю ({reply_lang.upper()}):</b>\n\n{html.escape(reply_text)}",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
