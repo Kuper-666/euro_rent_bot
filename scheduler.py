@@ -251,6 +251,19 @@ async def send_promo_to_group():
 
 
 # ============================================================================
+# 7. АВТОПОСТИНГ В КАНАЛ (раз в час)
+# ============================================================================
+
+async def run_channel_poster():
+    """Сканирует порталы и постит объявления в канал."""
+    try:
+        from channel_poster import run_channel_post
+        await run_channel_post()
+    except Exception as e:
+        logger.error("Channel poster error: %s", e, exc_info=True)
+
+
+# ============================================================================
 # ПЛАНИРОВЩИК
 # ============================================================================
 
@@ -270,9 +283,11 @@ def run_scheduler():
     apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=10, minute=0), name="group_digest_10")
     apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=18, minute=0), name="group_digest_18")
     apscheduler.add_job(lambda: _run_async(send_promo_to_group()), CronTrigger(hour=15, minute=0), name="promo_15")
+    # Канал: сканируем порталы и постим раз в час (0-23)
+    apscheduler.add_job(lambda: _run_async(run_channel_poster()), CronTrigger(minute=5), name="channel_poster_hourly")
     apscheduler.add_listener(_job_error_handler, EVENT_JOB_ERROR)
     apscheduler.start()
-    logger.info("APScheduler: group posts at 10:00, 18:00, promo at 15:00 Berlin time")
+    logger.info("APScheduler: group at 10/18, promo at 15, channel every hour Berlin time")
 
     # --- Личные задачи (каждые N часов) ---
     import schedule as sched_lib

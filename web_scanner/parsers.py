@@ -98,7 +98,14 @@ def _parse_price(text: str) -> float:
 
 def parse_immowelt(city: str = "berlin", max_price: int = 0) -> list[Listing]:
     """Парсинг Immowelt через HTML scraping."""
-    city_slug = city.lower().replace(" ", "-")
+    # Immowelt использует немецкие названия городов
+    city_de_map = {
+        "berlin": "berlin", "muenchen": "muenchen", "munich": "muenchen",
+        "hamburg": "hamburg", "koeln": "koeln", "cologne": "koeln",
+        "frankfurt": "frankfurt", "stuttgart": "stuttgart",
+        "dresden": "dresden", "leipzig": "leipzig", "hannover": "hannover",
+    }
+    city_slug = city_de_map.get(city.lower(), city.lower())
     url = f"https://www.immowelt.de/liste/{city_slug}/wohnungen/mieten"
     r = _safe_get(url, _headers("https://www.immowelt.de/"))
     if not r:
