@@ -138,7 +138,7 @@ def remove_tracker_entry(user_id: str, entry_id: int) -> bool:
 
 # ── Профиль пользователя ───────────────────────────────────────
 
-PROFILE_FIELDS = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets", "cover_letter"]
+PROFILE_FIELDS = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets", "rental_duration", "preferred_letter_lang"]
 
 
 def get_profile(user_id: str) -> dict:

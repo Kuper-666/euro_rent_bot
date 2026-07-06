@@ -54,7 +54,6 @@ _last_groq_call = LimitedDict(max_size=10000, ttl=3600)
 
 def get_lang(update: Update) -> str:
     try:
-        from utils import load_data, get_user_data
         user_id = str(update.effective_user.id)
         data = load_data()
         user = get_user_data(data, user_id)
@@ -81,13 +80,22 @@ def can_use(user: dict) -> bool:
     if user.get("balance") == -1:
         last_paid = user.get("last_paid_at", 0)
         if last_paid and (time.time() - last_paid) > SUBSCRIPTION_DAYS * 86400:
-            user["balance"] = 0
             return False
         return True
     if user.get("balance", 0) > 0:
         return True
     if user.get("free_used", 0) < FREE_LIMIT:
         return True
+    return False
+
+
+def expire_unlimited_if_needed(user: dict) -> bool:
+    """Сбрасывает безлимит, если срок подписки истёк. Возвращает True если сбросился."""
+    if user.get("balance") == -1:
+        last_paid = user.get("last_paid_at", 0)
+        if last_paid and (time.time() - last_paid) > SUBSCRIPTION_DAYS * 86400:
+            user["balance"] = 0
+            return True
     return False
 
 

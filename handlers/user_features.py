@@ -1,7 +1,6 @@
 """
 Хендлеры Phase 1-3: Избранное, Трекер, Профиль, Фильтры, Письма, Алерты.
 """
-import os
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -160,71 +159,6 @@ async def track_status_command(update: Update, context: ContextTypes.DEFAULT_TYP
         )
     else:
         await update.message.reply_text("❌ Ошибка. Проверьте ID и статус.", reply_markup=kb(update))
-
-
-# ── Профиль ────────────────────────────────────────────────────
-
-async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
-
-    current = "\n".join(f"  {field}: {profile.get(field, '')}" for field in PROFILE_FIELDS if profile.get(field))
-    current_str = f"\n\nТекущий профиль:\n{current}" if current else ""
-
-    await update.message.reply_text(
-        f"📝 <b>Профиль</b>{current_str}\n\n"
-        f"Отправьте построчно:\n"
-        f"1. Имя\n2. Профессия\n3. Доход\n4. Работодатель\n"
-        f"5. Дата переезда\n6. Жильцы\n7. Питомцы\n\n"
-        f"/skip_profile — отмена",
-        reply_markup=kb(update), parse_mode="HTML"
-    )
-    user = get_user(user_id)
-    user["profile_state"] = "awaiting_profile"
-    save_user(user_id, user)
-
-
-async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    user = get_user(user_id)
-    user.pop("profile_state", None)
-    save_user(user_id, user)
-    await update.message.reply_text("❌ Отменено.", reply_markup=kb(update))
-
-
-async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
-    fields_ru = {
-        "full_name": "Имя", "profession": "Профессия", "income": "Доход",
-        "employer": "Работодатель", "move_in_date": "Дата переезда",
-        "occupants": "Жильцы", "pets": "Питомцы",
-    }
-    text = "📝 <b>Профиль</b>:\n\n"
-    for field, label in fields_ru.items():
-        text += f"  {label}: {profile.get(field, '') or '—'}\n"
-    text += "\nИзменить: /set_profile"
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
-
-
-# ── Фильтры ────────────────────────────────────────────────────
-
-async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    filters = get_user_filters(user_id)
-    f = "✅" if filters.get("filter_furnished") else "❌"
-    p = "✅" if filters.get("filter_pets") else "❌"
-    pk = "✅" if filters.get("filter_parking") else "❌"
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🪑 Мебель: {f}", callback_data="filter:furnished")],
-        [InlineKeyboardButton(f"🐾 Питомцы: {p}", callback_data="filter:pets")],
-        [InlineKeyboardButton(f"🅿️ Парковка: {pk}", callback_data="filter:parking")],
-    ])
-    await update.message.reply_text(
-        "🔧 <b>Фильтры</b>\n\nБот отмечает соответствие при анализе.",
-        reply_markup=keyboard, parse_mode="HTML"
-    )
 
 
 # ── Рабочий адрес ──────────────────────────────────────────────

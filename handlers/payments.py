@@ -1,7 +1,6 @@
 """Хендлеры платежей: инвойсы, precheckout, successful_payment."""
 import os
 import time
-import asyncio
 import logging
 from telegram import Update, LabeledPrice
 from telegram.ext import ContextTypes
@@ -13,8 +12,6 @@ from messages import get_msg
 from services.keyboards import kb
 
 logger = logging.getLogger(__name__)
-
-_payment_lock = asyncio.Lock() if __import__('asyncio') else None
 
 
 async def pay_stars_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

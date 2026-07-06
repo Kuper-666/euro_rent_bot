@@ -81,7 +81,6 @@ def generate_letter(profile: dict, listing_text: str, lang: str = "de") -> str |
     prompt = prompt_template.format(
         profile=profile_text,
         listing=listing_text[:1500],
-        preferred_language=lang,
     )
 
     try:

@@ -34,6 +34,10 @@ def _get_supabase():
     return _supabase
 
 
+# Алиас для обратной совместимости с импортами из handlers
+_get_sb = _get_supabase
+
+
 def _load_json():
     try:
         if os.path.exists(DATA_FILE):
@@ -68,15 +72,34 @@ def _user_to_row(uid: str, info: dict) -> dict:
         "created_at": info.get("created_at", ""),
         "total_checks": info.get("total_checks", 0),
         "email": info.get("email", ""),
+        "balance": info.get("balance", 0),
+        "vip": info.get("vip", False),
+        "ref_code": info.get("ref_code", ""),
+        "referrals": json.dumps(info.get("referrals", [])),
+        "last_paid_at": info.get("last_paid_at", 0),
+        "last_activity": info.get("last_activity", 0),
         "filter_furnished": info.get("filter_furnished", False),
         "filter_pets": info.get("filter_pets", False),
         "filter_parking": info.get("filter_parking", False),
         "work_address": info.get("work_address", ""),
+        "vip_criteria": info.get("vip_criteria", ""),
+        "pdf_state": info.get("pdf_state", ""),
+        "pdf_started_at": info.get("pdf_started_at", 0),
+        "vip_state": info.get("vip_state", ""),
+        "profile_state": info.get("profile_state", ""),
+        "timezone": info.get("timezone", ""),
+        "last_letter": info.get("last_letter", ""),
     }
 
 
 def _row_to_user(row: dict) -> dict:
     """Конвертирует строку Supabase в пользовательский dict."""
+    referrals_raw = row.get("referrals", "[]")
+    if isinstance(referrals_raw, str):
+        try:
+            referrals_raw = json.loads(referrals_raw)
+        except (json.JSONDecodeError, TypeError):
+            referrals_raw = []
     return {
         "pdf_paid": row.get("paid", False),
         "free_used": row.get("count", 0),
@@ -84,14 +107,23 @@ def _row_to_user(row: dict) -> dict:
         "created_at": row.get("created_at", ""),
         "total_checks": row.get("total_checks", 0),
         "email": row.get("email", ""),
-        "balance": 0,
-        "vip": False,
-        "ref_code": "",
-        "referrals": [],
+        "balance": row.get("balance", 0),
+        "vip": row.get("vip", False),
+        "ref_code": row.get("ref_code", ""),
+        "referrals": referrals_raw if isinstance(referrals_raw, list) else [],
+        "last_paid_at": row.get("last_paid_at", 0),
+        "last_activity": row.get("last_activity", 0),
         "filter_furnished": row.get("filter_furnished", False),
         "filter_pets": row.get("filter_pets", False),
         "filter_parking": row.get("filter_parking", False),
         "work_address": row.get("work_address", ""),
+        "vip_criteria": row.get("vip_criteria", ""),
+        "pdf_state": row.get("pdf_state", ""),
+        "pdf_started_at": row.get("pdf_started_at", 0),
+        "vip_state": row.get("vip_state", ""),
+        "profile_state": row.get("profile_state", ""),
+        "timezone": row.get("timezone", ""),
+        "last_letter": row.get("last_letter", ""),
     }
 
 

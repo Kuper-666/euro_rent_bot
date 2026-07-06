@@ -11,8 +11,7 @@ from datetime import datetime
 from urllib.parse import unquote
 from io import BytesIO
 from telegram import (
-    Update, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+    Update, InlineKeyboardButton, InlineKeyboardMarkup
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
@@ -23,11 +22,16 @@ from groq import Groq
 from config import TELEGRAM_TOKEN, GROQ_API_KEY, WEBHOOK_URL, AFFILIATE_REVOLUT, AFFILIATE_WISE, FREE_LIMIT, PDF_PRICE, VIP_PRICE
 from messages import get_msg
 from storage import save_user, get_user
+from user_features import save_profile, get_profile
+from user_features import (
+    get_user_filters, save_user_filters,
+    remove_favorite, update_tracker_status, STATUSES,
+)
 from utils import (
     load_data, save_data, get_lang, get_user_data,
     can_use, use_check, is_url, fetch_url_text, ocr_from_photo,
     calc_remaining, check_rate_limit, sanitize_pdf_input,
-    is_pdf_state_expired, validate_pdf_data
+    is_pdf_state_expired, validate_pdf_data, expire_unlimited_if_needed
 )
 from pdf_generator import generate_mieterprofil_pdf
 from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
@@ -93,66 +97,6 @@ PENDING_FILE = "pending_listings.json"
 from rent_scanner.formatting import create_url_token, resolve_url_token
 
 
-def _load_pending_listings():
-    if os.path.exists(PENDING_FILE):
-        with open(PENDING_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
-
-def _save_pending_listings(data):
-    with open(PENDING_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def get_keyboard():
-    keyboard = [
-        [KeyboardButton("Старт"), KeyboardButton("Помощь"), KeyboardButton("Баланс")],
-        [KeyboardButton("PDF"), KeyboardButton("VIP"), KeyboardButton("Мой язык")],
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-
-
-def kb(update, chat_type=None):
-    """Reply-keyboard только в личке. В группе — None.
-    chat_type: override для случаев, когда update.effective_chat != целевой чат."""
-    if chat_type is None:
-        chat_type = update.effective_chat.type if update and update.effective_chat else None
-    if chat_type == "private":
-        return get_keyboard()
-    return None
-
-
-def get_analysis_inline_buttons():
-    keyboard = [
-        [
-            InlineKeyboardButton("📋 Скопировать перевод", callback_data="copy"),
-            InlineKeyboardButton("🔍 Ещё одно объявление", callback_data="new"),
-        ],
-        [
-            InlineKeyboardButton("📄 Получить PDF", callback_data="pdf"),
-            InlineKeyboardButton("🌐 Поделиться", callback_data="share"),
-        ],
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-
-def split_message(text: str, max_len: int = 4000) -> list:
-    if len(text) <= max_len:
-        return [text]
-    parts = []
-    while text:
-        if len(text) <= max_len:
-            parts.append(text)
-            break
-        cut = text.rfind("\n", 0, max_len)
-        if cut == -1:
-            cut = max_len
-        parts.append(text[:cut])
-        text = text[cut:].lstrip("\n")
-    return parts
-
-
 async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_text: str, user_id: str, lang: str) -> None:
     data = load_data()
     user = get_user_data(data, user_id)
@@ -179,7 +123,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         result = response.choices[0].message.content
 
         # Сохраняем URL для /favorite
-        _last_analyzed_url[user_id] = listing_text[:200] if is_url(listing_text) else listing_text[:200]
+        track_last_url(user_id, listing_text[:200])
 
         # Определяем город и цену для трендов
         city_key = detect_city(listing_text)
@@ -211,6 +155,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         else:
             # Атомарное обновление пользователя
             user = get_user(user_id)
+            expire_unlimited_if_needed(user)
             if not can_use(user):
                 ref_code = user.get("ref_code", "")
                 ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
@@ -261,7 +206,6 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                     except Exception:
                         pass
                     user.pop("referred_by", None)
-                save_data(data)
                 if user.get("free_used", 0) == 1:
                     ref_code = user.get("ref_code", "")
                     ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
@@ -372,6 +316,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         stale = [uid for uid, (_, ws) in _flood_tracker.items() if ws < cutoff]
         for uid in stale:
             del _flood_tracker[uid]
+        # Очистка greeting cooldown старше 2 часов
+        greeting_cutoff = now - 7200
+        stale_greetings = [uid for uid, ts in _greeting_cooldown.items() if ts < greeting_cutoff]
+        for uid in stale_greetings:
+            del _greeting_cooldown[uid]
 
     count, window_start = _flood_tracker.get(user_id, (0, now))
     if now - window_start > 60:
@@ -457,7 +406,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user.pop("profile_state", None)
         save_user(user_id, user)
         lines = [line.strip() for line in update.message.text.strip().split("\n") if line.strip()]
-        fields = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets"]
+        fields = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets", "rental_duration", "preferred_letter_lang"]
         profile_data = {}
         for i, field in enumerate(fields):
             if i < len(lines):
@@ -477,13 +426,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     if not can_use(user):
-        ref_code = user.get("ref_code", "")
-        ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
-        await update.message.reply_text(
-            get_msg(lang, "limit_reached").format(ref_link),
-            reply_markup=kb(update)
-        )
-        return
+        expire_unlimited_if_needed(user)
+        if not can_use(user):
+            ref_code = user.get("ref_code", "")
+            ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+            await update.message.reply_text(
+                get_msg(lang, "limit_reached").format(ref_link),
+                reply_markup=kb(update)
+            )
+            return
 
     user_text = update.message.text
 
@@ -547,15 +498,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = get_user_data(data, user_id)
 
     if not can_use(user):
-        ref_code = user.get("ref_code", "")
-        ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
-        await update.message.reply_text(
-            get_msg(lang, "limit_reached").format(ref_link),
-            reply_markup=kb(update)
-        )
-        return
-
-    save_data(data)
+        expire_unlimited_if_needed(user)
+        if not can_use(user):
+            ref_code = user.get("ref_code", "")
+            ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
+            await update.message.reply_text(
+                get_msg(lang, "limit_reached").format(ref_link),
+                reply_markup=kb(update)
+            )
+            return
 
     allowed, wait = check_rate_limit(user_id)
     if not allowed:
@@ -575,6 +526,19 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not listing_text or listing_text.startswith("ERROR"):
         await update.message.reply_text("❌ Не удалось распознать текст. Попробуйте отправить текст или ссылку.", reply_markup=kb(update))
         return
+
+    # Проверка фильтра города
+    user_city = get_user_city(user_id)
+    if user_city:
+        detected = detect_city(listing_text)
+        if detected and detected != user_city:
+            user_city_info = POPULAR_CITIES.get(user_city, {})
+            city_name = user_city_info.get("name", user_city)
+            await update.message.reply_text(
+                get_msg(lang, "city_filter_skip").format(user_city=city_name),
+                reply_markup=kb(update),
+            )
+            return
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     try:
@@ -714,24 +678,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif data_prefix == "filter":
             filter_type = query.data.split(":")[1] if ":" in query.data else ""
             if filter_type in ("furnished", "pets", "parking"):
-                filters = get_user_filters(user_id)
+                user_filters = get_user_filters(user_id)
                 field = f"filter_{filter_type}"
-                new_val = not filters.get(field, False)
-                filters[field] = new_val
+                new_val = not user_filters.get(field, False)
+                user_filters[field] = new_val
                 save_user_filters(
                     user_id,
-                    furnished=filters.get("filter_furnished", False),
-                    pets=filters.get("filter_pets", False),
-                    parking=filters.get("filter_parking", False),
+                    furnished=user_filters.get("filter_furnished", False),
+                    pets=user_filters.get("filter_pets", False),
+                    parking=user_filters.get("filter_parking", False),
                 )
                 icon = "✅" if new_val else "❌"
                 label = {"furnished": "Мебель", "pets": "Питомцы", "parking": "Парковка"}[filter_type]
                 await query.answer(f"{label}: {icon}", show_alert=False)
                 # Обновляем клавиатуру
-                filters = get_user_filters(user_id)
-                furnished = "✅" if filters.get("filter_furnished") else "❌"
-                pets_f = "✅" if filters.get("filter_pets") else "❌"
-                parking = "✅" if filters.get("filter_parking") else "❌"
+                user_filters = get_user_filters(user_id)
+                furnished = "✅" if user_filters.get("filter_furnished") else "❌"
+                pets_f = "✅" if user_filters.get("filter_pets") else "❌"
+                parking = "✅" if user_filters.get("filter_parking") else "❌"
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton(f"🪑 Мебель: {furnished}", callback_data="filter:furnished")],
                     [InlineKeyboardButton(f"🐾 Питомцы: {pets_f}", callback_data="filter:pets")],
@@ -758,6 +722,94 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     await query.answer(f"Статус: {STATUSES.get(new_status, new_status)}", show_alert=False)
                 else:
                     await query.answer("Ошибка", show_alert=True)
+
+        # Кнопка "Письмо" после анализа
+        elif data_prefix == "gen_letter":
+            profile = get_profile(user_id)
+            filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
+            if filled < 2:
+                await context.bot.send_message(
+                    chat_id=int(user_id),
+                    text="📝 Для генерации письма заполните профиль.\n\nИспользуйте: /set_profile",
+                )
+            else:
+                last_url = get_last_url(user_id)
+                if not last_url:
+                    await context.bot.send_message(
+                        chat_id=int(user_id),
+                        text="📝 Сначала проанализируйте объявление, потом /generate_letter.",
+                    )
+                else:
+                    await context.bot.send_message(chat_id=int(user_id), text="📝 Генерирую письмо...")
+                    letter_lang = profile.get("preferred_letter_lang", "")
+                    if letter_lang not in ("de", "en"):
+                        letter_lang = "de" if lang in ("ru", "de") else "en"
+                    letter = generate_letter(profile, last_url, lang=letter_lang)
+                    if letter:
+                        keyboard = InlineKeyboardMarkup([
+                            [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
+                            [InlineKeyboardButton("📄 Скачать PDF", callback_data="pdf_letter")],
+                        ])
+                        await context.bot.send_message(
+                            chat_id=int(user_id),
+                            text=f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{letter}",
+                            reply_markup=keyboard, parse_mode="HTML",
+                        )
+                        user = get_user(user_id)
+                        user["last_letter"] = letter
+                        save_user(user_id, user)
+                    else:
+                        await context.bot.send_message(
+                            chat_id=int(user_id),
+                            text="❌ Не удалось сгенерировать письмо. Попробуйте позже.",
+                        )
+
+        # Кнопка "В избранное"
+        elif data_prefix == "fav_save":
+            from handlers.user_features import get_last_url
+            last_url = get_last_url(user_id)
+            if last_url:
+                from user_features import add_favorite
+                ok = add_favorite(user_id, last_url, title="Из анализа")
+                if ok:
+                    await query.answer("⭐ Добавлено в избранное!", show_alert=False)
+                else:
+                    await query.answer("Ошибка", show_alert=True)
+            else:
+                await query.answer("Нет объявления для сохранения", show_alert=True)
+
+        # Кнопка "Копировать письмо"
+        elif data_prefix == "copy_letter":
+            await query.answer("Скопируйте текст выше", show_alert=True)
+
+        # Кнопка "PDF письма"
+        elif data_prefix == "pdf_letter":
+            from handlers.user_features import get_last_url
+            from user_features import get_profile
+            profile = get_profile(user_id)
+            last_letter = get_user(user_id).get("last_letter", "")
+            if last_letter:
+                from pdf_generator import generate_mieterprofil_pdf
+                pdf_data = {
+                    "name": profile.get("full_name", ""),
+                    "dob": "",
+                    "phone": "",
+                    "email": "",
+                    "address": "",
+                    "employer": profile.get("employer", ""),
+                    "income": profile.get("income", ""),
+                    "occupants": profile.get("occupants", ""),
+                }
+                pdf_bytes = generate_mieterprofil_pdf(pdf_data, cover_letter=last_letter)
+                from io import BytesIO
+                await context.bot.send_document(
+                    chat_id=int(user_id),
+                    document=BytesIO(pdf_bytes),
+                    filename="Cover_Letter_Mieterprofil.pdf",
+                    caption="📄 Письмо + Mieterprofil PDF",
+                )
+            else:
+                await query.answer("Сначала сгенерируйте письмо", show_alert=True)
 
     except Exception as e:
         logger.error(f"handle_callback error: {e}", exc_info=True)
@@ -1158,15 +1210,15 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
 
     bot_username = context.bot.username
 
-    is_url = text.strip().startswith(("http://", "https://", "t.me/"))
+    has_url = text.strip().startswith(("http://", "https://", "t.me/"))
     is_long_text = len(text.strip()) > 30
 
-    if not is_url and not is_long_text:
+    if not has_url and not is_long_text:
         return
 
     lang = get_lang(update)
 
-    if is_url:
+    if has_url:
         listing_url = text.strip().split()[0]
         token = create_url_token(listing_url)
         keyboard = InlineKeyboardMarkup([
@@ -1284,10 +1336,6 @@ async def unsubscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # НОВЫЕ ФИЧИ: Избранное, Трекер, Профиль, Фильтры, Письмо
 # ═══════════════════════════════════════════════════════════════
 
-# Временное хранилище последнего проанализированного URL для текущего пользователя
-_last_analyzed_url = {}
-
-
 # ── Трекер заявок ──────────────────────────────────────────────
 
 # ── Профиль (для писем) ────────────────────────────────────────
@@ -1385,7 +1433,6 @@ if __name__ == "__main__":
     logging.info("Flask started in background")
 
     # Передаём bot в scheduler ДО запуска polling
-    from scheduler import set_bot
     set_bot(application.bot)
 
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
