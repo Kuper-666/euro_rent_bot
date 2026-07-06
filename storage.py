@@ -5,36 +5,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 DATA_FILE = "users_data.json"
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_TABLE = "Users"
 
-_supabase = None
 _storage_mode = None
 
 
 def _get_mode():
     global _storage_mode
     if _storage_mode is None:
-        if SUPABASE_URL and SUPABASE_KEY:
+        if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_KEY"):
             _storage_mode = "supabase"
-            logger.info("Using Supabase for storage")
         else:
             _storage_mode = "json"
-            logger.warning("Supabase not configured, using JSON file (NOT SAFE FOR PRODUCTION)")
+            logger.warning("Supabase not configured, using JSON file")
     return _storage_mode
 
 
 def _get_supabase():
-    global _supabase
-    if _supabase is None:
-        from supabase import create_client
-        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    return _supabase
+    from services.supabase_client import get_supabase
+    return get_supabase()
 
 
-# Алиас для обратной совместимости с импортами из handlers
+# Алиас для обратной совместимости
 _get_sb = _get_supabase
 
 

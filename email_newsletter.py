@@ -49,7 +49,27 @@ bot = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
+def _get_sb():
+    """Возвращает Supabase client или None."""
+    try:
+        from services.supabase_client import get_supabase
+        return get_supabase()
+    except Exception:
+        return None
+
+
+SUBSCRIBERS_TABLE = "EmailSubscribers"
+
+
 def get_email_subscribers() -> list[dict]:
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(SUBSCRIBERS_TABLE).select("*").execute()
+            return result.data or []
+        except Exception as e:
+            logger.debug("Supabase get_email_subscribers failed: %s", e)
+    # Fallback: локальный JSON
     subscribers_file = "email_subscribers.json"
     if os.path.exists(subscribers_file):
         with open(subscribers_file, "r", encoding="utf-8") as f:
@@ -58,6 +78,26 @@ def get_email_subscribers() -> list[dict]:
 
 
 def save_email_subscribers(subscribers: list[dict]):
+    sb = _get_sb()
+    if sb:
+        try:
+            for s in subscribers:
+                result = sb.table(SUBSCRIBERS_TABLE).select("id").eq("email", s["email"]).limit(1).execute()
+                if result.data:
+                    sb.table(SUBSCRIBERS_TABLE).update({
+                        "active": s.get("active", True),
+                        "user_id": s.get("user_id", ""),
+                    }).eq("email", s["email"]).execute()
+                else:
+                    sb.table(SUBSCRIBERS_TABLE).insert({
+                        "email": s["email"],
+                        "user_id": s.get("user_id", ""),
+                        "active": s.get("active", True),
+                    }).execute()
+            return
+        except Exception as e:
+            logger.debug("Supabase save_email_subscribers failed: %s", e)
+    # Fallback: локальный JSON
     with open("email_subscribers.json", "w", encoding="utf-8") as f:
         json.dump(subscribers, f, ensure_ascii=False, indent=2)
 
@@ -66,6 +106,21 @@ def add_email_subscriber(email: str, user_id: str) -> bool:
     if not re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$', email):
         logger.warning(f"Invalid email rejected: {email}")
         return False
+    sb = _get_sb()
+    if sb:
+        try:
+            existing = sb.table(SUBSCRIBERS_TABLE).select("id").eq("email", email).limit(1).execute()
+            if existing.data:
+                return False
+            sb.table(SUBSCRIBERS_TABLE).insert({
+                "email": email,
+                "user_id": user_id,
+                "active": True,
+            }).execute()
+            return True
+        except Exception as e:
+            logger.debug("Supabase add_email_subscriber failed: %s", e)
+    # Fallback: локальный JSON
     subscribers = get_email_subscribers()
     for s in subscribers:
         if s["email"] == email:
@@ -81,6 +136,14 @@ def add_email_subscriber(email: str, user_id: str) -> bool:
 
 
 def remove_email_subscriber(email: str) -> bool:
+    sb = _get_sb()
+    if sb:
+        try:
+            sb.table(SUBSCRIBERS_TABLE).update({"active": False}).eq("email", email).execute()
+            return True
+        except Exception as e:
+            logger.debug("Supabase remove_email_subscriber failed: %s", e)
+    # Fallback: локальный JSON
     subscribers = get_email_subscribers()
     for s in subscribers:
         if s["email"] == email:
@@ -91,6 +154,13 @@ def remove_email_subscriber(email: str) -> bool:
 
 
 def get_active_subscribers() -> list[dict]:
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(SUBSCRIBERS_TABLE).select("*").eq("active", True).execute()
+            return result.data or []
+        except Exception as e:
+            logger.debug("Supabase get_active_subscribers failed: %s", e)
     return [s for s in get_email_subscribers() if s.get("active", True)]
 
 

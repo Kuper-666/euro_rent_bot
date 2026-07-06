@@ -98,3 +98,67 @@ DO $$ BEGIN
     CREATE POLICY "Service role full access on UserCities" ON "UserCities" FOR ALL USING (auth.role() = 'service_role');
   END IF;
 END $$;
+
+-- ══════════════════════════════════════════════════════════════
+-- НОВЫЕ ТАБЛИЦЫ (миграция из локальных JSON)
+-- ══════════════════════════════════════════════════════════════
+
+-- Email subscribers
+CREATE TABLE IF NOT EXISTS "EmailSubscribers" (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  user_id TEXT DEFAULT '',
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "EmailSubscribers" ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role full access on EmailSubscribers' AND tablename = 'EmailSubscribers') THEN
+    CREATE POLICY "Service role full access on EmailSubscribers" ON "EmailSubscribers" FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;
+
+-- Posted listings (для дедупликации постов в канал)
+CREATE TABLE IF NOT EXISTS "PostedListings" (
+  id SERIAL PRIMARY KEY,
+  url TEXT UNIQUE NOT NULL,
+  title TEXT DEFAULT '',
+  city TEXT DEFAULT '',
+  posted_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "PostedListings" ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role full access on PostedListings' AND tablename = 'PostedListings') THEN
+    CREATE POLICY "Service role full access on PostedListings" ON "PostedListings" FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;
+
+-- Referral events (лог реферальных событий)
+CREATE TABLE IF NOT EXISTS "ReferralEvents" (
+  id SERIAL PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  extra JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "ReferralEvents" ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role full access on ReferralEvents' AND tablename = 'ReferralEvents') THEN
+    CREATE POLICY "Service role full access on ReferralEvents" ON "ReferralEvents" FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;
+
+-- PendingListings (для daily_poster)
+CREATE TABLE IF NOT EXISTS "PendingListings" (
+  id SERIAL PRIMARY KEY,
+  short_id TEXT UNIQUE NOT NULL,
+  url TEXT NOT NULL,
+  title TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE "PendingListings" ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role full access on PendingListings' AND tablename = 'PendingListings') THEN
+    CREATE POLICY "Service role full access on PendingListings" ON "PendingListings" FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;

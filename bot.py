@@ -77,13 +77,33 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 REFERRAL_LOG = "referral_events.jsonl"
+REFERRAL_TABLE = "ReferralEvents"
 
 
 def log_referral_event(event_type: str, user_id: str, extra: dict = None):
+    """Логирует реферальное событие в Supabase или JSONL."""
     import time as _time
-    entry = {"ts": _time.time(), "type": event_type, "user_id": user_id}
+    ts = _time.time()
+    entry = {"ts": ts, "type": event_type, "user_id": user_id}
     if extra:
         entry.update(extra)
+
+    # Пробуем Supabase
+    try:
+        from services.supabase_client import get_supabase
+        sb = get_supabase()
+        if sb:
+            sb.table(REFERRAL_TABLE).insert({
+                "event_type": event_type,
+                "user_id": user_id,
+                "extra": json.dumps(extra or {}),
+                "created_at": datetime.now().isoformat(),
+            }).execute()
+            return
+    except Exception:
+        pass
+
+    # Fallback: локальный JSONL
     try:
         with open(REFERRAL_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")

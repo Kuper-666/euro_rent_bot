@@ -26,12 +26,8 @@ _TABLE_CITIES = "UserCities"
 def _get_sb():
     """Возвращает Supabase client или None."""
     try:
-        import dns_fix  # noqa
-        from supabase import create_client
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        if url and key:
-            return create_client(url, key)
+        from services.supabase_client import get_supabase
+        return get_supabase()
     except Exception as e:
         logger.debug("Supabase not available: %s", e)
     return None

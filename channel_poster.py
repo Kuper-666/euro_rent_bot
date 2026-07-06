@@ -69,7 +69,29 @@ bot = Bot(token=TELEGRAM_TOKEN) if TELEGRAM_TOKEN else None
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
+POSTED_TABLE = "PostedListings"
+
+
+def _get_sb():
+    """Возвращает Supabase client или None."""
+    try:
+        from services.supabase_client import get_supabase
+        return get_supabase()
+    except Exception:
+        return None
+
+
 def load_posted():
+    """Загружает список опубликованных URL из Supabase или JSON."""
+    sb = _get_sb()
+    if sb:
+        try:
+            result = sb.table(POSTED_TABLE).select("url").execute()
+            urls = [r["url"] for r in (result.data or [])]
+            return {"urls": urls, "last_run": ""}
+        except Exception as e:
+            logger.debug("Supabase load_posted failed: %s", e)
+    # Fallback: локальный JSON
     if os.path.exists(POSTED_FILE):
         with open(POSTED_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -77,6 +99,20 @@ def load_posted():
 
 
 def save_posted(data):
+    """Сохраняет URL в Supabase или JSON."""
+    sb = _get_sb()
+    if sb:
+        try:
+            # Сохраняем только новые URL (без дубликатов)
+            for url in data["urls"][-MAX_POSTED_HISTORY:]:
+                try:
+                    sb.table(POSTED_TABLE).insert({"url": url}).execute()
+                except Exception:
+                    pass  # Уже существует (UNIQUE constraint)
+            return
+        except Exception as e:
+            logger.debug("Supabase save_posted failed: %s", e)
+    # Fallback: локальный JSON
     data["urls"] = data["urls"][-MAX_POSTED_HISTORY:]
     with open(POSTED_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
