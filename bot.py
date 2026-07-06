@@ -867,28 +867,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
                 listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
+                    # Парсер не смог загрузить — предлагаем скопировать текст
                     await update.message.reply_text(
-                        "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
-                        "Скопируйте текст объявления и отправьте его сюда.",
+                        f"❌ Не удалось загрузить страницу автоматически.\n\n"
+                        f"📋 Ссылка: {url}\n\n"
+                        f"Скопируйте текст объявления с сайта и отправьте его сюда — я проанализирую!",
                         reply_markup=kb(update)
                     )
                     return
                 try:
                     await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
                 except Exception as e:
-                    logging.error(f"process_listing (start token) error for user {user_id}: {e}")
+                    logging.error("process_listing (start token) error for user %s: %s", user_id, e)
                     try:
                         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
                     except Exception:
                         pass
                 return
             else:
-                # Токен не найден — показываем приветствие вместо ошибки
-                logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
-                if os.path.exists(logo_path):
-                    with open(logo_path, "rb") as photo:
-                        await update.message.reply_photo(photo=photo)
-                await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
+                # Токен не найден — показываем приветствие с подсказкой
+                await update.message.reply_text(
+                    "👋 Добро пожаловать!\n\n"
+                    "Отправьте мне ссылку на объявление или текст — я проанализирую за 5 секунд!\n\n"
+                    "Примеры:\n"
+                    "• https://www.immowelt.de/expose/...\n"
+                    "• Текст объявления на любом языке",
+                    reply_markup=kb(update)
+                )
                 return
         elif payload.startswith("analyze_"):
             # Старый формат: полный URL (для обратной совместимости)
@@ -901,8 +906,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
                     await update.message.reply_text(
-                        "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
-                        "Скопируйте текст объявления и отправьте его сюда.",
+                        f"❌ Не удалось загрузить страницу автоматически.\n\n"
+                        f"📋 Ссылка: {url}\n\n"
+                        f"Скопируйте текст объявления с сайта и отправьте его сюда — я проанализирую!",
                         reply_markup=kb(update)
                     )
                     return
