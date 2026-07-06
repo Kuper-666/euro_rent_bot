@@ -659,6 +659,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             save_data(data_dict)
             lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
             await query.answer(f"Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
+            # Отправляем сообщение на новом языке
+            await context.bot.send_message(
+                chat_id=int(user_id),
+                text=f"✅ {get_msg(new_lang, 'start')[:200]}...",
+                reply_markup=kb(update, chat_type="private"),
+            )
 
         # Кнопка "Поделиться"
         elif data_prefix == "share":
