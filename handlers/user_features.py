@@ -327,6 +327,65 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
         return
 
 
+# ── Ответ арендодателю ────────────────────────────────────────
+
+async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Генерирует ответ на сообщение арендодателю."""
+    user_id = str(update.effective_user.id)
+    profile = get_profile(user_id)
+
+    filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
+    if filled < 2:
+        await update.message.reply_text(
+            "📝 Для генерации ответа заполните профиль.\n\n"
+            "Используйте: /set_profile",
+            reply_markup=kb(update)
+        )
+        return
+
+    if context.args:
+        landlord_message = " ".join(context.args)
+    else:
+        last_url = get_last_url(user_id)
+        if last_url:
+            landlord_message = last_url
+        else:
+            await update.message.reply_text(
+                "💬 /reply сообщение_арендодателя\n\n"
+                "Ответьте на сообщение арендодателя или пришлите текст объявления.",
+                reply_markup=kb(update)
+            )
+            return
+
+    await update.message.reply_text("💬 Генерирую ответ...", reply_markup=kb(update))
+
+    lang = get_lang(update)
+    reply_lang = profile.get("preferred_letter_lang", "")
+    if reply_lang not in ("de", "en"):
+        reply_lang = "de" if lang in ("ru", "de") else "en"
+
+    from reply_generator import generate_reply
+    reply_text = generate_reply(profile, landlord_message, lang=reply_lang)
+
+    if reply_text:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
+        ])
+        await update.message.reply_text(
+            f"💬 <b>Ответ арендодателю ({reply_lang.upper()}):</b>\n\n{reply_text}",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        user = get_user(user_id)
+        user["last_letter"] = reply_text
+        save_user(user_id, user)
+    else:
+        await update.message.reply_text(
+            "❌ Не удалось сгенерировать ответ. Попробуйте позже.",
+            reply_markup=kb(update)
+        )
+
+
 # ── Алерты ─────────────────────────────────────────────────────
 
 async def subscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

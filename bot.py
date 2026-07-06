@@ -40,7 +40,7 @@ from handlers.user_features import (
     favorite_command, favorites_command,
     track_command, mytracks_command, track_status_command,
     set_profile_command, skip_profile_command, profile_command,
-    filters_command, set_work_address_command, generate_letter_command,
+    filters_command, set_work_address_command, generate_letter_command, reply_command,
     subscribe_alert_command, unsubscribe_alert_command, my_alerts_command,
     handle_profile_state, track_last_url, get_last_url,
 )
@@ -1401,6 +1401,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("filters", filters_command, priv))
     application.add_handler(CommandHandler("set_work_address", set_work_address_command, priv))
     application.add_handler(CommandHandler("generate_letter", generate_letter_command, priv))
+    application.add_handler(CommandHandler("reply", reply_command, priv))
     application.add_handler(CommandHandler("subscribe_alert", subscribe_alert_command, priv))
     application.add_handler(CommandHandler("unsubscribe_alert", unsubscribe_alert_command, priv))
     application.add_handler(CommandHandler("my_alerts", my_alerts_command, priv))
