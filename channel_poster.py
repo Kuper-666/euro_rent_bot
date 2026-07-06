@@ -55,8 +55,6 @@ SCAN_CITIES = {
     "berlin": 2000,
     "munich": 2500,
     "hamburg": 2000,
-    "amsterdam": 2500,
-    "london": 3000,
 }
 
 CHANNEL_SYSTEM_PROMPT = (
