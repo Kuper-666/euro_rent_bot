@@ -16,9 +16,14 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.errors import FloodWaitError
+
 logger = logging.getLogger(__name__)
 
 CHANNELS_FILE = os.path.join(os.path.dirname(__file__), "channels.json")
+SUBSCRIBED_FILE = os.path.join(os.path.dirname(__file__), "subscribed_channels.json")
+MAX_AUTO_SUBS_PER_DAY = 5
 
 
 def _load_channels() -> dict:
@@ -27,6 +32,30 @@ def _load_channels() -> dict:
         with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {"channels": [], "scan_keywords": [], "price_patterns": [], "exclude_keywords": []}
+
+
+def _load_subscribed() -> dict:
+    """Загружает список подписанных каналов."""
+    if os.path.exists(SUBSCRIBED_FILE):
+        with open(SUBSCRIBED_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"subscribed": [], "last_reset": ""}
+
+
+def _save_subscribed(data: dict):
+    """Сохраняет список подписанных каналов."""
+    with open(SUBSCRIBED_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _reset_daily_counter():
+    """Сбрасывает счётчик подписок при смене дня."""
+    data = _load_subscribed()
+    today = datetime.now(timezone.utc).date().isoformat()
+    if data.get("last_reset") != today:
+        data["subscribed_today"] = 0
+        data["last_reset"] = today
+        _save_subscribed(data)
 
 
 def _is_rental_listing(text: str, keywords: list, exclude: list) -> bool:
@@ -103,14 +132,38 @@ async def scan_channel(client, channel, keywords: list, price_patterns: list, ex
 
 
 async def auto_subscribe(client, channel_username: str) -> bool:
-    """Подписывается на канал, если ещё не подписан."""
+    """Подписывается на канал с лимитом 5 подписок в день."""
+    _reset_daily_counter()
+    data = _load_subscribed()
+
+    # Проверяем лимит
+    if data.get("subscribed_today", 0) >= MAX_AUTO_SUBS_PER_DAY:
+        logger.info("Daily subscribe limit reached (%d)", MAX_AUTO_SUBS_PER_DAY)
+        return False
+
+    # Проверяем, не подписаны ли уже
+    if channel_username in data.get("subscribed", []):
+        return True
+
     try:
         entity = await client.get_entity(channel_username)
-        await client(SubscribeRequest(entity))
+        await client(JoinChannelRequest(entity))
         logger.info("Subscribed to %s", channel_username)
+
+        # Сохраняем
+        if channel_username not in data.get("subscribed", []):
+            data.setdefault("subscribed", []).append(channel_username)
+        data["subscribed_today"] = data.get("subscribed_today", 0) + 1
+        _save_subscribed(data)
         return True
+    except FloodWaitError as e:
+        logger.warning("Flood wait on subscribe to %s: %ds", channel_username, e.seconds)
+        return False
     except Exception as e:
-        logger.warning("Failed to subscribe to %s: %s", channel_username, e)
+        if "private" in str(e).lower() or "channel" in str(e).lower():
+            logger.warning("Channel %s is private or inaccessible", channel_username)
+        else:
+            logger.warning("Failed to subscribe to %s: %s", channel_username, e)
         return False
 
 
@@ -118,6 +171,7 @@ async def check_subscription(client, channel_username: str) -> bool:
     """Проверяет, подписан ли клиент на канал."""
     try:
         entity = await client.get_entity(channel_username)
+        # Если можем получить entity — канал доступен
         return True
     except Exception:
         return False
@@ -144,24 +198,41 @@ def match_listing_to_subscribers(listing: dict, subscribers: list[dict]) -> list
 
 
 async def run_channel_scan(client, bot_client=None) -> dict:
-    """Запускает полное сканирование всех каналов."""
+    """Запускает полное сканирование всех каналов с автоподпиской."""
     config = _load_channels()
     channels = config.get("channels", [])
     keywords = config.get("scan_keywords", [])
     price_patterns = config.get("price_patterns", [])
     exclude = config.get("exclude_keywords", [])
 
-    stats = {"channels_scanned": 0, "listings_found": 0, "alerts_sent": 0}
+    stats = {
+        "channels_scanned": 0,
+        "listings_found": 0,
+        "alerts_sent": 0,
+        "auto_subscribed": 0,
+    }
 
     for channel in channels:
         if not channel.get("active", True):
             continue
 
+        username = channel.get("username", "")
+        if not username:
+            continue
+
+        # Автоподписка если ещё не подписаны
+        subscribed = await check_subscription(client, username)
+        if not subscribed:
+            if await auto_subscribe(client, username):
+                stats["auto_subscribed"] += 1
+                await asyncio.sleep(3)  # Задержка после подписки
+
+        # Сканирование
         listings = await scan_channel(client, channel, keywords, price_patterns, exclude)
         stats["channels_scanned"] += 1
         stats["listings_found"] += len(listings)
 
-        # Сохраняем объявления и отправляем алерты
+        # Обработка объявлений
         for listing in listings:
             await _process_listing(listing, bot_client)
             stats["alerts_sent"] += 1
