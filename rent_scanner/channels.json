@@ -1,40 +1,41 @@
 {
   "channels": [
-    {"name": "Berlin Apartments", "username": "berlin_apartments", "city": "berlin", "lang": "de", "active": true},
+    {"name": "Berlin Immobilien", "username": "immomessengerberlin", "city": "berlin", "lang": "de", "active": true},
     {"name": "Wohnung Berlin", "username": "wohnung_berlin", "city": "berlin", "lang": "de", "active": true},
+    {"name": "Berlin Apartments", "username": "berlin_apartments", "city": "berlin", "lang": "en", "active": true},
     {"name": "Berlin Rent", "username": "berlin_rent", "city": "berlin", "lang": "en", "active": true},
-    {"name": "Berlin Expats", "username": "berlin_expats", "city": "berlin", "lang": "en", "active": true},
     {"name": "Muenchen Wohnungen", "username": "muenchen_wohnungen", "city": "munich", "lang": "de", "active": true},
-    {"name": "Munich Apartments", "username": "munich_apartments", "city": "munich", "lang": "en", "active": true},
     {"name": "Hamburg Wohnungen", "username": "hamburg_wohnungen", "city": "hamburg", "lang": "de", "active": true},
-    {"name": "Hamburg Apartments", "username": "hamburg_apartments", "city": "hamburg", "lang": "en", "active": true},
-    {"name": "Wien Wohnungen", "username": "wien_wohnungen", "city": "vienna", "lang": "de", "active": true},
-    {"name": "Vienna Apartments", "username": "vienna_apartments", "city": "vienna", "lang": "en", "active": true},
-    {"name": "Amsterdam Apartments", "username": "amsterdam_apartments", "city": "amsterdam", "lang": "en", "active": true},
-    {"name": "Pararius Updates", "username": "pararius_updates", "city": "amsterdam", "lang": "nl", "active": true},
-    {"name": "London Flats", "username": "london_flats", "city": "london", "lang": "en", "active": true},
-    {"name": "Rightmove Updates", "username": "rightmove_updates", "city": "london", "lang": "en", "active": true},
-    {"name": "Prague Apartments", "username": "prague_apartments", "city": "prague", "lang": "en", "active": true},
-    {"name": "Warsaw Rentals", "username": "warsaw_rentals", "city": "warsaw", "lang": "pl", "active": true},
-    {"name": "Barcelona Apartments", "username": "barcelona_apartments", "city": "barcelona", "lang": "es", "active": true},
-    {"name": "Paris Apartments", "username": "paris_apartments", "city": "paris", "lang": "fr", "active": true}
+    {"name": "ExpatRent Community", "username": "ExpatRent_Community", "city": "berlin", "lang": "ru", "active": true},
+    {"name": "Milano Affitto", "username": "appartamentiaffittoMilano", "city": "milan", "lang": "it", "active": true},
+    {"name": "Roma Affitto", "username": "appartamentiRoma_SBG", "city": "rome", "lang": "it", "active": true},
+    {"name": "Praha Pronajem", "username": "pronajem_bydleni_praha", "city": "prague", "lang": "cs", "active": true},
+    {"name": "Praha Arenda", "username": "arendaprahacesko", "city": "prague", "lang": "cs", "active": true},
+    {"name": "London Rentals", "username": "SpacesLondon", "city": "london", "lang": "en", "active": true},
+    {"name": "London Rent Hub", "username": "LondonRentHub", "city": "london", "lang": "en", "active": true},
+    {"name": "Warszawa Mieszkania", "username": "moreEtate", "city": "warsaw", "lang": "pl", "active": true},
+    {"name": "Warszawa Arenda", "username": "rentapartaments_waw", "city": "warsaw", "lang": "pl", "active": true}
   ],
   "scan_keywords": [
     "квартира", "аренда", "съем", "снять",
     "wohnung", "miete", "mieten", "zimmer",
     "apartment", "rent", "flat", "let",
     "appartement", "huur", "verhuur",
-    "apartamento", "alquiler", "alquiler",
-    "appartement", "location", "louer",
-    "€", "EUR", "eur", "muebles", "möbliert"
+    "apartamento", "alquiler",
+    "appartamento", "affitto",
+    "pronajem", "bydleni", "najem",
+    "mieszkanie", "wynajem", "pokoje",
+    "€", "EUR", "eur", "muebles", "möbliert",
+    "кв.м", "m²", "м²", "rooms", "Zimmer"
   ],
   "price_patterns": [
     "(\\d[\\d.,]*)\\s*(?:€|EUR|евро)",
     "(\\d[\\d.,]*)\\s*(?:pro\\s*Monat|monatlich|monthly|par\\s*mois)",
-    "(?:Kaltmiete|Warmmiete|rent|huur|alquiler|loyer):?\\s*(\\d[\\d.,]*)"
+    "(?:Kaltmiete|Warmmiete|rent|huur|alquiler|loyer|affitto):?\\s*(\\d[\\d.,]*)",
+    "(\\d[\\d.,]*)\\s*(?:PLN|zł|zlotych)"
   ],
   "exclude_keywords": [
     "купить", "продажа", "kaufen", "verkauf", "buy", "sale",
-    "вторичка", "novostroy", "new build"
+    "вторичка", "novostroy", "new build", "comprare", "vendita"
   ]
 }
