@@ -35,6 +35,7 @@ from utils import (
     is_pdf_state_expired, validate_pdf_data, expire_unlimited_if_needed
 )
 from pdf_generator import generate_mieterprofil_pdf
+from letter_generator import generate_letter
 from email_newsletter import add_email_subscriber, remove_email_subscriber, get_active_subscribers
 from services.keyboards import kb, get_keyboard, get_analysis_inline_buttons, split_message, _load_pending_listings, _save_pending_listings
 from handlers.user_features import (
@@ -66,7 +67,6 @@ from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
 
-_payment_lock = asyncio.Lock()
 _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
 _last_flood_cleanup = 0
@@ -786,7 +786,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "PDF письма"
         elif data_prefix == "pdf_letter":
             from handlers.user_features import get_last_url
-            from user_features import get_profile
             profile = get_profile(user_id)
             last_letter = get_user(user_id).get("last_letter", "")
             if last_letter:
