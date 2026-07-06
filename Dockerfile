@@ -19,5 +19,8 @@ COPY *.py .
 COPY templates/ templates/
 COPY icons/ icons/
 COPY rent_scanner/ rent_scanner/
+COPY services/ services/
+COPY handlers/ handlers/
+COPY web_scanner/ web_scanner/
 
 CMD ["python", "bot.py"]
