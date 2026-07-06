@@ -868,7 +868,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         pass
                 return
             else:
-                await update.message.reply_text("❌ Ссылка устарела. Отправьте объявление напрямую.", reply_markup=kb(update))
+                await update.message.reply_text(
+                    "❌ Ссылка не найдена или устарела.\n\n"
+                    "Отправьте ссылку на объявление или текст прямо сюда — я проанализирую!",
+                    reply_markup=kb(update)
+                )
                 return
         elif payload.startswith("analyze_"):
             # Старый формат: полный URL (для обратной совместимости)
