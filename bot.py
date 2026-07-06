@@ -868,11 +868,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         pass
                 return
             else:
-                await update.message.reply_text(
-                    "❌ Ссылка не найдена или устарела.\n\n"
-                    "Отправьте ссылку на объявление или текст прямо сюда — я проанализирую!",
-                    reply_markup=kb(update)
-                )
+                # Токен не найден — показываем приветствие вместо ошибки
+                logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
+                if os.path.exists(logo_path):
+                    with open(logo_path, "rb") as photo:
+                        await update.message.reply_photo(photo=photo)
+                await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
                 return
         elif payload.startswith("analyze_"):
             # Старый формат: полный URL (для обратной совместимости)
@@ -898,6 +899,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
                     except Exception:
                         pass
+                return
+            else:
+                # URL не валиден — показываем приветствие
+                logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
+                if os.path.exists(logo_path):
+                    with open(logo_path, "rb") as photo:
+                        await update.message.reply_photo(photo=photo)
+                await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
                 return
         elif payload.startswith("ref_"):
             ref_code = payload
