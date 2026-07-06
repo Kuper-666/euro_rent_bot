@@ -1,9 +1,13 @@
 """
 Парсеры для европейских порталов недвижимости.
-Поддержка: Immowelt (DE), WG-Gesucht (DE/EU), Rightmove (UK),
-           ImmoScout24 (DE), HousingAnywhere (EU).
+Поддержка: Immowelt (DE), WG-Gesucht (DE/EU), Rightmove (UK).
 
-Все парсеры используют HTML scraping с rotation User-Agent.
+Уровни обхода блокировок:
+1. User-Agent rotation (10+ вариантов)
+2. Сессии с куками
+3. Referer headers
+4. Rate limiting (задержки между запросами)
+5. Retry с exponential backoff
 """
 import os
 import re
@@ -15,30 +19,87 @@ from dataclasses import dataclass
 from typing import Optional
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
+# Расширенный пул User-Agent (10+ вариантов)
 USER_AGENTS = [
+    # Chrome Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    # Chrome Mac
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    # Firefox
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0",
+    # Safari
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    # Edge
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0",
+    # Linux Chrome
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    # Mobile
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
 ]
 
 REQUEST_TIMEOUT = 15
+MIN_DELAY = 1.0  # Минимальная задержка между запросами (сек)
+MAX_DELAY = 3.0  # Максимальная задержка
+
+# Глобальная сессия с retry и connection pooling
+_session = None
 
 
-def _headers(referer: str = "") -> dict:
+def _get_session():
+    """Возвращает кешированную сессию с retry."""
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retry, pool_maxsize=10)
+        _session.mount("http://", adapter)
+        _session.mount("https://", adapter)
+    return _session
+
+
+def _headers(referer: str = "", portal: str = "") -> dict:
+    """Генерирует заголовки с ротацией User-Agent и правильным Referer."""
     h = {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,de;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
     }
     if referer:
         h["Referer"] = referer
+        h["Sec-Fetch-Site"] = "same-origin"
+    elif portal:
+        # Автоматический Referer для портала
+        portal_domains = {
+            "immowelt": "https://www.immowelt.de/",
+            "wg-gesucht": "https://www.wg-gesucht.de/",
+            "rightmove": "https://www.rightmove.co.uk/",
+        }
+        if portal in portal_domains:
+            h["Referer"] = portal_domains[portal]
+            h["Sec-Fetch-Site"] = "same-origin"
     return h
+
+
+def _delay():
+    """Случайная задержка между запросами."""
+    time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
 
 
 @dataclass
@@ -53,13 +114,15 @@ class Listing:
     text: str
 
 
-def _safe_get(url: str, headers: dict = None, timeout: int = REQUEST_TIMEOUT) -> Optional[requests.Response]:
-    """GET с обработкой ошибок и ретраями."""
+def _safe_get(url: str, headers: dict = None, portal: str = "", timeout: int = REQUEST_TIMEOUT) -> Optional[requests.Response]:
+    """GET с session, retry, rate limiting."""
     if headers is None:
-        headers = _headers()
+        headers = _headers(portal=portal)
+    session = _get_session()
     for attempt in range(3):
         try:
-            r = requests.get(url, headers=headers, timeout=timeout)
+            _delay()
+            r = session.get(url, headers=headers, timeout=timeout)
             if r.status_code == 429:
                 wait = int(r.headers.get("Retry-After", 30))
                 logger.warning("Rate limited on %s, waiting %ds", url, wait)
@@ -97,8 +160,7 @@ def _parse_price(text: str) -> float:
 # ── Immowelt (DE) ──────────────────────────────────────────────
 
 def parse_immowelt(city: str = "berlin", max_price: int = 0) -> list[Listing]:
-    """Парсинг Immowelt через HTML scraping."""
-    # Immowelt использует немецкие названия городов
+    """Парсинг Immowelt через HTML scraping с sessions и rate limiting."""
     city_de_map = {
         "berlin": "berlin", "muenchen": "muenchen", "munich": "muenchen",
         "hamburg": "hamburg", "koeln": "koeln", "cologne": "koeln",
@@ -107,7 +169,7 @@ def parse_immowelt(city: str = "berlin", max_price: int = 0) -> list[Listing]:
     }
     city_slug = city_de_map.get(city.lower(), city.lower())
     url = f"https://www.immowelt.de/liste/{city_slug}/wohnungen/mieten"
-    r = _safe_get(url, _headers("https://www.immowelt.de/"))
+    r = _safe_get(url, portal="immowelt")
     if not r:
         return []
 
@@ -162,7 +224,7 @@ def parse_immowelt(city: str = "berlin", max_price: int = 0) -> list[Listing]:
 # ── WG-Gesucht (DE/EU) ────────────────────────────────────────
 
 def parse_wg_gesucht(city: str = "berlin", max_price: int = 0) -> list[Listing]:
-    """Парсинг WG-Gesucht (квартиры)."""
+    """Парсинг WG-Gesucht с sessions и rate limiting."""
     city_map = {
         "berlin": 8, "muenchen": 90, "munich": 90, "hamburg": 55,
         "koeln": 73, "cologne": 73, "frankfurt": 41, "stuttgart": 121,
@@ -170,7 +232,7 @@ def parse_wg_gesucht(city: str = "berlin", max_price: int = 0) -> list[Listing]:
     }
     city_id = city_map.get(city.lower(), 8)
     url = f"https://www.wg-gesucht.de/wohnungen-in-{city.title()}.{city_id}.2.1.0.html"
-    r = _safe_get(url, _headers("https://www.wg-gesucht.de/"))
+    r = _safe_get(url, portal="wg-gesucht")
     if not r:
         return []
 
@@ -238,10 +300,10 @@ def parse_wg_gesucht(city: str = "berlin", max_price: int = 0) -> list[Listing]:
 # ── Rightmove (UK) ────────────────────────────────────────────
 
 def parse_rightmove(city: str = "london", max_price: int = 0) -> list[Listing]:
-    """Парсинг Rightmove (HTML scraping)."""
+    """Парсинг Rightmove с sessions и rate limiting."""
     city_slug = city.lower().replace(" ", "-")
     url = f"https://www.rightmove.co.uk/property-to-rent/find.html?locationIdentifier=REGION%5E904&searchLocation={city_slug}"
-    r = _safe_get(url, _headers("https://www.rightmove.co.uk/"))
+    r = _safe_get(url, portal="rightmove")
     if not r:
         return []
 
