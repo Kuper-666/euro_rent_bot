@@ -24,20 +24,32 @@ def _save_pending_listings(data):
         json.dump(data, f, ensure_ascii=False)
 
 
-def get_keyboard():
+_KB_LABELS = {
+    "ru": {"start": "Старт", "help": "Помощь", "balance": "Баланс", "lang": "Мой язык"},
+    "uk": {"start": "Старт", "help": "Допомога", "balance": "Баланс", "lang": "Мова"},
+    "en": {"start": "Start", "help": "Help", "balance": "Balance", "lang": "My language"},
+    "de": {"start": "Start", "help": "Hilfe", "balance": "Guthaben", "lang": "Sprache"},
+    "pl": {"start": "Start", "help": "Pomoc", "balance": "Saldo", "lang": "Język"},
+}
+
+
+def get_keyboard(lang="ru"):
+    labels = _KB_LABELS.get(lang, _KB_LABELS["en"])
     keyboard = [
-        [KeyboardButton("Старт"), KeyboardButton("Помощь"), KeyboardButton("Баланс")],
-        [KeyboardButton("PDF"), KeyboardButton("VIP"), KeyboardButton("Мой язык")],
+        [KeyboardButton(labels["start"]), KeyboardButton(labels["help"]), KeyboardButton(labels["balance"])],
+        [KeyboardButton("PDF"), KeyboardButton("VIP"), KeyboardButton(labels["lang"])],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 
-def kb(update, chat_type=None):
+def kb(update, chat_type=None, lang=None):
     """Reply-keyboard только в личке."""
     if chat_type is None:
         chat_type = update.effective_chat.type if update and update.effective_chat else None
     if chat_type == "private":
-        return get_keyboard()
+        if lang is None:
+            lang = get_lang(update) if update else "en"
+        return get_keyboard(lang)
     return None
 
 

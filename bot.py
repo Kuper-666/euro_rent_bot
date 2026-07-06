@@ -353,12 +353,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     btn_map = {
         "старт": start, "start": start,
-        "помощь": help_command, "help": help_command,
+        "помощь": help_command, "help": help_command, "допомога": help_command, "hilfe": help_command, "pomoc": help_command,
         "оплата": pay_command, "pay": pay_command, "оплатить": pay_command,
         "pdf": pdf_command, "пдф": pdf_command,
         "vip": vip_command, "вип": vip_command,
-        "баланс": balance_command, "balance": balance_command,
-        "мой язык": lang_command, "my lang": lang_command,
+        "баланс": balance_command, "balance": balance_command, "guthaben": balance_command, "saldo": balance_command,
+        "мой язык": lang_command, "my lang": lang_command, "my language": lang_command, "мова": lang_command, "sprache": lang_command, "język": lang_command,
     }
     if text in btn_map:
         await btn_map[text](update, context)
@@ -572,11 +572,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if not update.effective_user:
             return
         query = update.callback_query
-        await query.answer()
         lang = get_lang(update)
         user_id = str(update.effective_user.id)
 
         data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
+
+        # Кнопка "Язык" — отвечаем с alert ниже, пропускаем общий answer
+        if data_prefix.startswith("lang_"):
+            new_lang = data_prefix.split("_", 1)[1]
+            uid = str(query.from_user.id)
+            data_dict = load_data()
+            user = get_user_data(data_dict, uid)
+            user["lang"] = new_lang
+            save_data(data_dict)
+            lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
+            await query.answer(f"✅ Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
+            return
+
+        await query.answer()
 
         # Кнопка "Ещё одно объявление" — в личку
         if data_prefix == "new":
@@ -648,17 +661,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "Скопировать"
         elif data_prefix == "copy":
             await query.answer("Скопируйте текст выше", show_alert=True)
-
-        # Кнопка "Язык"
-        elif data_prefix.startswith("lang_"):
-            new_lang = data_prefix.split("_", 1)[1]
-            user_id = str(query.from_user.id)
-            data_dict = load_data()
-            user = get_user_data(data_dict, user_id)
-            user["lang"] = new_lang
-            save_data(data_dict)
-            lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
-            await query.answer(f"✅ Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
 
         # Кнопка "Поделиться"
         elif data_prefix == "share":
@@ -1038,7 +1040,17 @@ async def ref_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(text, parse_mode="HTML")
 
 
+_LANG_PROMPT = {
+    "ru": "Выберите язык:",
+    "uk": "Оберіть мову:",
+    "en": "Choose language:",
+    "de": "Sprache wählen:",
+    "pl": "Wybierz język:",
+}
+
+
 async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    lang = get_lang(update)
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"),
@@ -1052,7 +1064,7 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             InlineKeyboardButton("🇵🇱 Polski", callback_data="lang_pl"),
         ],
     ])
-    await update.message.reply_text("Выберите язык / Choose language:", reply_markup=keyboard)
+    await update.message.reply_text(_LANG_PROMPT.get(lang, _LANG_PROMPT["en"]), reply_markup=keyboard)
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

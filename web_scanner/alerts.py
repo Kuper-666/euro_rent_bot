@@ -22,7 +22,7 @@ def _get_sb():
 
 
 def is_new_listing(url: str) -> bool:
-    """Проверяет, есть ли уже这样的 URL в БД."""
+    """Проверяет, есть ли уже такой URL в БД."""
     sb = _get_sb()
     if not sb:
         return True

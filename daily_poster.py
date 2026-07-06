@@ -1,3 +1,4 @@
+import dns_fix  # noqa: F401 — патч DNS для Windows (запускается как отдельный cron)
 import os
 import json
 import asyncio
