@@ -1,3 +1,4 @@
+import dns_fix  # noqa: F401 — патч DNS для Windows
 import os
 import re
 import json
