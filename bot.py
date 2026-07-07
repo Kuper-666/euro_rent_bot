@@ -587,10 +587,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if data_prefix.startswith("lang_"):
             new_lang = data_prefix.split("_", 1)[1]
             uid = str(query.from_user.id)
-            data_dict = load_data()
-            user = get_user_data(data_dict, uid)
+            user = get_user(uid)
             user["lang"] = new_lang
-            save_data(data_dict)
+            save_user(uid, user)
             lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
             await query.answer(f"✅ Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
             return

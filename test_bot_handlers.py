@@ -608,44 +608,41 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = callback_data
         ctx = make_context()
-        shared_data = {"123": dict(user_data)}
-        with patch("bot.load_data", return_value=shared_data):
-            with patch("bot.save_data") as mock_save:
-                with patch("utils.load_data", return_value=shared_data):
+        saved = {}
+        def capture_save(uid, data):
+            saved.update({uid: dict(data)})
+        with patch("bot.get_user", return_value=dict(user_data)):
+            with patch("bot.save_user", side_effect=capture_save):
+                with patch("utils.load_data", return_value={"123": dict(user_data)}):
                     await self.bot_module.handle_callback(update, ctx)
-        return mock_save
+        return saved
 
     async def test_lang_ru_saves(self):
-        mock_save = await self._run_lang_callback("lang_ru")
-        args = mock_save.call_args[0][0]
-        self.assertEqual(args["123"]["lang"], "ru")
+        saved = await self._run_lang_callback("lang_ru")
+        self.assertEqual(saved["123"]["lang"], "ru")
 
     async def test_lang_en_saves(self):
-        mock_save = await self._run_lang_callback("lang_en", {"lang": "ru", "free_used": 0, "balance": 0})
-        args = mock_save.call_args[0][0]
-        self.assertEqual(args["123"]["lang"], "en")
+        saved = await self._run_lang_callback("lang_en", {"lang": "ru", "free_used": 0, "balance": 0})
+        self.assertEqual(saved["123"]["lang"], "en")
 
     async def test_lang_de_saves(self):
-        mock_save = await self._run_lang_callback("lang_de", {"lang": "en", "free_used": 0, "balance": 0})
-        args = mock_save.call_args[0][0]
-        self.assertEqual(args["123"]["lang"], "de")
+        saved = await self._run_lang_callback("lang_de", {"lang": "en", "free_used": 0, "balance": 0})
+        self.assertEqual(saved["123"]["lang"], "de")
 
     async def test_lang_uk_saves(self):
-        mock_save = await self._run_lang_callback("lang_uk")
-        args = mock_save.call_args[0][0]
-        self.assertEqual(args["123"]["lang"], "uk")
+        saved = await self._run_lang_callback("lang_uk")
+        self.assertEqual(saved["123"]["lang"], "uk")
 
     async def test_lang_pl_saves(self):
-        mock_save = await self._run_lang_callback("lang_pl")
-        args = mock_save.call_args[0][0]
-        self.assertEqual(args["123"]["lang"], "pl")
+        saved = await self._run_lang_callback("lang_pl")
+        self.assertEqual(saved["123"]["lang"], "pl")
 
     async def test_lang_callback_shows_alert(self):
         update = make_update(user_id=123)
         update.callback_query.data = "lang_en"
         ctx = make_context()
-        with patch("bot.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
-            with patch("bot.save_data"):
+        with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("bot.save_user"):
                 with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
                     await self.bot_module.handle_callback(update, ctx)
         update.callback_query.answer.assert_called_once()
@@ -657,8 +654,8 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "lang_ru"
         ctx = make_context()
-        with patch("bot.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
-            with patch("bot.save_data"):
+        with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("bot.save_user"):
                 with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
                     await self.bot_module.handle_callback(update, ctx)
         ctx.bot.send_message.assert_not_called()

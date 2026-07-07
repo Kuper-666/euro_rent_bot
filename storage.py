@@ -179,18 +179,21 @@ def save_data(data):
 def save_user(user_id: str, user_data: dict):
     """Сохраняет одного пользователя (атомарная операция для платежей)."""
     if _get_mode() == "supabase":
-        try:
-            sb = _get_supabase()
-            result = sb.table(SUPABASE_TABLE).select("user_id").eq("user_id", user_id).execute()
-            row_data = _user_to_row(user_id, user_data)
-            if result.data:
-                sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", user_id).execute()
-            else:
-                sb.table(SUPABASE_TABLE).insert(row_data).execute()
-            return
-        except Exception as e:
-            logger.error(f"Supabase save_user error for {user_id}: {e}")
-    # Fallback: загружаем всё, обновляем, сохраняем всё
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                result = sb.table(SUPABASE_TABLE).select("user_id").eq("user_id", user_id).execute()
+                row_data = _user_to_row(user_id, user_data)
+                if result.data:
+                    sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", user_id).execute()
+                else:
+                    sb.table(SUPABASE_TABLE).insert(row_data).execute()
+                return
+            except Exception as e:
+                logger.warning(f"Supabase save_user attempt {attempt+1} for {user_id}: {e}")
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
+    # Fallback
     data = _load_json()
     data[user_id] = user_data
     _save_json(data)
@@ -199,12 +202,16 @@ def save_user(user_id: str, user_data: dict):
 def get_user(user_id: str) -> dict:
     """Получает одного пользователя."""
     if _get_mode() == "supabase":
-        try:
-            sb = _get_supabase()
-            result = sb.table(SUPABASE_TABLE).select("*").eq("user_id", user_id).execute()
-            if result.data:
-                return _row_to_user(result.data[0])
-        except Exception as e:
-            logger.error(f"Supabase get_user error for {user_id}: {e}")
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                result = sb.table(SUPABASE_TABLE).select("*").eq("user_id", user_id).execute()
+                if result.data:
+                    return _row_to_user(result.data[0])
+                return {}
+            except Exception as e:
+                logger.warning(f"Supabase get_user attempt {attempt+1} for {user_id}: {e}")
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
     data = _load_json()
     return data.get(user_id, {})
