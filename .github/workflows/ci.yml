@@ -32,4 +32,7 @@ jobs:
           pip install pytest
 
       - name: Run tests
+        env:
+          TELEGRAM_TOKEN: "123456:dummy-token-for-ci"
+          GROQ_API_KEY: "dummy-key-for-ci"
         run: python -m pytest test_bot.py test_smart_poster.py test_bot_handlers.py -v
