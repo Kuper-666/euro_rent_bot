@@ -56,20 +56,25 @@ def _save_json(data):
 
 def _user_to_row(uid: str, info: dict) -> dict:
     """Конвертирует пользовательский dict в строку Supabase."""
+    # Приводим timestamp-поля к None если пустые (Supabase TIMESTAMPTZ не принимает "")
+    created_at = info.get("created_at", "") or None
+    last_paid_at = info.get("last_paid_at", 0) or None
+    last_activity = info.get("last_activity", 0) or None
+
     return {
         "user_id": uid,
         "paid": info.get("pdf_paid", False),
         "count": info.get("free_used", 0),
         "lang": info.get("lang", ""),
-        "created_at": info.get("created_at", ""),
+        "created_at": created_at,
         "total_checks": info.get("total_checks", 0),
         "email": info.get("email", ""),
         "balance": info.get("balance", 0),
         "vip": info.get("vip", False),
         "ref_code": info.get("ref_code", ""),
         "referrals": json.dumps(info.get("referrals", [])),
-        "last_paid_at": info.get("last_paid_at", 0),
-        "last_activity": info.get("last_activity", 0),
+        "last_paid_at": last_paid_at,
+        "last_activity": last_activity,
         "filter_furnished": info.get("filter_furnished", False),
         "filter_pets": info.get("filter_pets", False),
         "filter_parking": info.get("filter_parking", False),
