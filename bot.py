@@ -804,7 +804,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             profile = get_profile(user_id)
             last_letter = get_user(user_id).get("last_letter", "")
             if last_letter:
-                from pdf_generator import generate_mieterprofil_pdf
                 pdf_data = {
                     "name": profile.get("full_name", ""),
                     "dob": "",
@@ -816,7 +815,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     "occupants": profile.get("occupants", ""),
                 }
                 pdf_bytes = generate_mieterprofil_pdf(pdf_data, cover_letter=last_letter)
-                from io import BytesIO
                 await context.bot.send_document(
                     chat_id=int(user_id),
                     document=BytesIO(pdf_bytes),

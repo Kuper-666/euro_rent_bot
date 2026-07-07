@@ -3,6 +3,40 @@
 -- Безопасный запуск: повторный запуск не вызовет ошибок
 -- ══════════════════════════════════════════════════════════════
 
+-- 0. Авто-RLS: любая новая таблица сразу получает RLS + service_role policy
+CREATE OR REPLACE FUNCTION auto_enable_rls()
+RETURNS event_trigger AS $$
+DECLARE
+  obj record;
+BEGIN
+  FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE'
+  LOOP
+    -- Включаем RLS
+    EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY',
+                   obj.schema_name, obj.object_identity::text);
+
+    -- Создаём policy для service_role (если ещё нет)
+    EXECUTE format(
+      'DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies '
+      'WHERE policyname = %L AND tablename = %L) THEN '
+      'CREATE POLICY %I ON %I.%I FOR ALL USING (auth.role() = %L); END IF; END $$',
+      'Service role full access on ' || obj.object_identity::text,
+      obj.object_identity::text,
+      'Service role full access on ' || obj.object_identity::text,
+      obj.schema_name, obj.object_identity::text,
+      'service_role'
+    );
+
+    RAISE NOTICE 'RLS + policy enabled on %.%', obj.schema_name, obj.object_identity;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP EVENT TRIGGER IF EXISTS on_table_created;
+CREATE EVENT TRIGGER on_table_created ON ddl_command_end
+  WHEN TAG IN ('CREATE TABLE')
+  EXECUTE PROCEDURE auto_enable_rls();
+
 -- 1. Таблицы (CREATE IF NOT EXISTS)
 CREATE TABLE IF NOT EXISTS "Favorites" (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, listing_url TEXT NOT NULL, listing_title TEXT DEFAULT '', price TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS "ApplicationTracker" (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, listing_url TEXT NOT NULL, listing_title TEXT DEFAULT '', status TEXT DEFAULT 'saved', notes TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
@@ -13,6 +47,15 @@ CREATE TABLE IF NOT EXISTS "UrlTokens" (id SERIAL PRIMARY KEY, token TEXT UNIQUE
 CREATE TABLE IF NOT EXISTS "ListingHistory" (id SERIAL PRIMARY KEY, url TEXT DEFAULT '', city TEXT DEFAULT '', price NUMERIC DEFAULT 0, score INTEGER DEFAULT 0, timestamp NUMERIC DEFAULT 0, is_holy_grail BOOLEAN DEFAULT FALSE, grail_reason TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS "PriceTrends" (id SERIAL PRIMARY KEY, city TEXT UNIQUE NOT NULL, prices JSONB DEFAULT '[]', avg NUMERIC DEFAULT 0, trend TEXT DEFAULT 'stable', trend_pct NUMERIC DEFAULT 0, updated_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS "UserCities" (id SERIAL PRIMARY KEY, user_id TEXT UNIQUE NOT NULL, city TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW());
+
+-- 1b. Включаем RLS на все существующие таблицы (safety-net)
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', r.tablename);
+  END LOOP;
+END $$;
 
 -- 2. Колонки в Users (ADD COLUMN IF NOT EXISTS)
 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS filter_furnished BOOLEAN DEFAULT FALSE;
