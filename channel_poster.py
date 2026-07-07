@@ -297,6 +297,16 @@ async def run_channel_post():
         logger.info("No entries found from any source")
         return
 
+    # 2b. Убираем дубли между источниками (один и тот же URL может прийти
+    # и из веб-сканера, и из RSS в рамках одного запуска)
+    seen_urls = set()
+    deduped_entries = []
+    for e in entries:
+        if e["url"] not in seen_urls:
+            seen_urls.add(e["url"])
+            deduped_entries.append(e)
+    entries = deduped_entries
+
     # 3. Фильтруем уже опубликованные
     new_entries = [e for e in entries if e["url"] not in posted["urls"]]
     if not new_entries:

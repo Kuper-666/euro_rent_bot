@@ -2,6 +2,7 @@
 Сканер порталов недвижимости — хранение в Supabase и доставка алертов.
 """
 import os
+import json
 import logging
 import asyncio
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 _sb = None
 
+LOCAL_SEEN_FILE = "web_listings_seen.json"
+
 
 def _get_sb():
     global _sb
@@ -21,24 +24,43 @@ def _get_sb():
     return _sb
 
 
+def _load_local_seen() -> set:
+    if os.path.exists(LOCAL_SEEN_FILE):
+        try:
+            with open(LOCAL_SEEN_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except Exception:
+            return set()
+    return set()
+
+
+def _save_local_seen(urls: set):
+    trimmed = list(urls)[-5000:]
+    with open(LOCAL_SEEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(trimmed, f, ensure_ascii=False)
+
+
 def is_new_listing(url: str) -> bool:
     """Проверяет, есть ли уже такой URL в БД."""
     sb = _get_sb()
     if not sb:
-        return True
+        return url not in _load_local_seen()
     try:
         result = sb.table("WebListings").select("id").eq("url", url).execute()
         return len(result.data) == 0
     except Exception as e:
         logger.warning("is_new_listing error: %s", e)
-        return True
+        return url not in _load_local_seen()
 
 
 def save_listing(listing) -> bool:
-    """Сохраняет объявление в Supabase."""
+    """Сохраняет объявление в Supabase (либо локально, если Supabase недоступен)."""
     sb = _get_sb()
     if not sb:
-        return False
+        seen = _load_local_seen()
+        seen.add(listing.url)
+        _save_local_seen(seen)
+        return True
     try:
         sb.table("WebListings").insert({
             "portal": listing.portal,
@@ -50,6 +72,9 @@ def save_listing(listing) -> bool:
         return True
     except Exception as e:
         logger.warning("save_listing error: %s", e)
+        seen = _load_local_seen()
+        seen.add(listing.url)
+        _save_local_seen(seen)
         return False
 
 
