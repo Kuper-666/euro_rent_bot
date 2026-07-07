@@ -4,17 +4,42 @@
     {"name": "Wohnung Berlin", "username": "wohnung_berlin", "city": "berlin", "lang": "de", "active": true},
     {"name": "Berlin Apartments", "username": "berlin_apartments", "city": "berlin", "lang": "en", "active": true},
     {"name": "Berlin Rent", "username": "berlin_rent", "city": "berlin", "lang": "en", "active": true},
+    {"name": "Berlin WG & Wohnung", "username": "wgberlin", "city": "berlin", "lang": "de", "active": true},
+    {"name": "Berlin Expat Housing", "username": "berlin_expat_housing", "city": "berlin", "lang": "en", "active": true},
     {"name": "Muenchen Wohnungen", "username": "muenchen_wohnungen", "city": "munich", "lang": "de", "active": true},
+    {"name": "München Immobilien", "username": "immobilien_muenchen", "city": "munich", "lang": "de", "active": true},
+    {"name": "München Apartments", "username": "munich_apartments", "city": "munich", "lang": "en", "active": true},
     {"name": "Hamburg Wohnungen", "username": "hamburg_wohnungen", "city": "hamburg", "lang": "de", "active": true},
-    {"name": "ExpatRent Community", "username": "ExpatRent_Community", "city": "berlin", "lang": "ru", "active": true},
+    {"name": "Hamburg Immobilien", "username": "immobilien_hamburg", "city": "hamburg", "lang": "de", "active": true},
+    {"name": "Köln Wohnungen", "username": "koeln_wohnungen", "city": "cologne", "lang": "de", "active": true},
+    {"name": "Frankfurt Wohnung", "username": "frankfurt_wohnung", "city": "frankfurt", "lang": "de", "active": true},
+    {"name": "Stuttgart Miete", "username": "stuttgart_miete", "city": "stuttgart", "lang": "de", "active": true},
+    {"name": "Wien Wohnung", "username": "wien_wohnung", "city": "vienna", "lang": "de", "active": true},
+    {"name": "Wien Immobilien", "username": "immobilien_wien", "city": "vienna", "lang": "de", "active": true},
+    {"name": "Amsterdam Rent", "username": "amsterdam_rent", "city": "amsterdam", "lang": "en", "active": true},
+    {"name": "Amsterdam Housing", "username": "amsterdam_housing", "city": "amsterdam", "lang": "en", "active": true},
+    {"name": "Paris Appartement", "username": "paris_appartement", "city": "paris", "lang": "fr", "active": true},
+    {"name": "Paris Location", "username": "paris_location", "city": "paris", "lang": "fr", "active": true},
+    {"name": "Barcelona Piso", "username": "barcelona_piso", "city": "barcelona", "lang": "es", "active": true},
+    {"name": "Barcelona Alquiler", "username": "barcelona_alquiler", "city": "barcelona", "lang": "es", "active": true},
+    {"name": "Madrid Piso", "username": "madrid_piso", "city": "madrid", "lang": "es", "active": true},
     {"name": "Milano Affitto", "username": "appartamentiaffittoMilano", "city": "milan", "lang": "it", "active": true},
     {"name": "Roma Affitto", "username": "appartamentiRoma_SBG", "city": "rome", "lang": "it", "active": true},
     {"name": "Praha Pronajem", "username": "pronajem_bydleni_praha", "city": "prague", "lang": "cs", "active": true},
     {"name": "Praha Arenda", "username": "arendaprahacesko", "city": "prague", "lang": "cs", "active": true},
     {"name": "London Rentals", "username": "SpacesLondon", "city": "london", "lang": "en", "active": true},
     {"name": "London Rent Hub", "username": "LondonRentHub", "city": "london", "lang": "en", "active": true},
+    {"name": "London Flats", "username": "london_flats", "city": "london", "lang": "en", "active": true},
     {"name": "Warszawa Mieszkania", "username": "moreEtate", "city": "warsaw", "lang": "pl", "active": true},
-    {"name": "Warszawa Arenda", "username": "rentapartaments_waw", "city": "warsaw", "lang": "pl", "active": true}
+    {"name": "Warszawa Arenda", "username": "rentapartaments_waw", "city": "warsaw", "lang": "pl", "active": true},
+    {"name": "Warszawa Nieruchomosci", "username": "nieruchomosci_waw", "city": "warsaw", "lang": "pl", "active": true},
+    {"name": "Lisboa Arrendamento", "username": "lisboa_arrendamento", "city": "lisbon", "lang": "pt", "active": true},
+    {"name": "Zürich Wohnung", "username": "zuerich_wohnung", "city": "zurich", "lang": "de", "active": true},
+    {"name": "Brussels Rental", "username": "brussels_rental", "city": "brussels", "lang": "en", "active": true},
+    {"name": "Copenhagen Rent", "username": "copenhagen_rent", "city": "copenhagen", "lang": "en", "active": true},
+    {"name": "Stockholm Rental", "username": "stockholm_rental", "city": "stockholm", "lang": "en", "active": true},
+    {"name": "Dublin Rent", "username": "dublin_rent", "city": "dublin", "lang": "en", "active": true},
+    {"name": "Athens Rent", "username": "athens_rent", "city": "athens", "lang": "en", "active": true}
   ],
   "scan_keywords": [
     "квартира", "аренда", "съем", "снять",
@@ -26,16 +51,22 @@
     "pronajem", "bydleni", "najem",
     "mieszkanie", "wynajem", "pokoje",
     "€", "EUR", "eur", "muebles", "möbliert",
-    "кв.м", "m²", "м²", "rooms", "Zimmer"
+    "кв.м", "m²", "м²", "rooms", "Zimmer",
+    "loft", "studio", "bedroom", "bathroom",
+    "furnished", "unfurnished", "möbliert",
+    "warmmiete", "kaltmiete", "nebenkosten"
   ],
   "price_patterns": [
     "(\\d[\\d.,]*)\\s*(?:€|EUR|евро)",
     "(\\d[\\d.,]*)\\s*(?:pro\\s*Monat|monatlich|monthly|par\\s*mois)",
     "(?:Kaltmiete|Warmmiete|rent|huur|alquiler|loyer|affitto):?\\s*(\\d[\\d.,]*)",
-    "(\\d[\\d.,]*)\\s*(?:PLN|zł|zlotych)"
+    "(\\d[\\d.,]*)\\s*(?:PLN|zł|zlotych)",
+    "(\\d[\\d.,]*)\\s*(?:CHF|franc)",
+    "(\\d[\\d.,]*)\\s*(?:£|GBP|gbp)"
   ],
   "exclude_keywords": [
     "купить", "продажа", "kaufen", "verkauf", "buy", "sale",
-    "вторичка", "novostroy", "new build", "comprare", "vendita"
+    "вторичка", "novostroy", "new build", "comprare", "vendita",
+    "garage", "parking", "Stellplatz", "儲車場"
   ]
 }
