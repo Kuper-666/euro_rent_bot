@@ -589,10 +589,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.answer(f"✅ Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
             return
 
-        await query.answer()
-
         # Кнопка "Ещё одно объявление" — в личку
         if data_prefix == "new":
+            await query.answer()
             await query.edit_message_reply_markup(reply_markup=None)
             data = load_data()
             user = get_user_data(data, user_id)
@@ -609,18 +608,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "Проанализировать" из группы — открываем бота в личке
         elif data_prefix in ("analyze_ad", "analyze_rss"):
+            await query.answer()
             try:
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
-                pass  # Сообщение могло быть удалено
+                pass
 
             token_or_short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
             bot_username = context.bot.username
 
-            # Сначала пробуем resolve как token из UrlTokens
             rss_url = resolve_url_token(token_or_short_id)
 
-            # Если не нашли — пробуем как short_id из PendingListings
             if not rss_url:
                 try:
                     from daily_poster import get_listing
@@ -663,21 +661,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     )
             except Exception as e:
                 logger.error("analyze_rss reply failed: %s", e)
-                try:
-                    await query.answer("Откройте бота в личке", show_alert=True)
-                except Exception:
-                    pass
 
         # Кнопка "Пропустить"
         elif data_prefix == "skip_ad":
-            pass  # query.answer() уже вызван выше
+            await query.answer()
 
         # Кнопка "Скопировать"
         elif data_prefix == "copy":
-            pass  # query.answer() уже вызван выше
+            await query.answer()
 
         # Кнопка "Поделиться"
         elif data_prefix == "share":
+            await query.answer()
             bot_username = context.bot.username
             share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+EuroRent+AI+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
             await context.bot.send_message(
@@ -688,6 +683,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "PDF"
         elif data_prefix == "pdf":
+            await query.answer()
             await context.bot.send_message(
                 chat_id=int(user_id),
                 text=get_msg(lang, "pay_pdf"),
@@ -696,6 +692,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопки оплаты
         elif data_prefix.startswith("show_pay_"):
+            await query.answer()
             plan = data_prefix.replace("show_pay_", "")
             msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
             if plan == "vip":
@@ -757,6 +754,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "Письмо" после анализа
         elif data_prefix == "gen_letter":
+            await query.answer()
             profile = get_profile(user_id)
             filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
             if filled < 2:
@@ -815,6 +813,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "PDF письма"
         elif data_prefix == "pdf_letter":
+            await query.answer()
             profile = get_profile(user_id)
             last_letter = get_user(user_id).get("last_letter", "")
             if last_letter:
