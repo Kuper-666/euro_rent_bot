@@ -784,7 +784,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "В избранное"
         elif data_prefix == "fav_save":
-            from handlers.user_features import get_last_url
             last_url = get_last_url(user_id)
             if last_url:
                 from user_features import add_favorite
@@ -802,7 +801,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "PDF письма"
         elif data_prefix == "pdf_letter":
-            from handlers.user_features import get_last_url
             profile = get_profile(user_id)
             last_letter = get_user(user_id).get("last_letter", "")
             if last_letter:
