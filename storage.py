@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -126,44 +127,52 @@ def _row_to_user(row: dict) -> dict:
 
 def load_data():
     if _get_mode() == "supabase":
-        try:
-            sb = _get_supabase()
-            result = sb.table(SUPABASE_TABLE).select("*").execute()
-            data = {}
-            for row in result.data:
-                uid = str(row.get("user_id", ""))
-                if not uid:
-                    continue
-                data[uid] = _row_to_user(row)
-            return data
-        except Exception as e:
-            logger.error(f"Supabase load error: {e}, falling back to JSON")
-            return _load_json()
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                result = sb.table(SUPABASE_TABLE).select("*").execute()
+                data = {}
+                for row in result.data:
+                    uid = str(row.get("user_id", ""))
+                    if not uid:
+                        continue
+                    data[uid] = _row_to_user(row)
+                return data
+            except Exception as e:
+                logger.warning(f"Supabase load attempt {attempt+1} failed: {e}")
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
+        logger.error("Supabase load failed after 3 attempts, falling back to JSON")
+        return _load_json()
     return _load_json()
 
 
 def save_data(data):
     if _get_mode() == "supabase":
-        try:
-            sb = _get_supabase()
-            # Получаем существующие user_id
-            existing = set()
-            result = sb.table(SUPABASE_TABLE).select("user_id").execute()
-            for row in result.data:
-                uid = str(row.get("user_id", ""))
-                if uid:
-                    existing.add(uid)
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                # Получаем существующие user_id
+                existing = set()
+                result = sb.table(SUPABASE_TABLE).select("user_id").execute()
+                for row in result.data:
+                    uid = str(row.get("user_id", ""))
+                    if uid:
+                        existing.add(uid)
 
-            # Обновляем или вставляем каждого пользователя
-            for uid, info in data.items():
-                row_data = _user_to_row(uid, info)
-                if uid in existing:
-                    sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", uid).execute()
-                else:
-                    sb.table(SUPABASE_TABLE).insert(row_data).execute()
-            return
-        except Exception as e:
-            logger.error(f"Supabase save error: {e}, falling back to JSON")
+                # Обновляем или вставляем каждого пользователя
+                for uid, info in data.items():
+                    row_data = _user_to_row(uid, info)
+                    if uid in existing:
+                        sb.table(SUPABASE_TABLE).update(row_data).eq("user_id", uid).execute()
+                    else:
+                        sb.table(SUPABASE_TABLE).insert(row_data).execute()
+                return
+            except Exception as e:
+                logger.warning(f"Supabase save attempt {attempt+1} failed: {e}")
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
+        logger.error("Supabase save failed after 3 attempts, falling back to JSON")
     _save_json(data)
 
 
