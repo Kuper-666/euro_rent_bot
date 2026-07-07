@@ -1,7 +1,10 @@
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -34,4 +37,4 @@ NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai
 OSRM_URL = os.getenv("OSRM_URL", "http://router.project-osrm.org")
 
 if not TELEGRAM_TOKEN or not GROQ_API_KEY:
-    raise RuntimeError("Set TELEGRAM_TOKEN and GROQ_API_KEY environment variables")
+    logger.warning("TELEGRAM_TOKEN or GROQ_API_KEY not set — bot will not start")
