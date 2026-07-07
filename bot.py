@@ -61,6 +61,8 @@ from handlers.groups import (
     group_start, group_help, group_greeting, group_rules,
     handle_group_listing, _greeting_cooldown,
 )
+from handlers.cities import get_cities_keyboard, cmd_cities, handle_city_selection
+from handlers.email import subscribe_email, unsubscribe_email
 from listing_features import (
     cmd_set_city, cmd_remove_city, cmd_my_city, cmd_trend, cmd_holygrail,
     get_user_city, filter_by_city, detect_city, record_listing, is_holy_grail,
@@ -1138,103 +1140,6 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception as e:
         logger.error(f"FAQ error: {e}")
         await update.message.reply_text("❌ Не удалось ответить. Попробуйте позже.")
-
-
-def get_cities_keyboard():
-    cities = sorted(POPULAR_CITIES.items(), key=lambda x: x[1]["avg_price"])
-    keyboard = []
-    row = []
-    for key, info in cities:
-        row.append(InlineKeyboardButton(
-            f"{info['emoji']} {info['name_en']}",
-            callback_data=f"select_city:{key}"
-        ))
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-    keyboard.append([InlineKeyboardButton("❌ Снять фильтр", callback_data="select_city:remove")])
-    return InlineKeyboardMarkup(keyboard)
-
-
-async def cmd_cities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
-    user_id = str(update.effective_user.id)
-    current_city = get_user_city(user_id)
-    current_name = ""
-    if current_city and current_city in POPULAR_CITIES:
-        ci = POPULAR_CITIES[current_city]
-        current_name = f"\n\nТекущий город: {ci['emoji']} {ci['name']}" if lang == "ru" else f"\n\nCurrent city: {ci['emoji']} {ci['name_en']}"
-
-    await update.message.reply_text(
-        f"🏙 Выберите город для фильтрации объявлений:{current_name}\n\n"
-        f"{list_cities()}\n\n"
-        "Нажмите на кнопку или используйте /set_city <город>",
-        reply_markup=get_cities_keyboard(),
-    )
-
-
-async def handle_city_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    lang = get_lang(update)
-    user_id = str(update.effective_user.id)
-    data_payload = query.data.split(":")[1] if ":" in query.data else ""
-
-    if data_payload == "remove":
-        from listing_features import remove_user_city
-        remove_user_city(user_id)
-        await query.edit_message_text("✅ Фильтр города снят. Показываю все объявления.")
-        return
-
-    if data_payload in POPULAR_CITIES:
-        set_user_city(user_id, data_payload)
-        info = POPULAR_CITIES[data_payload]
-        await query.edit_message_text(
-            get_msg(lang, "city_selected").format(emoji=info["emoji"], name=info["name"])
-        )
-
-
-async def subscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    if not context.args or len(context.args) < 1:
-        await update.message.reply_text(
-            "📧 Подписка на недельный дайджест\n\n"
-            "Отправьте свою почту:\n/subscribe_email your@email.com\n\n"
-            "Каждую неделю вы будете получать подборку лучших объявлений!"
-        )
-        return
-
-    email = context.args[0].strip()
-    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
-        await update.message.reply_text("❌ Некорректный email. Попробуйте ещё раз.")
-        return
-
-    if add_email_subscriber(email, user_id):
-        await update.message.reply_text(
-            f"✅ Вы подписались на дайджест!\n\n"
-            f"Email: {email}\n"
-            f"Частота: 1 раз в неделю (понедельник)\n\n"
-            f"Отписаться: /unsubscribe_email"
-        )
-    else:
-        await update.message.reply_text("ℹ️ Этот email уже подписан на дайджест.")
-
-
-async def unsubscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not context.args or len(context.args) < 1:
-        await update.message.reply_text(
-            "📧 Отписка от дайджеста\n\n"
-            "Отправьте свою почту:\n/unsubscribe_email your@email.com"
-        )
-        return
-
-    email = context.args[0].strip()
-    if remove_email_subscriber(email):
-        await update.message.reply_text(f"✅ Вы отписались от дайджеста ({email}).")
-    else:
-        await update.message.reply_text("ℹ️ Этот email не найден в подписчиках.")
 
 
 # ═══════════════════════════════════════════════════════════════

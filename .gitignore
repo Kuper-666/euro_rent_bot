@@ -2,7 +2,6 @@
 .env
 .env.*
 !.env.example
-Docs.txt
 
 # Python
 __pycache__/
@@ -11,6 +10,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
 
 # Data & sessions
 data/
@@ -24,6 +24,7 @@ referral_events.jsonl
 url_tokens.json
 cities_config.json
 posted_listings.json
+web_listings_seen.json
 
 # Telethon sessions
 *.session
@@ -34,10 +35,14 @@ rent_scanner/sessions/
 # Rent scanner data
 rent_scanner/data/
 
-# Icons (not needed in repo)
+# Icons
 *.png
 *.jpg
 *.jpeg
+
+# Patches & temp files
+*.patch
+Error.txt
 
 # IDE
 .vscode/
