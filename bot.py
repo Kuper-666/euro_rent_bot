@@ -65,7 +65,7 @@ from listing_features import (
 from scheduler import update_last_activity, run_scheduler, set_bot, set_application, store_event_loop
 from web import app
 
-client = Groq(api_key=GROQ_API_KEY)
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
