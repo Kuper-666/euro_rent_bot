@@ -40,6 +40,12 @@ logger = logging.getLogger(__name__)
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "")
 CHANNEL_ID = int(CHANNEL_ID) if CHANNEL_ID else None
 
+GROUP_ID = os.environ.get("GROUP_ID", "")
+GROUP_ID = int(GROUP_ID) if GROUP_ID else None
+
+# Если CHANNEL_ID не задан, постим в GROUP_ID
+POST_TARGET = CHANNEL_ID or GROUP_ID
+
 CITY_CHANNELS = {}
 _raw = os.environ.get("CITY_CHANNELS", "")
 if _raw:
@@ -263,8 +269,8 @@ async def send_holy_grail_alert(entry: dict, bot_username: str):
     city = entry.get("city", "")
     channel_ids = set()
 
-    if CHANNEL_ID:
-        channel_ids.add(CHANNEL_ID)
+    if POST_TARGET:
+        channel_ids.add(POST_TARGET)
     if city in CITY_CHANNELS:
         channel_ids.add(CITY_CHANNELS[city])
 
@@ -357,7 +363,7 @@ async def run_channel_post():
             trend_info=trend_text, is_deal=deal, portal=portal,
         )
 
-        main_channel = CHANNEL_ID
+        main_channel = POST_TARGET
         city_channel = CITY_CHANNELS.get(city_key) if city_key else None
 
         if main_channel:
