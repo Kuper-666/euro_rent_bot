@@ -245,7 +245,7 @@ async def run_channel_scan(client, bot_client=None) -> dict:
 
 
 async def _process_listing(listing: dict, bot_client=None):
-    """Обрабатывает найденное объявление."""
+    """Обрабатывает найденное объявление: сохраняет в БД, отправляет алерты и в группу."""
     try:
         from services.supabase_client import get_supabase
         sb = get_supabase()
@@ -265,6 +265,26 @@ async def _process_listing(listing: dict, bot_client=None):
             "price": listing.get("price", 0),
             "city": listing.get("city", ""),
         }).execute()
+
+        # Отправляем в группу
+        group_id = int(os.environ.get("GROUP_ID", "0"))
+        if group_id and bot_client:
+            try:
+                price_text = f"💰 {listing.get('price', 0):.0f} EUR/мес" if listing.get("price") else ""
+                city_text = f"🏙 {listing.get('city', '').title()}" if listing.get("city") else ""
+                lines = [f"📌 {listing.get('title', '')[:120]}"]
+                if price_text:
+                    lines.append(price_text)
+                if city_text:
+                    lines.append(city_text)
+                lines.append(f"🌐 {listing.get('channel', 'Telegram')}")
+                lines.append(f"🔗 {listing['url']}")
+                await bot_client.send_message(
+                    chat_id=group_id,
+                    text="\n".join(lines),
+                )
+            except Exception as e:
+                logger.warning("Failed to send to group: %s", e)
 
         # Отправляем алерты подписчикам
         if bot_client:
