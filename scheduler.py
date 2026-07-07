@@ -22,19 +22,42 @@ logger = logging.getLogger(__name__)
 # Модульный bot создаётся лениво
 _bot = None
 _app_loop = None
+_application = None
 
 
 def set_bot(bot_instance, app_loop=None):
     """Устанавливает bot и event loop из основного приложения."""
-    global _bot, _app_loop
+    global _bot, _app_loop, _application
     _bot = bot_instance
     _app_loop = app_loop
 
 
+def set_application(app):
+    """Сохраняет Application для доступа к create_task()."""
+    global _application
+    _application = app
+
+
+async def store_event_loop(app):
+    """Callback для post_init: сохраняет event loop после его создания."""
+    global _app_loop
+    _app_loop = asyncio.get_running_loop()
+    logger.info("Scheduler: event loop captured via post_init")
+
+
+def _get_event_loop():
+    """Находит running event loop (лениво, после запуска polling)."""
+    global _app_loop
+    if _app_loop and _app_loop.is_running():
+        return _app_loop
+    return None
+
+
 def _run_async(coro):
     """Запускает корутину на основном event loop (безопасно из потока)."""
-    if _app_loop and _app_loop.is_running():
-        asyncio.run_coroutine_threadsafe(coro, _app_loop)
+    loop = _get_event_loop()
+    if loop:
+        asyncio.run_coroutine_threadsafe(coro, loop)
     else:
         logger.warning("No event loop available, skipping async task")
 

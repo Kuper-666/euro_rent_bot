@@ -62,7 +62,7 @@ from listing_features import (
     format_holy_grail_alert, extract_price, record_price, extract_score,
     POPULAR_CITIES, list_cities, set_user_city
 )
-from scheduler import update_last_activity, run_scheduler, set_bot
+from scheduler import update_last_activity, run_scheduler, set_bot, set_application, store_event_loop
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -1392,7 +1392,7 @@ async def unsubscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 if __name__ == "__main__":
     # 1. Создаём приложение
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_TOKEN).post_init(store_event_loop).build()
 
     # 2. Регистрируем все команды
     priv = filters.ChatType.PRIVATE
@@ -1477,6 +1477,7 @@ if __name__ == "__main__":
 
     # Передаём bot в scheduler ДО запуска polling
     set_bot(application.bot)
+    set_application(application)
 
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
