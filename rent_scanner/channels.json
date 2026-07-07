@@ -24,6 +24,7 @@
     {"name": "Barcelona Alquiler", "username": "barcelona_alquiler", "city": "barcelona", "lang": "es", "active": true},
     {"name": "Madrid Piso", "username": "madrid_piso", "city": "madrid", "lang": "es", "active": true},
     {"name": "Milano Affitto", "username": "appartamentiaffittoMilano", "city": "milan", "lang": "it", "active": true},
+    {"name": "Milano Case/Appartamenti", "username": "stay_buy_home_community", "city": "milan", "lang": "it", "active": true},
     {"name": "Roma Affitto", "username": "appartamentiRoma_SBG", "city": "rome", "lang": "it", "active": true},
     {"name": "Praha Pronajem", "username": "pronajem_bydleni_praha", "city": "prague", "lang": "cs", "active": true},
     {"name": "Praha Arenda", "username": "arendaprahacesko", "city": "prague", "lang": "cs", "active": true},
