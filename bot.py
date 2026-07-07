@@ -609,7 +609,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "Проанализировать" из группы — открываем бота в личке
         elif data_prefix in ("analyze_ad", "analyze_rss"):
-            await query.edit_message_reply_markup(reply_markup=None)
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass  # Сообщение могло быть удалено
 
             token_or_short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
             bot_username = context.bot.username
@@ -639,28 +642,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             data = load_data()
             user = get_user_data(data, user_id)
 
-            if not can_use(user):
-                await query.message.reply_text(
-                    "❌ У вас закончились проверки.\n\n"
-                    "Пакеты:\n"
-                    "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                    "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                    "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
-                    reply_markup=keyboard,
-                )
-            else:
-                await query.message.reply_text(
-                    "🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
-                    reply_markup=keyboard,
-                )
+            try:
+                if not can_use(user):
+                    await context.bot.send_message(
+                        chat_id=int(user_id),
+                        text=(
+                            "❌ У вас закончились проверки.\n\n"
+                            "Пакеты:\n"
+                            "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+                            "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+                            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
+                        ),
+                        reply_markup=keyboard,
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=int(user_id),
+                        text="🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
+                        reply_markup=keyboard,
+                    )
+            except Exception as e:
+                logger.error("analyze_rss reply failed: %s", e)
+                try:
+                    await query.answer("Откройте бота в личке", show_alert=True)
+                except Exception:
+                    pass
 
         # Кнопка "Пропустить"
         elif data_prefix == "skip_ad":
-            await query.answer("Ок", show_alert=False)
+            pass  # query.answer() уже вызван выше
 
         # Кнопка "Скопировать"
         elif data_prefix == "copy":
-            await query.answer("Скопируйте текст выше", show_alert=True)
+            pass  # query.answer() уже вызван выше
 
         # Кнопка "Поделиться"
         elif data_prefix == "share":

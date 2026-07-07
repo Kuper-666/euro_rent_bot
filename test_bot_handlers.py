@@ -677,9 +677,8 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         update.callback_query.data = "skip_ad"
         ctx = make_context()
         await self.bot_module.handle_callback(update, ctx)
-        calls = update.callback_query.answer.call_args_list
-        has_ok = any("Ок" in str(c) for c in calls)
-        self.assertTrue(has_ok)
+        # skip_ad now uses the generic query.answer() — just verify it was called
+        update.callback_query.answer.assert_called_once()
 
     @patch("bot.load_data")
     async def test_copy_answers_copied(self, mock_load):
