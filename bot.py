@@ -578,14 +578,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         query = update.callback_query
         logger.info("Callback received: data=%s user=%s", query.data, query.from_user.id if query.from_user else "?")
         if not update.effective_user:
+            await query.answer()
             return
-        query = update.callback_query
+        
         lang = get_lang(update)
         user_id = str(update.effective_user.id)
 
         data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
+        
+        # Acknowledge the callback FIRST to prevent timeout
+        if not data_prefix.startswith("lang_") and not data_prefix in ("copy", "copy_letter") and not data_prefix.startswith("filter") and not data_prefix.startswith("fav_") and not data_prefix.startswith("track"):
+            await query.answer()
 
-        # Кнопка "Язык" — отвечаем с alert ниже, пропускаем общий answer
+        # Кнопка "Язык" — отвечаем с alert, но first acknowledge
         if data_prefix.startswith("lang_"):
             new_lang = data_prefix.split("_", 1)[1]
             uid = str(query.from_user.id)

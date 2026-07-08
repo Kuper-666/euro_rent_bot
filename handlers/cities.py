@@ -45,6 +45,7 @@ async def cmd_cities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def handle_city_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    # Acknowledge FIRST
     await query.answer()
     lang = get_lang(update)
     user_id = str(update.effective_user.id)
