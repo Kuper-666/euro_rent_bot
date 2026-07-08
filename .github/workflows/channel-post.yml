@@ -27,6 +27,8 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          GROUP_ID: ${{ secrets.GROUP_ID }}
           CITY_CHANNELS: ${{ secrets.CITY_CHANNELS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python channel_poster.py
