@@ -1264,13 +1264,14 @@ if __name__ == "__main__":
     WEBHOOK_URL = os.getenv("WEBHOOK_URL")
     if WEBHOOK_URL:
         logging.info("Starting bot with webhook...")
-        # Initialize application
-        application.initialize()
-        # Start application
         import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(application.start())
+        # Initialize and start application
+        async def init_and_start():
+            await application.initialize()
+            await application.start()
+        loop.run_until_complete(init_and_start())
         # Run Flask in main thread
         from web import app
         # Add webhook route to Flask app
