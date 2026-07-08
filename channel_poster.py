@@ -110,12 +110,21 @@ def save_posted(data):
     sb = _get_sb()
     if sb:
         try:
-            # Сохраняем только новые URL (без дубликатов)
-            for url in data["urls"][-MAX_POSTED_HISTORY:]:
-                try:
-                    sb.table(POSTED_TABLE).insert({"url": url}).execute()
-                except Exception:
-                    pass  # Уже существует (UNIQUE constraint)
+            # Получаем уже существующие URL
+            existing = set()
+            result = sb.table(POSTED_TABLE).select("url").execute()
+            for row in (result.data or []):
+                if row.get("url"):
+                    existing.add(row["url"])
+
+            # Вставляем только новые
+            new_urls = [u for u in data["urls"][-MAX_POSTED_HISTORY:] if u not in existing]
+            if new_urls:
+                for url in new_urls:
+                    try:
+                        sb.table(POSTED_TABLE).insert({"url": url}).execute()
+                    except Exception:
+                        pass
             return
         except Exception as e:
             logger.debug("Supabase save_posted failed: %s", e)
