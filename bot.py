@@ -8,6 +8,7 @@ import time
 import hashlib
 import asyncio
 import html
+import secrets
 from datetime import datetime
 from urllib.parse import unquote
 from io import BytesIO
@@ -125,7 +126,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
     user = get_user_data(data, user_id)
 
     is_admin = False
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "-1"))
     if update.effective_user and update.effective_user.id == ADMIN_ID:
         is_admin = True
     if not is_admin and update.effective_chat.type in ["group", "supergroup"]:
@@ -246,7 +247,10 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 elif user.get("free_used", 0) % 5 == 0 and user.get("free_used", 0) > 0:
                     ref_code = user.get("ref_code", "")
                     ref_link = f"https://t.me/{context.bot.username}?start={ref_code}" if ref_code else ""
-                    total_checks = user.get("free_used", 0) + user.get("balance", 0)
+                    if user.get("balance", 0) == -1:
+                        total_checks = "∞"
+                    else:
+                        total_checks = user.get("free_used", 0) + max(0, user.get("balance", 0))
                     gentle_msg = (
                         f"📊 Вы уже сделали {total_checks} проверок с ботом!\n\n"
                         f"Если знаете кого-то в похожей ситуации — "
@@ -874,7 +878,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         data[user_id] = {
             "free_used": 0,
             "balance": 0,
-            "ref_code": f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}",
+            "ref_code": f"ref_{secrets.token_hex(8)}",
             "lang": lang,
             "created_at": datetime.now().isoformat(),
             "total_checks": 0,
@@ -1007,7 +1011,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = get_user_data(data, user_id)
     lang = get_lang(update)
 
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "-1"))
     is_admin = update.effective_user.id == ADMIN_ID
 
     if not is_admin and not user.get("vip") and not user.get("pdf_paid") and user.get("balance", 0) <= 0:
@@ -1114,7 +1118,11 @@ def parse_pdf_data(text: str) -> dict:
 def run_flask():
     import os
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    try:
+        from waitress import serve
+        serve(app, host="0.0.0.0", port=port, threads=4)
+    except ImportError:
+        app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 
 async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1155,22 +1163,6 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error(f"FAQ error: {e}")
         await update.message.reply_text("❌ Не удалось ответить. Попробуйте позже.")
 
-
-# ═══════════════════════════════════════════════════════════════
-# НОВЫЕ ФИЧИ: Избранное, Трекер, Профиль, Фильтры, Письмо
-# ═══════════════════════════════════════════════════════════════
-
-# ── Трекер заявок ──────────────────────────────────────────────
-
-# ── Профиль (для писем) ────────────────────────────────────────
-
-# ── Фильтры ────────────────────────────────────────────────────
-
-# ── Рабочий адрес (для travel time) ────────────────────────────
-
-# ── Генерация письма ───────────────────────────────────────────
-
-# ── Подписки на алерты ─────────────────────────────────────────
 
 # Global application for webhook access
 application = None
@@ -1267,7 +1259,6 @@ if __name__ == "__main__":
     WEBHOOK_URL = os.getenv("WEBHOOK_URL")
     if WEBHOOK_URL:
         logging.info("Starting bot with webhook...")
-        import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         # Initialize and start application
@@ -1283,7 +1274,7 @@ if __name__ == "__main__":
             if application:
                 update = Update.de_json(data=request.get_json(force=True), bot=application.bot)
                 if update:
-                    loop.create_task(application.process_update(update))
+                    asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
             return jsonify({"ok": True})
         # Set webhook
         async def set_webhook():
