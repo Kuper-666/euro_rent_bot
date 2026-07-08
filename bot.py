@@ -575,6 +575,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
+        query = update.callback_query
+        logger.info("Callback received: data=%s user=%s", query.data, query.from_user.id if query.from_user else "?")
         if not update.effective_user:
             return
         query = update.callback_query
