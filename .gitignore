@@ -34,6 +34,11 @@ rent_scanner/sessions/
 
 # Rent scanner data
 rent_scanner/data/
+rent_scanner/subscribed_channels.json
+
+# Test files
+test_poster.db
+test_poster.db-journal
 
 # Icons
 *.png
@@ -43,6 +48,7 @@ rent_scanner/data/
 # Patches & temp files
 *.patch
 Error.txt
+Docs.txt
 
 # IDE
 .vscode/
