@@ -224,15 +224,17 @@ class TestHandleMessage(unittest.IsolatedAsyncioTestCase):
 
     @patch("bot.save_data")
     @patch("bot.load_data")
+    @patch("bot.get_user", return_value={"free_used": 3, "balance": 0, "lang": "ru"})
     @patch("bot.update_last_activity")
-    async def test_limit_reached(self, mock_activity, mock_load, mock_save):
+    async def test_limit_reached(self, mock_activity, mock_get_user, mock_load, mock_save):
         user = make_user(free_used=3, balance=0)
         mock_load.return_value = {"123": user}
         update = make_update(text="some listing text here")
         ctx = make_context()
         uid = str(update.effective_user.id)
         self.bot_module._flood_tracker[uid] = (0, time.time())
-        await self.bot_module.handle_message(update, ctx)
+        with patch("bot.get_lang", return_value="ru"):
+            await self.bot_module.handle_message(update, ctx)
         self.assertTrue(update.message.reply_text.called)
         call_text = update.message.reply_text.call_args[0][0]
         self.assertTrue(

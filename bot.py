@@ -597,9 +597,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "Ещё одно объявление" — в личку
         if data_prefix == "new":
             await query.answer()
-            await query.edit_message_reply_markup(reply_markup=None)
-            data = load_data()
-            user = get_user_data(data, user_id)
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+            user = get_user(user_id)
             remaining = calc_remaining(user)
             await context.bot.send_message(
                 chat_id=int(user_id),
@@ -642,8 +644,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
             ])
 
-            data = load_data()
-            user = get_user_data(data, user_id)
+            user = get_user(user_id)
 
             try:
                 if not can_use(user):
@@ -673,7 +674,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "Скопировать"
         elif data_prefix == "copy":
-            await query.answer()
+            await query.answer("Скопируйте текст выше", show_alert=True)
 
         # Кнопка "Поделиться"
         elif data_prefix == "share":
@@ -756,6 +757,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     await query.answer(f"Статус: {STATUSES.get(new_status, new_status)}", show_alert=False)
                 else:
                     await query.answer("Ошибка", show_alert=True)
+            else:
+                await query.answer()
 
         # Кнопка "Письмо" после анализа
         elif data_prefix == "gen_letter":
