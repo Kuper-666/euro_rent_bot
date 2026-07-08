@@ -168,9 +168,9 @@ def ocr_from_photo(photo_bytes: bytes) -> str:
 
 
 def calc_remaining(user: dict) -> str:
-    if user["balance"] == -1:
+    if user.get("balance") == -1:
         return "∞"
-    if user["balance"] > 0:
+    if user.get("balance", 0) > 0:
         return str(user["balance"])
     return str(max(0, FREE_LIMIT - user.get("free_used", 0)))
 

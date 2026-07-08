@@ -687,10 +687,8 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         await self.bot_module.handle_callback(update, ctx)
         self.assertTrue(update.callback_query.answer.called)
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    async def test_new_callback_sends_message(self, mock_load, mock_save):
-        mock_load.return_value = {"123": {"free_used": 0, "balance": 0}}
+    @patch("bot.get_user", return_value={"free_used": 0, "balance": 5})
+    async def test_new_callback_sends_message(self, mock_get_user):
         update = make_update(user_id=123)
         update.callback_query.data = "new"
         update.callback_query.edit_message_reply_markup = AsyncMock()
