@@ -1,6 +1,7 @@
 python-telegram-bot
 groq
 flask
+asgiref
 requests
 beautifulsoup4
 pytesseract

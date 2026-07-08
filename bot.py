@@ -11,6 +11,8 @@ import html
 from datetime import datetime
 from urllib.parse import unquote
 from io import BytesIO
+from flask import request, jsonify
+from asgiref.sync import async_to_sync
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup
 )
@@ -1167,6 +1169,9 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # ── Подписки на алерты ─────────────────────────────────────────
 
+# Global application for webhook access
+application = None
+
 if __name__ == "__main__":
     # 1. Создаём приложение
     application = Application.builder().token(TELEGRAM_TOKEN).post_init(store_event_loop).build()
@@ -1247,12 +1252,7 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_group_listing))
 
-    # 3. Запускаем Flask и планировщик в фоновых потоках (до polling)
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    logging.info("Flask started in background")
-
-    # Передаём bot в scheduler ДО запуска polling
+    # Передаём bot в scheduler
     set_bot(application.bot)
     set_application(application)
 
@@ -1260,6 +1260,42 @@ if __name__ == "__main__":
     scheduler_thread.start()
     logging.info("Scheduler started in background")
 
-    # 4. Запускаем бота (в основном потоке)
-    logging.info("Starting bot polling...")
-    application.run_polling(drop_pending_updates=True)
+    # 3. Check if WEBHOOK_URL is set
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+    if WEBHOOK_URL:
+        logging.info("Starting bot with webhook...")
+        # Initialize application
+        application.initialize()
+        # Start application
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.start())
+        # Run Flask in main thread
+        from web import app
+        # Add webhook route to Flask app
+        @app.post(f"/{TELEGRAM_TOKEN}")
+        def webhook():
+            if application:
+                update = Update.de_json(data=request.get_json(force=True), bot=application.bot)
+                if update:
+                    loop.create_task(application.process_update(update))
+            return jsonify({"ok": True})
+        # Set webhook
+        async def set_webhook():
+            await application.bot.set_webhook(WEBHOOK_URL + f"/{TELEGRAM_TOKEN}")
+        loop.run_until_complete(set_webhook())
+        logging.info(f"Webhook set to {WEBHOOK_URL}/{TELEGRAM_TOKEN}")
+        # Run Flask in a thread
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        # Keep the main thread alive
+        loop.run_forever()
+    else:
+        # Run Flask in background thread
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        logging.info("Flask started in background")
+        # 4. Запускаем бота в polling mode
+        logging.info("Starting bot polling...")
+        application.run_polling(drop_pending_updates=True)
