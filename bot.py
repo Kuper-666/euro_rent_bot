@@ -168,14 +168,15 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         # Добавляем примечание о городе
         city_note = ""
         if city_key:
-            ci = POPULAR_CITIES[city_key]
-            city_note = f"\n\n🏙 Город: {ci['emoji']} {ci['name']}"
-            if price and ci.get("avg_price"):
-                ratio = price / ci["avg_price"]
-                if ratio < 0.75:
-                    city_note += f"\n🔥 Цена {price} EUR — ниже средней ({ratio:.0%})"
-                elif ratio < 0.9:
-                    city_note += f"\n💰 Цена {price} EUR — ниже средней"
+            ci = POPULAR_CITIES.get(city_key)
+            if ci:
+                city_note = f"\n\n🏙 Город: {ci['emoji']} {ci['name']}"
+                if price and ci.get("avg_price"):
+                    ratio = price / ci["avg_price"]
+                    if ratio < 0.75:
+                        city_note += f"\n🔥 Цена {price} EUR — ниже средней ({ratio:.0%})"
+                    elif ratio < 0.9:
+                        city_note += f"\n💰 Цена {price} EUR — ниже средней"
 
         if is_admin:
             save_data(data)
@@ -276,9 +277,9 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         work_address = user.get("work_address", "")
         travel_note = ""
         if work_address and city_key and city_key in POPULAR_CITIES:
-            from travel_time import calc_travel_time
+            from travel_time import calc_travel_time_async
             city_name = POPULAR_CITIES[city_key].get("name", city_key)
-            travel = calc_travel_time(work_address, city_name)
+            travel = await calc_travel_time_async(work_address, city_name)
             if travel:
                 travel_note = f"\n\n🚗 <b>До работы:</b> {travel['text']}"
 
@@ -299,7 +300,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 reply_markup=kb(update)
             )
         else:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
 
 
 def check_followups(user: dict, lang: str) -> str:
@@ -515,7 +516,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
         logging.error(f"process_listing error for user {user_id}: {e}")
         try:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
         except Exception:
             pass
 
@@ -577,7 +578,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     except Exception as e:
         logging.error(f"process_listing (photo) error for user {user_id}: {e}")
         try:
-            await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
         except Exception:
             pass
 
@@ -912,7 +913,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 except Exception as e:
                     logging.error("process_listing (start token) error for user %s: %s", user_id, e)
                     try:
-                        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+                        await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
                     except Exception:
                         pass
                 return
@@ -949,7 +950,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 except Exception as e:
                     logging.error(f"process_listing (start) error for user {user_id}: {e}")
                     try:
-                        await update.message.reply_text(get_msg(lang, "error").format(e), reply_markup=kb(update))
+                        await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
                     except Exception:
                         pass
                 return

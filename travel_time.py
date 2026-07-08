@@ -3,6 +3,7 @@ Travel Time Calculator через OSRM (OpenStreetMap).
 Бесплатный API для расчета времени в пути.
 """
 import os
+import asyncio
 import logging
 import re
 import requests
@@ -29,13 +30,7 @@ def geocode(address: str) -> tuple[float, float] | None:
 
 
 def calc_travel_time(origin: str, destination: str) -> dict | None:
-    """Рассчитывает время в пути между двумя адресами.
-
-    Возвращает dict с ключами:
-    - duration_min: время в минутах
-    - distance_km: расстояние в км
-    - text: человекочитаемая строка
-    """
+    """Рассчитывает время в пути между двумя адресами."""
     origin_coords = geocode(origin)
     dest_coords = geocode(destination)
 
@@ -75,3 +70,8 @@ def calc_travel_time(origin: str, destination: str) -> dict | None:
     except Exception as e:
         logger.warning("Travel time error: %s", e)
         return None
+
+
+async def calc_travel_time_async(origin: str, destination: str) -> dict | None:
+    """Async обёртка — не блокирует event loop."""
+    return await asyncio.to_thread(calc_travel_time, origin, destination)
