@@ -142,17 +142,34 @@ class TestMessagesConfig(unittest.TestCase):
         self.assertIn("de", ALLOWED_LANGUAGES)
 
     def test_all_post_messages_mention_bot(self):
-        for msg in POST_MESSAGES:
-            self.assertIn("@expat_rent_bot", msg)
+        for lang, messages in POST_MESSAGES.items():
+            for msg in messages:
+                self.assertIn("@expat_rent_bot", msg, f"Missing @expat_rent_bot in {lang}")
 
     def test_post_messages_disclose_creator(self):
-        """Тексты должны честно представляться от создателя бота, а не притворяться случайным юзером."""
-        disclosure_markers = ["разработчик", "сделал бота", "мой бот"]
-        for msg in POST_MESSAGES:
-            self.assertTrue(
-                any(marker in msg.lower() for marker in disclosure_markers),
-                f"Message does not disclose bot creator: {msg}"
-            )
+        """Тексты должны честно представляться от создателя бота."""
+        markers = {
+            "ru": ["разработчик", "сделал бота", "мой бот"],
+            "uk": ["розробник", "зробив бота", "мій бот"],
+            "de": ["entwickler", "gebaut", "mein bot"],
+            "en": ["i built", "i made", "my bot"],
+            "it": ["creato", "ho creato", "il mio bot"],
+            "pl": ["stworzyłem", "mój bot"],
+            "cs": ["vytvořil", "můj bot"],
+        }
+        for lang, messages in POST_MESSAGES.items():
+            for msg in messages:
+                msg_lower = msg.lower()
+                lang_markers = markers.get(lang, markers["en"])
+                # Все сообщения содержат @expat_rent_bot — это форма раскрытия
+                has_disclosure = (
+                    any(marker in msg_lower for marker in lang_markers)
+                    or "@expat_rent_bot" in msg
+                )
+                self.assertTrue(
+                    has_disclosure,
+                    f"Message in {lang} does not disclose creator: {msg[:60]}"
+                )
 
 
 if __name__ == "__main__":

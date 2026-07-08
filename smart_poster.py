@@ -56,13 +56,45 @@ RENT_KEYWORDS = [
     "nebenkosten", "kaution", "warmmiete", "kaltmiete",
 ]
 
-# ── Сообщения для постинга ────────────────────────────────────────
-POST_MESSAGES = [
-    "Привет! Я разработчик бота @expat_rent_bot — он за 5 секунд проверяет объявления об аренде и находит скрытые платежи. Первые 3 проверки бесплатно, если кому пригодится.",
-    "Кто ищет квартиру? Сделал бота @expat_rent_bot — переводит объявления, считает реальную цену с учётом всех платежей. Бесплатно 3 проверки.",
-    "Если сталкивались с непонятными Nebenkosten в объявлениях — я сделал бота @expat_rent_bot, который разбирает это автоматически.",
-    "Переезжаете и разбираете объявления об аренде? Мой бот @expat_rent_bot анализирует их и показывает реальную цену за 5 секунд.",
-]
+# ── Сообщения для постинга (мультиязычные) ────────────────────────
+POST_MESSAGES = {
+    "ru": [
+        "Привет! Я разработчик бота @expat_rent_bot — он за 5 секунд проверяет объявления об аренде и находит скрытые платежи. Первые 3 проверки бесплатно, если кому пригодится.",
+        "Кто ищет квартиру? Сделал бота @expat_rent_bot — переводит объявления, считает реальную цену с учётом всех платежей. Бесплатно 3 проверки.",
+        "Если сталкивались с непонятными Nebenkosten в объявлениях — я сделал бота @expat_rent_bot, который разбирает это автоматически.",
+        "Переезжаете и разбираете объявления об аренде? Мой бот @expat_rent_bot анализирует их и показывает реальную цену за 5 секунд.",
+    ],
+    "uk": [
+        "Привіт! Я розробник бота @expat_rent_bot — він за 5 секунд перевіряє оголошення про оренду і знаходить приховані платежі. Перші 3 перевірки безкоштовно.",
+        "Хто шукає квартиру? Зробив бота @expat_rent_bot — перекладає оголошення, рахує реальну ціну з усіма платежами. Безкоштовно 3 перевірки.",
+        "Якщо стикалися з незрозумілими Nebenkosten — я зробив бота @expat_rent_bot, який розбирає це автоматично.",
+    ],
+    "de": [
+        "Hallo! Ich bin der Entwickler von @expat_rent_bot — er prüft Mietangebote in 5 Sekunden und findet versteckte Gebühren. Die ersten 3 Prüfungen sind kostenlos.",
+        "Wer sucht eine Wohnung? Ich habe @expat_rent_bot gebaut — übersetzt Angebote, berechnet den echten Preis inkl. aller Nebenkosten. 3 kostenlose Prüfungen.",
+        "Wenn ihr euch mit unverständlichen Nebenkosten abmüsst — mein Bot @expat_rent_bot analysiert das automatisch.",
+    ],
+    "en": [
+        "Hi! I built @expat_rent_bot — it checks rental listings in 5 seconds and finds hidden fees. First 3 checks are free!",
+        "Looking for an apartment? @expat_rent_bot translates listings, calculates the real price with all fees. 3 free checks.",
+        "Tired of confusing Nebenkosten? My bot @expat_rent_bot breaks it all down automatically.",
+    ],
+    "it": [
+        "Ciao! Ho creato @expat_rent_bot — controlla gli annunci di affitto in 5 secondi e trova le spese nascoste. I primi 3 controlli sono gratis!",
+        "Cerchi un appartamento? @expat_rent_bot traduce gli annunci, calcola il prezzo reale con tutte le spese. 3 controlli gratuiti.",
+        "Se ti confondono le spese accessorie — il mio bot @expat_rent_bot le analizza automaticamente.",
+    ],
+    "pl": [
+        "Cześć! Stworzyłem @expat_rent_bot — sprawdza oferty wynajmu w 5 sekund i znajduje ukryte opłaty. Pierwsze 3 sprawdzenia za darmo!",
+        "Szukasz mieszkania? @expat_rent_bot tłumaczy oferty, oblicza realną cenę ze wszystkimi opłatami. 3 darmowe sprawdzenia.",
+        "Jeśli męczą Cię niezrozumiałe Nebenkosten — mój bot @expat_rent_bot analizuje to automatycznie.",
+    ],
+    "cs": [
+        "Ahoj! Vytvořil jsem @expat_rent_bot — kontroluje nabídky pronájmu za 5 sekund a najde skryté poplatky. První 3 kontroly zdarma!",
+        "Hledáte byt? @expat_rent_bot překládá nabídky, počítá skutečnou cenu se všemi poplatky. 3 kontroly zdarma.",
+        "Pokud vás mátou nesrozumitelné Nebenkosten — můj bot @expat_rent_bot je analyzuje automaticky.",
+    ],
+}
 
 SENT_HISTORY_FILE = "sent_groups_history.txt"
 SMART_POSTER_DB = "data/smart_poster.db"
@@ -294,11 +326,16 @@ class SmartPoster:
 
         for entity in selected:
             try:
-                msg = random.choice(POST_MESSAGES)
+                # Определяем язык группы по названию
+                title = entity.title or ""
+                group_lang = detect_language(title)
+                if group_lang not in POST_MESSAGES:
+                    group_lang = "ru"
+                msg = random.choice(POST_MESSAGES[group_lang])
                 await self.client.send_message(entity, msg)
                 self.storage.mark_sent(entity.id, entity.title or "")
                 self.storage.log_post(entity.id, entity.title or "", msg)
-                logger.info(f"Posted to {entity.title}")
+                logger.info(f"Posted to {entity.title} (lang={group_lang})")
                 await asyncio.sleep(random.uniform(5, 10))
             except Exception as e:
                 logger.error(f"Error posting to {entity.title}: {e}")
