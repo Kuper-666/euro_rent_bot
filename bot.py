@@ -12,7 +12,6 @@ from datetime import datetime
 from urllib.parse import unquote
 from io import BytesIO
 from flask import request, jsonify
-from asgiref.sync import async_to_sync
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup
 )
@@ -140,11 +139,14 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
     try:
         system_prompt = get_msg(lang, "system_prompt")
         full_prompt = f"{system_prompt}\n\nListing text:\n{listing_text}"
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": full_prompt}]
         )
         result = response.choices[0].message.content
+        if not result:
+            result = "No analysis generated."
 
         # Сохраняем URL для /favorite
         track_last_url(user_id, listing_text[:200])
@@ -389,6 +391,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if pdf_state == "awaiting_data":
         user.pop("pdf_state", None)
         user.pop("pdf_started_at", None)
+        save_data(data)
         pdf_data = parse_pdf_data(update.message.text)
         if not pdf_data:
             await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
@@ -579,7 +582,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         query = update.callback_query
         logger.info("Callback received: data=%s user=%s", query.data, query.from_user.id if query.from_user else "?")
-        if not update.effective_user:
+        if not update.effective_user or not query.data:
+            return
             await query.answer()
             return
         
@@ -588,11 +592,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
         
-        # Acknowledge the callback FIRST to prevent timeout
-        if not data_prefix.startswith("lang_") and not data_prefix in ("copy", "copy_letter") and not data_prefix.startswith("filter") and not data_prefix.startswith("fav_") and not data_prefix.startswith("track"):
-            await query.answer()
-
-        # Кнопка "Язык" — отвечаем с alert, но first acknowledge
+        # Кнопка "Язык" — отвечаем с alert, пропускаем общий answer
         if data_prefix.startswith("lang_"):
             new_lang = data_prefix.split("_", 1)[1]
             uid = str(query.from_user.id)
@@ -1138,7 +1138,8 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "кратко и по делу на русском языке. Максимум 200 слов. "
             "Если вопрос не про аренду — вежливо перенаправляй на тему."
         )
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -1146,7 +1147,9 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             ],
             max_tokens=400,
         )
-        answer = response.choices[0].message.content.strip()
+        answer = response.choices[0].message.content
+        if not answer:
+            answer = "Не удалось сформировать ответ."
         await update.message.reply_text(answer)
     except Exception as e:
         logger.error(f"FAQ error: {e}")
@@ -1202,7 +1205,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("pay_3", pay_3, priv))
     application.add_handler(CommandHandler("pay_9", pay_9, priv))
     application.add_handler(CommandHandler("pay_19", pay_19, priv))
-    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT & priv, successful_payment))
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(CommandHandler("pin", pin_message, priv))
     application.add_handler(CommandHandler("subscribe_email", subscribe_email, priv))
