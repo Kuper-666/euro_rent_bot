@@ -666,18 +666,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             token_or_short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
             bot_username = context.bot.username
 
-            rss_url = resolve_url_token(token_or_short_id)
+            rss_url = await asyncio.to_thread(resolve_url_token, token_or_short_id)
 
             if not rss_url:
                 try:
                     from daily_poster import get_listing
-                    listing = get_listing(token_or_short_id)
+                    listing = await asyncio.to_thread(get_listing, token_or_short_id)
                     rss_url = listing.get("url", "")
                 except Exception:
                     pass
 
             if rss_url and is_url(rss_url):
-                new_token = create_url_token(rss_url)
+                new_token = await asyncio.to_thread(create_url_token, rss_url)
                 analyze_url = f"https://t.me/{bot_username}?start=an_{new_token}"
             else:
                 analyze_url = f"https://t.me/{bot_username}"
