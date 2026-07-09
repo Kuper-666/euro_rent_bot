@@ -45,6 +45,8 @@ def make_context(bot_username="TestBot"):
     ctx.bot.username = bot_username
     ctx.bot.id = 999
     ctx.bot.get_chat_member = AsyncMock(return_value=MagicMock(status="member"))
+    ctx.bot.send_message = AsyncMock()
+    ctx.bot.send_document = AsyncMock()
     ctx.args = []
     return ctx
 
@@ -652,15 +654,56 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         self.assertIn("English", call_args[0][0])
         self.assertTrue(call_args[1]["show_alert"])
 
-    async def test_lang_callback_returns_early(self):
+    async def test_lang_callback_sends_confirmation_message(self):
+        """After language switch, bot clears keyboard and sends welcome in new language."""
         update = make_update(user_id=123)
         update.callback_query.data = "lang_ru"
+        update.callback_query.edit_message_reply_markup = AsyncMock()
         ctx = make_context()
         with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
             with patch("bot.save_user"):
                 with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
                     await self.bot_module.handle_callback(update, ctx)
-        ctx.bot.send_message.assert_not_called()
+        update.callback_query.edit_message_reply_markup.assert_called_once_with(reply_markup=None)
+        ctx.bot.send_message.assert_called_once()
+        call_kwargs = ctx.bot.send_message.call_args[1]
+        self.assertEqual(call_kwargs["chat_id"], 123)
+
+    async def test_lang_callback_answers_before_db_access(self):
+        """answer() must fire BEFORE database read/write (10s Telegram timeout)."""
+        call_order = []
+        update = make_update(user_id=123)
+        update.callback_query.data = "lang_de"
+
+        async def record_answer(*a, **k):
+            call_order.append("answer")
+        update.callback_query.answer = AsyncMock(side_effect=record_answer)
+
+        def record_get_user(uid):
+            call_order.append("get_user")
+            return {"free_used": 0, "balance": 0}
+
+        def record_save_user(uid, data):
+            call_order.append("save_user")
+
+        ctx = make_context()
+        with patch("bot.get_user", side_effect=record_get_user):
+            with patch("bot.save_user", side_effect=record_save_user):
+                with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
+                    await self.bot_module.handle_callback(update, ctx)
+
+        self.assertEqual(call_order[0], "answer", f"answer() must be first, got order: {call_order}")
+
+    async def test_lang_callback_db_failure_notifies_user(self):
+        """If DB save fails, user gets explicit error message."""
+        update = make_update(user_id=123)
+        update.callback_query.data = "lang_en"
+        ctx = make_context()
+        with patch("bot.get_user", side_effect=Exception("Supabase unavailable")):
+            await self.bot_module.handle_callback(update, ctx)
+        ctx.bot.send_message.assert_called_once()
+        call_kwargs = ctx.bot.send_message.call_args[1]
+        self.assertEqual(call_kwargs["chat_id"], 123)
 
 
 # ── Callback handler branches ──────────────────────────────────────
