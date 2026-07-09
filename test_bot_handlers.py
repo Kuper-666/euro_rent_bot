@@ -506,8 +506,7 @@ class TestGetLang(unittest.TestCase):
         from utils import get_lang
         update = make_update(user_id=123)
         update.effective_user.language_code = "en"
-        fake_data = {"123": {"lang": "de"}}
-        with patch("utils.load_data", return_value=fake_data):
+        with patch("utils.get_user", return_value={"lang": "de"}):
             result = get_lang(update)
         self.assertEqual(result, "de")
 
@@ -515,7 +514,7 @@ class TestGetLang(unittest.TestCase):
         from utils import get_lang
         update = make_update(user_id=123)
         update.effective_user.language_code = "de"
-        with patch("utils.load_data", return_value={}):
+        with patch("utils.get_user", return_value={}):
             result = get_lang(update)
         self.assertEqual(result, "de")
 
@@ -523,7 +522,7 @@ class TestGetLang(unittest.TestCase):
         from utils import get_lang
         update = make_update(user_id=123)
         update.effective_user.language_code = "fr"
-        with patch("utils.load_data", return_value={}):
+        with patch("utils.get_user", return_value={}):
             result = get_lang(update)
         self.assertEqual(result, "en")
 
@@ -717,9 +716,9 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
     async def test_skip_ad_answers_ok(self, mock_load):
         update = make_update(user_id=123)
         update.callback_query.data = "skip_ad"
+        update.callback_query.edit_message_reply_markup = AsyncMock()
         ctx = make_context()
         await self.bot_module.handle_callback(update, ctx)
-        # skip_ad now uses the generic query.answer() — just verify it was called
         update.callback_query.answer.assert_called_once()
 
     @patch("bot.load_data")
@@ -1050,7 +1049,7 @@ class TestLangCommand(unittest.IsolatedAsyncioTestCase):
     async def _check_lang_text(self, lang_code, expected_text):
         update = make_update(user_id=123)
         ctx = make_context()
-        with patch("utils.load_data", return_value={"123": {"lang": lang_code}}):
+        with patch("utils.get_user", return_value={"lang": lang_code}):
             await self.bot_module.lang_command(update, ctx)
         text = update.message.reply_text.call_args[0][0]
         self.assertIn(expected_text, text)

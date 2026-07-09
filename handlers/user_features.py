@@ -3,6 +3,7 @@
 """
 import html
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -328,7 +329,7 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
 
     await update.message.reply_text("📝 Генерирую письмо...", reply_markup=kb(update))
 
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     # Используем предпочтительный язык из профиля, если указан
     letter_lang = profile.get("preferred_letter_lang", "")
     if letter_lang not in ("de", "en"):
@@ -391,7 +392,7 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     await update.message.reply_text("💬 Генерирую ответ...", reply_markup=kb(update))
 
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     reply_lang = profile.get("preferred_letter_lang", "")
     if reply_lang not in ("de", "en"):
         reply_lang = "de" if lang in ("ru", "de") else "en"

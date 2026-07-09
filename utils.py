@@ -11,7 +11,7 @@ from collections import OrderedDict
 
 from config import FREE_LIMIT, SUBSCRIPTION_DAYS, GROQ_RATE_LIMIT_SECONDS
 from messages import DEFAULT_LANG, MESSAGES
-from storage import load_data, save_data
+from storage import load_data, save_data, get_user
 
 
 class LimitedDict(OrderedDict):
@@ -55,8 +55,7 @@ _last_groq_call = LimitedDict(max_size=10000, ttl=3600)
 def get_lang(update: Update) -> str:
     try:
         user_id = str(update.effective_user.id)
-        data = load_data()
-        user = get_user_data(data, user_id)
+        user = get_user(user_id)
         saved = user.get("lang")
         if saved and saved in MESSAGES:
             return saved

@@ -367,7 +367,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     text = update.message.text.replace('\xa0', ' ').strip().lower()
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     btn_map = {
         "старт": start, "start": start,
@@ -530,7 +530,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not update.effective_user:
         return
     user_id = str(update.effective_user.id)
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     data = load_data()
     user = get_user_data(data, user_id)
 
@@ -633,7 +633,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 logger.warning("Failed to send post-language-switch message: %s", e)
             return
 
-        lang = get_lang(update)
+        lang = await asyncio.to_thread(get_lang, update)
         user_id = str(update.effective_user.id)
 
         # Кнопка "Ещё одно объявление" — в личку
@@ -759,11 +759,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif data_prefix == "filter":
             filter_type = query.data.split(":")[1] if ":" in query.data else ""
             if filter_type in ("furnished", "pets", "parking"):
-                user_filters = get_user_filters(user_id)
+                user_filters = await asyncio.to_thread(get_user_filters, user_id)
                 field = f"filter_{filter_type}"
                 new_val = not user_filters.get(field, False)
                 user_filters[field] = new_val
-                save_user_filters(
+                await asyncio.to_thread(
+                    save_user_filters,
                     user_id,
                     furnished=user_filters.get("filter_furnished", False),
                     pets=user_filters.get("filter_pets", False),
@@ -772,8 +773,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 icon = "✅" if new_val else "❌"
                 label = {"furnished": "Мебель", "pets": "Питомцы", "parking": "Парковка"}[filter_type]
                 await query.answer(f"{label}: {icon}", show_alert=False)
-                # Обновляем клавиатуру
-                user_filters = get_user_filters(user_id)
                 furnished = "✅" if user_filters.get("filter_furnished") else "❌"
                 pets_f = "✅" if user_filters.get("filter_pets") else "❌"
                 parking = "✅" if user_filters.get("filter_parking") else "❌"
@@ -782,14 +781,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     [InlineKeyboardButton(f"🐾 Питомцы: {pets_f}", callback_data="filter:pets")],
                     [InlineKeyboardButton(f"🅿️ Парковка: {parking}", callback_data="filter:parking")],
                 ])
-                await query.edit_message_reply_markup(reply_markup=keyboard)
+                try:
+                    await query.edit_message_reply_markup(reply_markup=keyboard)
+                except Exception:
+                    pass
 
         # Удаление из избранного
         elif data_prefix == "fav_del":
             fav_id = int(query.data.split(":")[1]) if ":" in query.data else 0
-            if fav_id and remove_favorite(user_id, fav_id):
+            if fav_id and await asyncio.to_thread(remove_favorite, user_id, fav_id):
                 await query.answer("Удалено из избранного", show_alert=False)
-                await query.edit_message_reply_markup(reply_markup=None)
+                try:
+                    await query.edit_message_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
             else:
                 await query.answer("Ошибка удаления", show_alert=True)
 
@@ -799,7 +804,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             if len(parts) == 3:
                 entry_id = int(parts[1])
                 new_status = parts[2]
-                if update_tracker_status(user_id, entry_id, new_status):
+                if await asyncio.to_thread(update_tracker_status, user_id, entry_id, new_status):
                     await query.answer(f"Статус: {STATUSES.get(new_status, new_status)}", show_alert=False)
                 else:
                     await query.answer("Ошибка", show_alert=True)
@@ -854,7 +859,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             fallback_text = get_last_listing_text(user_id)
             if last_url or fallback_text:
                 from user_features import add_favorite
-                ok = add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
+                ok = await asyncio.to_thread(add_favorite, user_id, last_url or fallback_text[:200], "Из анализа")
                 if ok:
                     await query.answer("⭐ Добавлено в избранное!", show_alert=False)
                 else:
@@ -903,7 +908,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user:
         return
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     user_id = str(update.effective_user.id)
     data = load_data()
@@ -1016,7 +1021,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     icon_path = os.path.join(os.path.dirname(__file__), "icons", "help.png")
     if os.path.exists(icon_path):
         with open(icon_path, "rb") as photo:
@@ -1043,7 +1048,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = str(update.effective_user.id)
     data = load_data()
     user = get_user_data(data, user_id)
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     ADMIN_ID = int(os.getenv("ADMIN_ID", "-1"))
     is_admin = update.effective_user.id == ADMIN_ID
@@ -1114,7 +1119,7 @@ _LANG_PROMPT = {
 
 
 async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🇷🇺 Русский", callback_data="lang_ru"),
@@ -1132,7 +1137,7 @@ async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def pay_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "vip_intro"), reply_markup=kb(update))
 
 

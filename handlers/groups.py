@@ -3,6 +3,7 @@
 import re
 import time
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -149,7 +150,7 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     if not has_url and not is_long_text:
         return
 
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     if has_url:
         listing_url = text.strip().split()[0]

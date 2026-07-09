@@ -2,6 +2,7 @@
 import os
 import time
 import logging
+import asyncio
 from telegram import Update, LabeledPrice
 from telegram.ext import ContextTypes
 
@@ -144,7 +145,8 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["last_paid_at"] = time.time()
     save_user(user_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-    await update.message.reply_text(get_msg(get_lang(update), "pay_done_3").format(remaining), reply_markup=kb(update))
+    lang = await asyncio.to_thread(get_lang, update)
+    await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -155,7 +157,8 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user["last_paid_at"] = time.time()
     save_user(user_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-    await update.message.reply_text(get_msg(get_lang(update), "pay_done_9").format(remaining), reply_markup=kb(update))
+    lang = await asyncio.to_thread(get_lang, update)
+    await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=kb(update))
 
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -165,7 +168,8 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user["balance"] = -1
     user["last_paid_at"] = time.time()
     save_user(user_id, user)
-    await update.message.reply_text(get_msg(get_lang(update), "pay_done_19"), reply_markup=kb(update))
+    lang = await asyncio.to_thread(get_lang, update)
+    await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=kb(update))
 
 
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -176,7 +180,8 @@ async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["pdf_state"] = "awaiting_data"
     user["pdf_started_at"] = time.time()
     save_user(user_id, user)
-    await update.message.reply_text(get_msg(get_lang(update), "pdf_need_data"), reply_markup=kb(update))
+    lang = await asyncio.to_thread(get_lang, update)
+    await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=kb(update))
 
 
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -186,7 +191,8 @@ async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user["vip"] = True
     user["vip_state"] = "awaiting_criteria"
     save_user(user_id, user)
-    await update.message.reply_text(get_msg(get_lang(update), "vip_ask_criteria"), reply_markup=kb(update))
+    lang = await asyncio.to_thread(get_lang, update)
+    await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=kb(update))
 
 
 # ── Пакеты ─────────────────────────────────────────────────────
@@ -205,7 +211,7 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     if user.get("pdf_paid"):
         user["pdf_state"] = "awaiting_data"
@@ -220,7 +226,7 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
 
     if user.get("vip"):
         text = "VIP уже активирован! Критерии: " + user.get("vip_criteria", "не заданы")
