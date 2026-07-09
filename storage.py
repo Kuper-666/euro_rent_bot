@@ -87,6 +87,8 @@ def _user_to_row(uid: str, info: dict) -> dict:
         "profile_state": info.get("profile_state", ""),
         "timezone": info.get("timezone", ""),
         "last_letter": info.get("last_letter", ""),
+        "last_listing_url": info.get("last_listing_url", ""),
+        "last_listing_text": info.get("last_listing_text", ""),
     }
 
 
@@ -122,6 +124,8 @@ def _row_to_user(row: dict) -> dict:
         "profile_state": row.get("profile_state", ""),
         "timezone": row.get("timezone", ""),
         "last_letter": row.get("last_letter", ""),
+        "last_listing_url": row.get("last_listing_url", ""),
+        "last_listing_text": row.get("last_listing_text", ""),
     }
 
 

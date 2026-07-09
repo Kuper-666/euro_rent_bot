@@ -742,6 +742,83 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["chat_id"], 123)
 
 
+# ── Last analyzed listing tracking (favorites / letters) ───────────
+
+class TestLastListingTracking(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        import bot as bot_module
+        import handlers.user_features as huf_module
+        self.bot_module = bot_module
+        self.huf_module = huf_module
+        self.huf_module._last_analyzed_cache.clear()
+
+    async def test_fav_save_uses_real_url_not_listing_text(self):
+        from handlers.user_features import track_last_url
+        user_id = "123"
+        with patch("handlers.user_features.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("handlers.user_features.save_user"):
+                track_last_url(user_id, "https://example.com/listing/42", "Some scraped ad text here")
+        update = make_update(user_id=123)
+        update.callback_query.data = "fav_save"
+        ctx = make_context()
+        with patch("user_features.add_favorite") as mock_add_fav:
+            mock_add_fav.return_value = True
+            await self.bot_module.handle_callback(update, ctx)
+        mock_add_fav.assert_called_once()
+        saved_url = mock_add_fav.call_args[0][1]
+        self.assertEqual(saved_url, "https://example.com/listing/42")
+
+    async def test_gen_letter_uses_listing_text_not_url(self):
+        from handlers.user_features import track_last_url
+        user_id = "123"
+        with patch("handlers.user_features.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("handlers.user_features.save_user"):
+                track_last_url(user_id, "https://example.com/listing/42", "Some scraped ad text here")
+        update = make_update(user_id=123)
+        update.callback_query.data = "gen_letter"
+        ctx = make_context()
+        with patch("bot.get_profile", return_value={"full_name": "A", "profession": "B", "income": "C", "employer": "D"}):
+            with patch("bot.generate_letter", return_value="Dear Sir/Madam...") as mock_gen:
+                with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
+                    with patch("bot.save_user"):
+                        await self.bot_module.handle_callback(update, ctx)
+        mock_gen.assert_called_once()
+        listing_text_arg = mock_gen.call_args[0][1]
+        self.assertEqual(listing_text_arg, "Some scraped ad text here")
+
+    async def test_fav_save_with_no_url_falls_back_to_text(self):
+        from handlers.user_features import track_last_url
+        user_id = "123"
+        with patch("handlers.user_features.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("handlers.user_features.save_user"):
+                track_last_url(user_id, "", "Raw pasted ad text without any link")
+        update = make_update(user_id=123)
+        update.callback_query.data = "fav_save"
+        ctx = make_context()
+        with patch("user_features.add_favorite") as mock_add_fav:
+            mock_add_fav.return_value = True
+            await self.bot_module.handle_callback(update, ctx)
+        mock_add_fav.assert_called_once()
+        saved_value = mock_add_fav.call_args[0][1]
+        self.assertIn("Raw pasted ad text", saved_value)
+
+    async def test_last_listing_survives_in_memory_cache_clear(self):
+        from handlers.user_features import track_last_url, get_last_url, get_last_listing_text
+        user_id = "123"
+        stored = {}
+        def fake_save_user(uid, data):
+            stored[uid] = dict(data)
+        def fake_get_user(uid):
+            return dict(stored.get(uid, {"free_used": 0, "balance": 0}))
+        with patch("handlers.user_features.get_user", side_effect=fake_get_user):
+            with patch("handlers.user_features.save_user", side_effect=fake_save_user):
+                track_last_url(user_id, "https://example.com/x", "listing text")
+        self.huf_module._last_analyzed_cache.clear()
+        with patch("handlers.user_features.get_user", side_effect=fake_get_user):
+            self.assertEqual(get_last_url(user_id), "https://example.com/x")
+            self.assertEqual(get_last_listing_text(user_id), "listing text")
+
+
 # ── Button routing ─────────────────────────────────────────────────
 
 class TestButtonRouting(unittest.IsolatedAsyncioTestCase):

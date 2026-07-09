@@ -19,18 +19,48 @@ from services.keyboards import kb
 
 logger = logging.getLogger(__name__)
 
-# Временное хранилище последнего проанализированного URL
-_last_analyzed_url = {}
+# Быстрый in-process кэш — экономит round-trip к БД.
+# НЕ единственный источник истины: при рестарте он обнуляется,
+# поэтому данные всегда читаются/пишутся через storage.
+_last_analyzed_cache = {}
 
 
-def track_last_url(user_id: str, url: str):
-    """Сохраняет URL последнего анализа для /favorite."""
-    _last_analyzed_url[user_id] = url
+def track_last_url(user_id: str, url: str, listing_text: str = ""):
+    """Сохраняет последнее проанализированное объявление для /favorite и /generate_letter."""
+    _last_analyzed_cache[user_id] = {"url": url or "", "text": listing_text or ""}
+    try:
+        user = get_user(user_id)
+        user["last_listing_url"] = url or ""
+        user["last_listing_text"] = listing_text or ""
+        save_user(user_id, user)
+    except Exception as e:
+        logger.warning("Failed to persist last listing for user=%s: %s", user_id, e)
 
 
 def get_last_url(user_id: str) -> str:
-    """Возвращает URL последнего анализа."""
-    return _last_analyzed_url.get(user_id, "")
+    """Возвращает оригинальную ссылку последнего анализа (для /favorite)."""
+    cached = _last_analyzed_cache.get(user_id)
+    if cached is not None:
+        return cached["url"]
+    try:
+        user = get_user(user_id)
+        return user.get("last_listing_url", "")
+    except Exception as e:
+        logger.warning("Failed to read last listing url for user=%s: %s", user_id, e)
+    return ""
+
+
+def get_last_listing_text(user_id: str) -> str:
+    """Возвращает текст последнего проанализированного объявления (для писем)."""
+    cached = _last_analyzed_cache.get(user_id)
+    if cached is not None and cached["text"]:
+        return cached["text"]
+    try:
+        user = get_user(user_id)
+        return user.get("last_listing_text", "")
+    except Exception as e:
+        logger.warning("Failed to read last listing text for user=%s: %s", user_id, e)
+        return ""
 
 
 # ── Избранное ──────────────────────────────────────────────────
@@ -38,15 +68,16 @@ def get_last_url(user_id: str) -> str:
 async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     last_url = get_last_url(user_id)
+    fallback_text = get_last_listing_text(user_id)
 
-    if not last_url:
+    if not last_url and not fallback_text:
         await update.message.reply_text(
             "⭐ Сначала проанализируйте объявление, потом /favorite.",
             reply_markup=kb(update)
         )
         return
 
-    ok = add_favorite(user_id, last_url, title="Из анализа")
+    ok = add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
     if ok:
         await update.message.reply_text(
             "⭐ Добавлено в избранное!\n\nПосмотреть: /favorites",
@@ -287,8 +318,8 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
         )
         return
 
-    last_url = get_last_url(user_id)
-    if not last_url:
+    last_listing_text = get_last_listing_text(user_id)
+    if not last_listing_text:
         await update.message.reply_text(
             "📝 Сначала проанализируйте объявление, потом /generate_letter.",
             reply_markup=kb(update)
@@ -303,7 +334,7 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
     if letter_lang not in ("de", "en"):
         letter_lang = "de" if lang in ("ru", "de") else "en"
 
-    letter = generate_letter(profile, last_url, lang=letter_lang)
+    letter = generate_letter(profile, last_listing_text, lang=letter_lang)
 
     if letter:
         # Кнопка для копирования и PDF
@@ -347,9 +378,9 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if context.args:
         landlord_message = " ".join(context.args)
     else:
-        last_url = get_last_url(user_id)
-        if last_url:
-            landlord_message = last_url
+        last_listing_text = get_last_listing_text(user_id)
+        if last_listing_text:
+            landlord_message = last_listing_text
         else:
             await update.message.reply_text(
                 "💬 /reply сообщение_арендодателя\n\n"

@@ -46,7 +46,7 @@ from handlers.user_features import (
     set_profile_command, skip_profile_command, profile_command,
     filters_command, set_work_address_command, generate_letter_command, reply_command,
     subscribe_alert_command, unsubscribe_alert_command, my_alerts_command,
-    handle_profile_state, track_last_url, get_last_url,
+    handle_profile_state, track_last_url, get_last_url, get_last_listing_text,
 )
 from handlers.payments import (
     pay_stars_3, pay_stars_9, pay_stars_19, pay_stars_pdf, pay_stars_vip,
@@ -121,7 +121,7 @@ def log_referral_event(event_type: str, user_id: str, extra: dict = None):
 from rent_scanner.formatting import create_url_token, resolve_url_token
 
 
-async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_text: str, user_id: str, lang: str) -> None:
+async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_text: str, user_id: str, lang: str, source_url: str = "") -> None:
     data = load_data()
     user = get_user_data(data, user_id)
 
@@ -149,8 +149,11 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         if not result:
             result = "No analysis generated."
 
-        # Сохраняем URL для /favorite
-        track_last_url(user_id, listing_text[:200])
+        # Сохраняем URL (если объявление пришло по ссылке) и текст объявления
+        # (для генерации писем) — раньше здесь всегда писался обрывок
+        # listing_text даже когда пользователь присылал ссылку, из-за чего
+        # "В избранное" сохраняло текст объявления вместо самой ссылки.
+        track_last_url(user_id, source_url, listing_text[:2000])
 
         # Определяем город и цену для трендов
         city_key = detect_city(listing_text)
@@ -469,8 +472,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
 
     user_text = update.message.text
+    source_url = ""
 
     if user_text and is_url(user_text):
+        source_url = user_text
         await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
         listing_text = await fetch_url_text_async(user_text)
         if listing_text.startswith("ERROR"):
@@ -512,7 +517,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     try:
-        await process_listing(update, context, listing_text, user_id, lang)
+        await process_listing(update, context, listing_text, user_id, lang, source_url=source_url)
     except Exception as e:
         logging.error(f"process_listing error for user {user_id}: {e}")
         try:
@@ -574,7 +579,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     try:
-        await process_listing(update, context, listing_text, user_id, lang)
+        await process_listing(update, context, listing_text, user_id, lang, source_url=source_url)
     except Exception as e:
         logging.error(f"process_listing (photo) error for user {user_id}: {e}")
         try:
@@ -808,8 +813,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     text="📝 Для генерации письма заполните профиль.\n\nИспользуйте: /set_profile",
                 )
             else:
-                last_url = get_last_url(user_id)
-                if not last_url:
+                last_listing_text = get_last_listing_text(user_id)
+                if not last_listing_text:
                     await context.bot.send_message(
                         chat_id=int(user_id),
                         text="📝 Сначала проанализируйте объявление, потом /generate_letter.",
@@ -819,7 +824,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     letter_lang = profile.get("preferred_letter_lang", "")
                     if letter_lang not in ("de", "en"):
                         letter_lang = "de" if lang in ("ru", "de") else "en"
-                    letter = generate_letter(profile, last_url, lang=letter_lang)
+                    letter = generate_letter(profile, last_listing_text, lang=letter_lang)
                     if letter:
                         keyboard = InlineKeyboardMarkup([
                             [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
@@ -842,9 +847,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "В избранное"
         elif data_prefix == "fav_save":
             last_url = get_last_url(user_id)
-            if last_url:
+            fallback_text = get_last_listing_text(user_id)
+            if last_url or fallback_text:
                 from user_features import add_favorite
-                ok = add_favorite(user_id, last_url, title="Из анализа")
+                ok = add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
                 if ok:
                     await query.answer("⭐ Добавлено в избранное!", show_alert=False)
                 else:
@@ -932,7 +938,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     )
                     return
                 try:
-                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
+                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang, source_url=url)
                 except Exception as e:
                     logging.error("process_listing (start token) error for user %s: %s", user_id, e)
                     try:
@@ -969,7 +975,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     )
                     return
                 try:
-                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang)
+                    await process_listing(update, context, listing_text, user_id=user_id, lang=lang, source_url=url)
                 except Exception as e:
                     logging.error(f"process_listing (start) error for user {user_id}: {e}")
                     try:
