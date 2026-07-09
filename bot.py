@@ -713,6 +713,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "Пропустить"
         elif data_prefix == "skip_ad":
             await query.answer()
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
 
         # Кнопка "Скопировать"
         elif data_prefix == "copy":
