@@ -1,5 +1,7 @@
 """Городские хендлеры: /cities, выбор города, снятие фильтра."""
 
+import asyncio
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -27,9 +29,9 @@ def get_cities_keyboard():
 
 
 async def cmd_cities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     user_id = str(update.effective_user.id)
-    current_city = get_user_city(user_id)
+    current_city = await asyncio.to_thread(get_user_city, user_id)
     current_name = ""
     if current_city and current_city in POPULAR_CITIES:
         ci = POPULAR_CITIES[current_city]
@@ -45,20 +47,19 @@ async def cmd_cities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def handle_city_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    # Acknowledge FIRST
     await query.answer()
-    lang = get_lang(update)
+    lang = await asyncio.to_thread(get_lang, update)
     user_id = str(update.effective_user.id)
     data_payload = query.data.split(":")[1] if ":" in query.data else ""
 
     if data_payload == "remove":
         from listing_features import remove_user_city
-        remove_user_city(user_id)
+        await asyncio.to_thread(remove_user_city, user_id)
         await query.edit_message_text("✅ Фильтр города снят. Показываю все объявления.")
         return
 
     if data_payload in POPULAR_CITIES:
-        set_user_city(user_id, data_payload)
+        await asyncio.to_thread(set_user_city, user_id, data_payload)
         info = POPULAR_CITIES[data_payload]
         await query.edit_message_text(
             get_msg(lang, "city_selected").format(emoji=info["emoji"], name=info["name"])
