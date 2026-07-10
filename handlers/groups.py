@@ -145,9 +145,9 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
     bot_username = context.bot.username
 
     has_url = text.strip().startswith(("http://", "https://", "t.me/"))
-    is_long_text = len(text.strip()) > 30
 
-    if not has_url and not is_long_text:
+    # Бот отвечает ТОЛЬКО на ссылки. Обычные тексты — игнорируем.
+    if not has_url:
         return
 
     lang = await asyncio.to_thread(get_lang, update)
