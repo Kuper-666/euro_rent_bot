@@ -16,6 +16,32 @@ from user_features import (
     get_user_filters, save_user_filters,
 )
 from letter_generator import generate_letter
+from reply_generator import generate_reply
+
+
+async def _get_user(user_id: str) -> dict:
+    return await asyncio.to_thread(get_user, user_id)
+
+
+async def _save_user(user_id: str, user_data: dict):
+    await asyncio.to_thread(save_user, user_id, user_data)
+
+
+async def _get_profile(user_id: str) -> dict:
+    return await asyncio.to_thread(get_profile, user_id)
+
+
+async def _save_profile(user_id: str, profile_data: dict):
+    await asyncio.to_thread(save_profile, user_id, profile_data)
+
+
+async def _add_favorite(user_id: str, url: str, title: str = "") -> bool:
+    return await asyncio.to_thread(add_favorite, user_id, url, title)
+
+
+async def _remove_favorite(user_id: str, fav_id: int) -> bool:
+    return await asyncio.to_thread(remove_favorite, user_id, fav_id)
+from letter_generator import generate_letter
 from services.keyboards import kb
 
 logger = logging.getLogger(__name__)
@@ -78,7 +104,7 @@ async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
 
-    ok = add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
+    ok = await _add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
     if ok:
         await update.message.reply_text(
             "⭐ Добавлено в избранное!\n\nПосмотреть: /favorites",
@@ -210,7 +236,7 @@ async def set_work_address_command(update: Update, context: ContextTypes.DEFAULT
     address = " ".join(context.args)
     user = get_user(user_id)
     user["work_address"] = "" if address.lower() == "clear" else address
-    save_user(user_id, user)
+    await _save_user(user_id, user)
     msg = "📍 Адрес удалён." if address.lower() == "clear" else f"📍 Сохранено: {address}"
     await update.message.reply_text(msg, reply_markup=kb(update))
 
@@ -234,7 +260,7 @@ PROFILE_LABELS = {
 async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Устанавливает профиль пользователя для генерации писем."""
     user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
+    profile = await _get_profile(user_id)
 
     fields_text = "\n".join(
         f"  {i+1}. {PROFILE_LABELS.get(f, f)}: {profile.get(f, '')}"
@@ -258,7 +284,7 @@ async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     user = get_user(user_id)
     user["profile_state"] = "awaiting_profile"
-    save_user(user_id, user)
+    await _save_user(user_id, user)
 
 
 async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -266,14 +292,14 @@ async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = str(update.effective_user.id)
     user = get_user(user_id)
     user.pop("profile_state", None)
-    save_user(user_id, user)
+    await _save_user(user_id, user)
     await update.message.reply_text("❌ Отменено.", reply_markup=kb(update))
 
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает текущий профиль."""
     user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
+    profile = await _get_profile(user_id)
 
     text = "📝 <b>Профиль</b>:\n\n"
     for field, label in PROFILE_LABELS.items():
@@ -308,7 +334,7 @@ async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Генерирует мотивационное письмо арендодателю."""
     user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
+    profile = await _get_profile(user_id)
 
     filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
     if filled < 2:
@@ -349,9 +375,9 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
             parse_mode="HTML"
         )
         # Сохраняем письмо для PDF
-        user = get_user(user_id)
+        user = await _get_user(user_id)
         user["last_letter"] = letter
-        save_user(user_id, user)
+        await _save_user(user_id, user)
     else:
         await update.message.reply_text(
             "❌ Не удалось сгенерировать письмо. Попробуйте позже.",
@@ -365,7 +391,7 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
 async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Генерирует ответ на сообщение арендодателю."""
     user_id = str(update.effective_user.id)
-    profile = get_profile(user_id)
+    profile = await _get_profile(user_id)
 
     filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
     if filled < 2:
@@ -409,9 +435,9 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-        user = get_user(user_id)
+        user = await _get_user(user_id)
         user["last_letter"] = reply_text
-        save_user(user_id, user)
+        await _save_user(user_id, user)
     else:
         await update.message.reply_text(
             "❌ Не удалось сгенерировать ответ. Попробуйте позже.",

@@ -3,6 +3,7 @@ import os
 import time
 import json
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -25,7 +26,7 @@ def _is_admin(update: Update) -> bool:
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update): return
     from storage import load_data
-    data = load_data()
+    data = await asyncio.to_thread(load_data)
 
     total_users = len(data)
     total_free = sum(u.get("free_used", 0) for u in data.values())
@@ -159,7 +160,7 @@ async def set_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     tz = args[0]
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["timezone"] = tz
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     await update.message.reply_text(f"✅ Часовой пояс: {tz}", reply_markup=kb(update))
