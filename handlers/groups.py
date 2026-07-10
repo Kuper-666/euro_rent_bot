@@ -154,7 +154,7 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if has_url:
         listing_url = text.strip().split()[0]
-        token = create_url_token(listing_url)
+        token = await asyncio.to_thread(create_url_token, listing_url)
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Проверить скрытые платежи", callback_data=f"analyze_ad:{token}")]
         ])
