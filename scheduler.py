@@ -14,6 +14,7 @@ import time
 import asyncio
 import logging
 import random
+import threading
 import pytz
 from datetime import datetime, timezone, timedelta
 
@@ -54,12 +55,24 @@ def _get_event_loop():
 
 
 def _run_async(coro):
-    """Запускает корутину на основном event loop (безопасно из потока)."""
-    loop = _get_event_loop()
-    if loop:
-        asyncio.run_coroutine_threadsafe(coro, loop)
-    else:
-        logger.warning("No event loop available, skipping async task")
+    """Запускает корутину в отдельном потоке, НЕ на основном event loop.
+
+    Раньше использовался run_coroutine_threadsafe — корутина выполнялась
+    на том же event loop, что обрабатывает Telegram-обновления. Любой
+    синхронный вызов внутри (requests.get, load_data, scan_all_portals)
+    замораживал весь бот для ВСЕХ пользователей на время сетевого запроса.
+    """
+    def _thread_target():
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(coro)
+        except Exception as e:
+            logger.error("Scheduler task failed: %s", e, exc_info=True)
+        finally:
+            loop.close()
+
+    thread = threading.Thread(target=_thread_target, daemon=True)
+    thread.start()
 
 
 # ============================================================================
