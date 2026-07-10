@@ -71,7 +71,7 @@ from listing_features import (
     format_holy_grail_alert, extract_price, record_price, extract_score,
     POPULAR_CITIES, list_cities, set_user_city
 )
-from scheduler import update_last_activity, run_scheduler, set_bot, set_application, store_event_loop
+from scheduler import update_last_activity, register_jobs
 from web import app
 
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -1208,7 +1208,7 @@ application = None
 
 if __name__ == "__main__":
     # 1. Создаём приложение
-    application = Application.builder().token(TELEGRAM_TOKEN).post_init(store_event_loop).build()
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     # 2. Регистрируем все команды
     priv = filters.ChatType.PRIVATE
@@ -1286,13 +1286,9 @@ if __name__ == "__main__":
     application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, handle_group_listing))
 
-    # Передаём bot в scheduler
-    set_bot(application.bot)
-    set_application(application)
-
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
-    logging.info("Scheduler started in background")
+    # Регистрируем задачи в job_queue (вместо отдельного потока)
+    register_jobs(application)
+    logging.info("Scheduler jobs registered in job_queue")
 
     # 3. Check if WEBHOOK_URL is set
     WEBHOOK_URL = os.getenv("WEBHOOK_URL")

@@ -1,12 +1,10 @@
 """
-Планировщик автоматических задач бота.
-- Возврат неактивных пользователей (7 дней)
-- Напоминание о последней бесплатной проверке
-- Еженедельный email-дайджест
-- Посты в группу в 10:00 и 18:00 по Берлину
-- Сканирование порталов недвижимости (каждый час)
+Планировщик задач бота через job_queue (встроенный в python-telegram-bot).
 
-Запуск: python scheduler.py (или интегрирован в bot.py как фоновый поток)
+Все задачи выполняются на основном event loop через Application.job_queue.
+Нет отдельных потоков, нет APScheduler, нет schedule — чистый asyncio.
+
+Запуск: register_jobs(application) вызывается в bot.py после создания Application.
 """
 
 import os
@@ -14,76 +12,44 @@ import time
 import asyncio
 import logging
 import random
-import threading
 import pytz
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Модульный bot создаётся лениво
-_bot = None
-_app_loop = None
+# Ссылка на application заполняется при register_jobs
 _application = None
 
 
-def set_bot(bot_instance, app_loop=None):
-    """Устанавливает bot и event loop из основного приложения."""
-    global _bot, _app_loop, _application
-    _bot = bot_instance
-    _app_loop = app_loop
+# ============================================================================
+# УТИЛИТЫ
+# ============================================================================
 
-
-def set_application(app):
-    """Сохраняет Application для доступа к create_task()."""
-    global _application
-    _application = app
-
-
-async def store_event_loop(app):
-    """Callback для post_init: сохраняет event loop после его создания."""
-    global _app_loop
-    _app_loop = asyncio.get_running_loop()
-    logger.info("Scheduler: event loop captured via post_init")
-
-
-def _get_event_loop():
-    """Находит running event loop (лениво, после запуска polling)."""
-    global _app_loop
-    if _app_loop and _app_loop.is_running():
-        return _app_loop
+def _get_bot():
+    """Возвращает bot из Application."""
+    if _application:
+        return _application.bot
     return None
 
 
-def _run_async(coro):
-    """Запускает корутину в отдельном потоке, НЕ на основном event loop.
-
-    Раньше использовался run_coroutine_threadsafe — корутина выполнялась
-    на том же event loop, что обрабатывает Telegram-обновления. Любой
-    синхронный вызов внутри (requests.get, load_data, scan_all_portals)
-    замораживал весь бот для ВСЕХ пользователей на время сетевого запроса.
-    """
-    def _thread_target():
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(coro)
-        except Exception as e:
-            logger.error("Scheduler task failed: %s", e, exc_info=True)
-        finally:
-            loop.close()
-
-    thread = threading.Thread(target=_thread_target, daemon=True)
-    thread.start()
-
-
-# ============================================================================
-# 1. ВОЗВРАТ НЕАКТИВНЫХ ПОЛЬЗОВАТЕЛЕЙ
-# ============================================================================
-
-async def return_inactive_users():
-    """Если юзер оплатил, но не писал 7 дней — напомнить."""
-    if not _bot:
+async def _safe_send(chat_id, text, parse_mode=None, reply_markup=None):
+    """Отправка сообщения с обработкой ошибок."""
+    bot = _get_bot()
+    if not bot:
         return
+    try:
+        await bot.send_message(chat_id=chat_id, text=text,
+                               parse_mode=parse_mode, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning("Failed to send to %s: %s", chat_id, e)
 
+
+# ============================================================================
+# 1. ВОЗВРАТ НЕАКТИВНЫХ ПОЛЬЗОВАТЕЛЕЙ (каждые 6 часов)
+# ============================================================================
+
+async def return_inactive_users(context=None):
+    """Если юзер оплатил, но не писал 7 дней — напомнить."""
     from storage import load_data, save_data
     data = load_data()
     now = time.time()
@@ -105,36 +71,28 @@ async def return_inactive_users():
             continue
 
         remaining = user.get("balance", 0)
-        try:
-            await _bot.send_message(
-                chat_id=int(user_id),
-                text=(
-                    f"👋 Привет! Давно не виделись.\n\n"
-                    f"У тебя есть {remaining} проверок. "
-                    f"Хочешь проанализировать новое объявление?\n\n"
-                    f"Просто отправь ссылку или текст — я разберу за 5 секунд!"
-                ),
-            )
-            sent += 1
-            user["last_reminder"] = now
-            await asyncio.sleep(0.3)
-        except Exception as e:
-            logger.warning(f"Failed to send inactive reminder to {user_id}: {e}")
+        await _safe_send(
+            int(user_id),
+            f"👋 Привет! Давно не виделись.\n\n"
+            f"У тебя есть {remaining} проверок. "
+            f"Хочешь проанализировать новое объявление?\n\n"
+            f"Просто отправь ссылку или текст — я разберу за 5 секунд!"
+        )
+        sent += 1
+        user["last_reminder"] = now
+        await asyncio.sleep(0.3)
 
     if sent:
         save_data(data)
-        logger.info(f"Inactive reminders sent: {sent}")
+        logger.info("Inactive reminders sent: %d", sent)
 
 
 # ============================================================================
-# 2. НАПОМИНАНИЕ О ПОСЛЕДНЕЙ БЕСПЛАТНОЙ ПРОВЕРКЕ
+# 2. НАПОМИНАНИЕ О ПОСЛЕДНЕЙ БЕСПЛАТНОЙ ПРОВЕРКЕ (каждый час)
 # ============================================================================
 
-async def remind_last_free_check():
+async def remind_last_free_check(context=None):
     """Напомнить тем, у кого осталась 1 бесплатная проверка."""
-    if not _bot:
-        return
-
     from storage import load_data, save_data
     from config import FREE_LIMIT
     data = load_data()
@@ -148,27 +106,22 @@ async def remind_last_free_check():
         if user.get("last_limit_reminder", 0) > time.time() - 86400:
             continue
 
-        try:
-            await _bot.send_message(
-                chat_id=int(user_id),
-                text=(
-                    f"⚠️ Осталась последняя бесплатная проверка!\n\n"
-                    f"После неё потребуется покупка.\n\n"
-                    f"Пакеты:\n"
-                    f"3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                    f"10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                    f"Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
-                ),
-            )
-            sent += 1
-            user["last_limit_reminder"] = time.time()
-            await asyncio.sleep(0.3)
-        except Exception as e:
-            logger.warning(f"Failed to send limit reminder to {user_id}: {e}")
+        await _safe_send(
+            int(user_id),
+            "⚠️ Осталась последняя бесплатная проверка!\n\n"
+            "После неё потребуется покупка.\n\n"
+            "Пакеты:\n"
+            "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
+            "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
+            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
+        )
+        sent += 1
+        user["last_limit_reminder"] = time.time()
+        await asyncio.sleep(0.3)
 
     if sent:
         save_data(data)
-        logger.info(f"Limit reminders sent: {sent}")
+        logger.info("Limit reminders sent: %d", sent)
 
 
 # ============================================================================
@@ -185,11 +138,10 @@ def update_last_activity(user_id: str):
 
 
 # ============================================================================
-# 4. ЕЖЕНЕДЕЛЬНЫЙ EMAIL-ДАЙДЖЕСТ
+# 4. ЕЖЕНЕДЕЛЬНЫЙ EMAIL-ДАЙДЖЕСТ (понедельник 10:00)
 # ============================================================================
 
-async def weekly_email_digest():
-    """Отправляет еженедельный email-дайджест."""
+async def weekly_email_digest(context=None):
     from email_newsletter import run_weekly_digest
     await run_weekly_digest()
 
@@ -198,8 +150,7 @@ async def weekly_email_digest():
 # 5. СКАНИРОВАНИЕ ПОРТАЛОВ (каждый час)
 # ============================================================================
 
-async def scan_web_portals():
-    """Сканирует порталы недвижимости и отправляет алерты подписчикам."""
+async def scan_web_portals(context=None):
     try:
         from web_scanner.alerts import run_web_scan
         new_count = run_web_scan(city="berlin", max_price=2000)
@@ -213,20 +164,19 @@ async def scan_web_portals():
 # 5.1 СКАНИРОВАНИЕ TELEGRAM КАНАЛОВ (каждый час)
 # ============================================================================
 
-async def scan_telegram_channels():
-    """Сканирует Telegram каналы на наличие объявлений об аренде."""
+async def scan_telegram_channels(context=None):
     try:
         from rent_scanner.channel_scanner import run_channel_scan
-        # Используем user_client из rent_scanner если доступен
         try:
             from rent_scanner.app import RentScanner
             from rent_scanner.config import RuntimeConfig
             config = RuntimeConfig.from_env()
             scanner = RentScanner(config)
-            stats = await run_channel_scan(scanner.user_client, _bot)
+            bot = _get_bot()
+            stats = await run_channel_scan(scanner.user_client, bot)
             logger.info("Telegram channel scan: %s", stats)
         except Exception as e:
-            logger.debug("RentScanner not available for channel scan: %s", e)
+            logger.debug("RentScanner not available: %s", e)
     except Exception as e:
         logger.error("Telegram channel scan error: %s", e)
 
@@ -238,82 +188,65 @@ async def scan_telegram_channels():
 GROUP_ID = int(os.environ.get("GROUP_ID", "0"))
 
 
-async def send_group_digest():
+async def send_group_digest(context=None):
     """Отправляет дайджест в основную группу."""
-    logger.info(f"send_group_digest called. bot={bool(_bot)}, GROUP_ID={GROUP_ID}")
-    if not _bot:
-        logger.error("send_group_digest: bot is None, skipping")
-        return
     if not GROUP_ID:
-        logger.warning("GROUP_ID not set, skipping group digest")
         return
     try:
         from daily_poster import send_daily_post
-        logger.info(f"send_group_digest: calling send_daily_post for GROUP_ID={GROUP_ID}")
         await send_daily_post()
-        logger.info("send_group_digest: send_daily_post completed")
     except Exception as e:
-        logger.error(f"Failed to send group digest: {e}", exc_info=True)
+        logger.error("Failed to send group digest: %s", e)
 
 
 # ============================================================================
-# 6. ПРОМО-СООБЩЕНИЕ В ГРУППУ (15:00 по Берлину)
+# 7. ПРОМО-СООБЩЕНИЕ В ГРУППУ (15:00 по Берлину)
 # ============================================================================
 
 PROMO_MESSAGES = [
-    (
-        "👋 *EuroRent AI — твой помощник по аренде в Европе!*\n\n"
-        "🔑 Чем я умею:\n"
-        "• Перевожу объявления с любого портала\n"
-        "• Нахожу скрытые платежи (Nebenkosten, Service Charge)\n"
-        "• Подсказываю документы (Schufa, NIE, Garant)\n"
-        "• Проверяю на мошенников и фейки\n\n"
-        "🎁 *Первые 3 проверки — бесплатно!*\n"
-        "Просто отправь ссылку или текст в этот чат."
-    ),
-    (
-        "🏠 *Ищешь квартиру в Европе?*\n\n"
-        "Я могу проверить любое объявление за 5 секунд:\n"
-        "💰 Реальная цена со всеми комиссиями\n"
-        "📋 Какие документы нужны\n"
-        "🚨 Есть ли риски\n\n"
-        "🎁 *3 бесплатные проверки!* Просто кинь ссылку."
-    ),
-    (
-        "💡 *Знаешь ли ты, что большинство объявлений скрывают реальную стоимость?*\n\n"
-        "Nebenkosten, Kaution, Provision — всё это можно узнать до переезда.\n\n"
-        "Отправь мне ссылку на объявление — я покажу реальную цену.\n\n"
-        "🎁 *Первые 3 проверки бесплатно!*"
-    ),
-    (
-        "⚠️ *Не попадись на мошенников!*\n\n"
-        "Каждый день кто-то теряет депозит из-за фейковых объявлений.\n\n"
-        "Я проверю:\n"
-        "✅ Существует ли объявление\n"
-        "✅ Нормальная ли цена\n"
-        "✅ Не просит ли хозяин лишнего\n\n"
-        "🎁 *Попробуй бесплатно — отправь ссылку!*"
-    ),
+    "👋 *EuroRent AI — твой помощник по аренде в Европе!*\n\n"
+    "🔑 Чем я умею:\n"
+    "• Перевожу объявления с любого портала\n"
+    "• Нахожу скрытые платежи (Nebenkosten, Service Charge)\n"
+    "• Подсказываю документы (Schufa, NIE, Garant)\n"
+    "• Проверяю на мошенников и фейки\n\n"
+    "🎁 *Первые 3 проверки — бесплатно!*\n"
+    "Просто отправь ссылку или текст в этот чат.",
+
+    "🏠 *Ищешь квартиру в Европе?*\n\n"
+    "Я могу проверить любое объявление за 5 секунд:\n"
+    "💰 Реальная цена со всеми комиссиями\n"
+    "📋 Какие документы нужны\n"
+    "🚨 Есть ли риски\n\n"
+    "🎁 *3 бесплатные проверки!* Просто кинь ссылку.",
+
+    "💡 *Знаешь ли ты, что большинство объявлений скрывают реальную стоимость?*\n\n"
+    "Nebenkosten, Kaution, Provision — всё это можно узнать до переезда.\n\n"
+    "Отправь мне ссылку на объявление — я покажу реальную цену.\n\n"
+    "🎁 *Первые 3 проверки бесплатно!*",
+
+    "⚠️ *Не попадись на мошенников!*\n\n"
+    "Каждый день кто-то теряет депозит из-за фейковых объявлений.\n\n"
+    "Я проверю:\n"
+    "✅ Существует ли объявление\n"
+    "✅ Нормальная ли цена\n"
+    "✅ Не просит ли хозяин лишнего\n\n"
+    "🎁 *Попробуй бесплатно — отправь ссылку!*",
 ]
 
 
-async def send_promo_to_group():
-    if not _bot or not GROUP_ID:
+async def send_promo_to_group(context=None):
+    if not GROUP_ID:
         return
     text = random.choice(PROMO_MESSAGES)
-    try:
-        await _bot.send_message(chat_id=GROUP_ID, text=text, parse_mode="Markdown")
-        logger.info("Promo sent to group")
-    except Exception as e:
-        logger.error(f"Failed to send promo: {e}")
+    await _safe_send(GROUP_ID, text, parse_mode="Markdown")
 
 
 # ============================================================================
-# 7. АВТОПОСТИНГ В КАНАЛ (раз в час)
+# 8. АВТОПОСТИНГ В КАНАЛ (раз в час)
 # ============================================================================
 
-async def run_channel_poster():
-    """Сканирует порталы и постит объявления в канал."""
+async def run_channel_poster(context=None):
     try:
         from channel_poster import run_channel_post
         await run_channel_post()
@@ -322,40 +255,46 @@ async def run_channel_poster():
 
 
 # ============================================================================
-# ПЛАНИРОВЩИК
+# РЕГИСТРАЦИЯ ЗАДАЧ
 # ============================================================================
 
-def _job_error_handler(job, exception):
-    """Обработчик ошибок для всех APScheduler jobs."""
-    logger.error(f"APScheduler job '{job.name}' failed: {exception}", exc_info=True)
+def register_jobs(application):
+    """Регистрирует все задачи в job_queue приложения.
 
+    Вызывается из bot.py после создания Application.
+    job_queue.run_repeating() создаёт задачу, которая повторяется
+    с заданным интервалом. Если задача завершается с ошибкой,
+    следующий запуск всё равно произойдёт.
+    """
+    jq = application.job_queue
 
-def run_scheduler():
-    """Запускает планировщик в фоновом потоке."""
-    from apscheduler.schedulers.background import BackgroundScheduler
-    from apscheduler.triggers.cron import CronTrigger
-    from apscheduler.events import EVENT_JOB_ERROR
+    # Группа: 10:00 и 18:00 по Берлину
+    berlin = pytz.timezone("Europe/Berlin")
+    jq.run_daily(send_group_digest, time=berlin.localize(datetime(2026, 1, 1, 10, 0)).time(),
+                 name="group_digest_10")
+    jq.run_daily(send_group_digest, time=berlin.localize(datetime(2026, 1, 1, 18, 0)).time(),
+                 name="group_digest_18")
 
-    # --- Группа: 10:00 и 18:00 по Берлину (APScheduler) ---
-    apscheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Berlin"))
-    apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=10, minute=0), name="group_digest_10")
-    apscheduler.add_job(lambda: _run_async(send_group_digest()), CronTrigger(hour=18, minute=0), name="group_digest_18")
-    apscheduler.add_job(lambda: _run_async(send_promo_to_group()), CronTrigger(hour=15, minute=0), name="promo_15")
-    # Канал: сканируем порталы и постим раз в час (0-23)
-    apscheduler.add_job(lambda: _run_async(run_channel_poster()), CronTrigger(minute=5), name="channel_poster_hourly")
-    apscheduler.add_listener(_job_error_handler, EVENT_JOB_ERROR)
-    apscheduler.start()
-    logger.info("APScheduler: group at 10/18, promo at 15, channel every hour Berlin time")
+    # Промо: 15:00 по Берлину
+    jq.run_daily(send_promo_to_group, time=berlin.localize(datetime(2026, 1, 1, 15, 0)).time(),
+                 name="promo_15")
 
-    # --- Личные задачи (каждые N часов) ---
-    import schedule as sched_lib
-    sched_lib.every(1).hours.do(lambda: _run_async(scan_web_portals()))
-    sched_lib.every(1).hours.do(lambda: _run_async(scan_telegram_channels()))
-    sched_lib.every(1).hours.do(lambda: _run_async(remind_last_free_check()))
-    sched_lib.every(6).hours.do(lambda: _run_async(return_inactive_users()))
-    sched_lib.every().monday.at("10:00").do(lambda: _run_async(weekly_email_digest()))
+    # Каждый час: канал, порталы, напоминания
+    jq.run_repeating(run_channel_poster, interval=3600, first=60,
+                     name="channel_poster_hourly")
+    jq.run_repeating(scan_web_portals, interval=3600, first=120,
+                     name="scan_web_portals")
+    jq.run_repeating(scan_telegram_channels, interval=3600, first=180,
+                     name="scan_telegram_channels")
+    jq.run_repeating(remind_last_free_check, interval=3600, first=240,
+                     name="remind_last_free_check")
 
-    logger.info("Scheduler started")
-    while True:
-        sched_lib.run_pending()
-        time.sleep(60)
+    # Каждые 6 часов: возврат неактивных
+    jq.run_repeating(return_inactive_users, interval=21600, first=300,
+                     name="return_inactive_users")
+
+    # Понедельник 10:00: email-дайджест
+    jq.run_daily(weekly_email_digest, time=berlin.localize(datetime(2026, 1, 1, 10, 0)).time(),
+                 days=(0,), name="weekly_email_digest")
+
+    logger.info("All jobs registered in job_queue")
