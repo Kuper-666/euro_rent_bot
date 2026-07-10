@@ -125,29 +125,38 @@ def resolve_redirect_url(url: str) -> str:
 
 def fetch_url_text(url: str) -> str:
     url = resolve_redirect_url(url)
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "meta", "noscript", "nav", "footer", "header", "aside"]):
-            tag.decompose()
-        text = soup.get_text(separator="\n", strip=True)
-        lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 5]
-        result = "\n".join(lines)
-        if len(result) > 6000:
-            result = result[:6000] + "... (текст сокращён для анализа)"
-        return result
-    except requests.exceptions.Timeout:
-        return "ERROR: Timeout — сайт не ответил за 10 секунд"
-    except requests.exceptions.ConnectionError:
-        return "ERROR: Не удалось подключиться к сайту"
-    except Exception as e:
-        return f"ERROR: {e}"
+    for attempt in range(3):
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+            }
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for tag in soup(["script", "style", "meta", "noscript", "nav", "footer", "header", "aside"]):
+                tag.decompose()
+            text = soup.get_text(separator="\n", strip=True)
+            lines = [line.strip() for line in text.splitlines() if len(line.strip()) > 5]
+            result = "\n".join(lines)
+            if len(result) > 6000:
+                result = result[:6000] + "... (текст сокращён для анализа)"
+            return result
+        except requests.exceptions.Timeout:
+            if attempt < 2:
+                import time
+                time.sleep(1 * (attempt + 1))
+                continue
+            return "ERROR: Timeout — сайт не ответил за 30 секунд"
+        except requests.exceptions.ConnectionError as e:
+            if attempt < 2:
+                import time
+                time.sleep(1 * (attempt + 1))
+                continue
+            return f"ERROR: Не удалось подключиться к сайту: {e}"
+        except Exception as e:
+            return f"ERROR: {e}"
 
 
 async def fetch_url_text_async(url: str) -> str:
