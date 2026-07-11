@@ -7,6 +7,7 @@ import os
 import json
 import re
 import time
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -530,7 +531,6 @@ def format_holy_grail_alert(entry: dict, bot_username: str) -> str:
 
 async def cmd_set_city(update, context) -> None:
     """Команда /set_city berlin"""
-    from storage import load_data, save_data
     user_id = str(update.effective_user.id)
 
     if not context.args:
@@ -543,7 +543,7 @@ async def cmd_set_city(update, context) -> None:
         return
 
     city_key = context.args[0].lower()
-    if set_user_city(user_id, city_key):
+    if await asyncio.to_thread(set_user_city, user_id, city_key):
         info = POPULAR_CITIES[city_key]
         await update.message.reply_text(
             f"✅ Город установлен: {info['emoji']} {info['name']}\n\n"
@@ -560,7 +560,7 @@ async def cmd_set_city(update, context) -> None:
 async def cmd_remove_city(update, context) -> None:
     """Команда /remove_city"""
     user_id = str(update.effective_user.id)
-    if remove_user_city(user_id):
+    if await asyncio.to_thread(remove_user_city, user_id):
         await update.message.reply_text("✅ Фильтр города снят. Показываю все объявления.")
     else:
         await update.message.reply_text("ℹ️ Фильтр города не был установлен.")
@@ -569,10 +569,10 @@ async def cmd_remove_city(update, context) -> None:
 async def cmd_my_city(update, context) -> None:
     """Команда /my_city"""
     user_id = str(update.effective_user.id)
-    city = get_user_city(user_id)
+    city = await asyncio.to_thread(get_user_city, user_id)
     if city:
         info = POPULAR_CITIES[city]
-        trend = format_trend(city)
+        trend = await asyncio.to_thread(format_trend, city)
         await update.message.reply_text(
             f"🏙 Ваш город: {info['emoji']} {info['name']} ({info['name_en']})\n"
             f"Средняя цена: ~{info['avg_price']} EUR/мес\n\n"
@@ -604,8 +604,8 @@ async def cmd_trend(update, context) -> None:
         return
 
     info = POPULAR_CITIES[city_key]
-    trend = format_trend(city_key)
-    history = _load_history()
+    trend = await asyncio.to_thread(format_trend, city_key)
+    history = await asyncio.to_thread(_load_history)
     city_listings = [l for l in history["listings"] if l.get("city") == city_key]
     grails = [l for l in city_listings if l.get("is_holy_grail")]
 
@@ -620,7 +620,7 @@ async def cmd_trend(update, context) -> None:
 
 async def cmd_holygrail(update, context) -> None:
     """Команда /holygrail — статистика святых граалей"""
-    stats = get_holy_grail_stats()
+    stats = await asyncio.to_thread(get_holy_grail_stats)
     text = (
         f"🏆 Святые граали\n\n"
         f"Всего объявлений: {stats['total_listings']}\n"

@@ -1,6 +1,7 @@
 """Email хендлеры: /subscribe_email, /unsubscribe_email."""
 
 import re
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -22,7 +23,7 @@ async def subscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("❌ Некорректный email. Попробуйте ещё раз.")
         return
 
-    if add_email_subscriber(email, user_id):
+    if await asyncio.to_thread(add_email_subscriber, email, user_id):
         await update.message.reply_text(
             f"✅ Вы подписались на дайджест!\n\n"
             f"Email: {email}\n"
@@ -42,7 +43,7 @@ async def unsubscribe_email(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     email = context.args[0].strip()
-    if remove_email_subscriber(email):
+    if await asyncio.to_thread(remove_email_subscriber, email):
         await update.message.reply_text(f"✅ Вы отписались от дайджеста ({email}).")
     else:
         await update.message.reply_text("ℹ️ Этот email не найден в подписчиках.")

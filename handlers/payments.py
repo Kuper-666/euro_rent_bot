@@ -77,45 +77,92 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(ok=False, error_message="Неизвестный способ оплаты.")
 
 
+async def _save_paid_user(user_id: str, user: dict, update: Update, context: ContextTypes.DEFAULT_TYPE, success_text: str) -> None:
+    """
+    Сохраняет пользователя после оплаты и отвечает ему.
+
+    КРИТИЧНО: на этом этапе Telegram Stars уже списаны — если save_user
+    не сработает и мы просто промолчим, пользователь заплатил и ничего
+    не получил, без единого слова объяснения. Поэтому: несколько попыток
+    сохранения, и если все провалились — явно говорим пользователю, что
+    произошла ошибка (а не тихо ничего не отвечаем), и шлём алерт админу
+    с деталями для ручного зачисления.
+    """
+    last_error = None
+    for attempt in range(3):
+        try:
+            await asyncio.to_thread(save_user, user_id, user)
+            await update.message.reply_text(success_text, reply_markup=kb(update))
+            return
+        except Exception as e:
+            last_error = e
+            logger.error("save_user after payment failed (attempt %d) for user=%s: %s", attempt + 1, user_id, e)
+            if attempt < 2:
+                await asyncio.sleep(1 * (attempt + 1))
+
+    # Все попытки провалились — Stars списаны, баланс не сохранён.
+    logger.critical(
+        "PAYMENT NOT CREDITED: user=%s payload_user_data=%s error=%s",
+        user_id, user, last_error,
+    )
+    try:
+        await update.message.reply_text(
+            "⚠️ Оплата прошла, но произошла техническая ошибка при начислении.\n\n"
+            "Мы уже получили уведомление и зачислим вручную в ближайшее время. "
+            "Если этого не произошло в течение часа — напишите в поддержку.",
+            reply_markup=kb(update),
+        )
+    except Exception:
+        pass
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if ADMIN_ID:
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_ID,
+                text=f"🚨 Оплата не зачислена!\nuser_id={user_id}\ndata={user}\nerror={last_error}",
+            )
+        except Exception:
+            pass
+
+
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     payload = update.message.successful_payment.invoice_payload
 
-    user = get_user(user_id)
+    try:
+        user = await asyncio.to_thread(get_user, user_id)
+    except Exception as e:
+        logger.error("get_user after payment failed for user=%s: %s", user_id, e)
+        user = {}
 
     if payload == "pay_stars_3":
         user["balance"] = user.get("balance", 0) + 3
         user["last_paid_at"] = time.time()
-        save_user(user_id, user)
         remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-        await update.message.reply_text(f"✅ +3 проверки. Осталось: {remaining}", reply_markup=kb(update))
+        await _save_paid_user(user_id, user, update, context, f"✅ +3 проверки. Осталось: {remaining}")
 
     elif payload == "pay_stars_9":
         user["balance"] = user.get("balance", 0) + 10
         user["last_paid_at"] = time.time()
-        save_user(user_id, user)
         remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
-        await update.message.reply_text(f"✅ +10 проверок. Осталось: {remaining}", reply_markup=kb(update))
+        await _save_paid_user(user_id, user, update, context, f"✅ +10 проверок. Осталось: {remaining}")
 
     elif payload == "pay_stars_19":
         user["balance"] = -1
         user["last_paid_at"] = time.time()
-        save_user(user_id, user)
-        await update.message.reply_text("✅ Безлимит на месяц!", reply_markup=kb(update))
+        await _save_paid_user(user_id, user, update, context, "✅ Безлимит на месяц!")
 
     elif payload == "pay_stars_pdf":
         user["pdf_paid"] = True
         user["pdf_state"] = "awaiting_data"
         user["pdf_started_at"] = time.time()
-        save_user(user_id, user)
-        await update.message.reply_text("✅ PDF оплачен! Отправьте данные.", reply_markup=kb(update))
+        await _save_paid_user(user_id, user, update, context, "✅ PDF оплачен! Отправьте данные.")
 
     elif payload == "pay_stars_vip":
         user["vip"] = True
         user["vip_state"] = "awaiting_criteria"
         user["last_paid_at"] = time.time()
-        save_user(user_id, user)
-        await update.message.reply_text("✅ VIP активирован! Отправьте критерии поиска.", reply_markup=kb(update))
+        await _save_paid_user(user_id, user, update, context, "✅ VIP активирован! Отправьте критерии поиска.")
 
 
 # ── Алиасы команд оплаты ───────────────────────────────────────
@@ -140,10 +187,10 @@ def _check_admin(update: Update) -> bool:
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["balance"] = user.get("balance", 0) + 3
     user["last_paid_at"] = time.time()
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=kb(update))
@@ -152,10 +199,10 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["balance"] = user.get("balance", 0) + 10
     user["last_paid_at"] = time.time()
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=kb(update))
@@ -164,10 +211,10 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["balance"] = -1
     user["last_paid_at"] = time.time()
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=kb(update))
 
@@ -175,11 +222,11 @@ async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["pdf_paid"] = True
     user["pdf_state"] = "awaiting_data"
     user["pdf_started_at"] = time.time()
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=kb(update))
 
@@ -187,10 +234,10 @@ async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["vip"] = True
     user["vip_state"] = "awaiting_criteria"
-    save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=kb(update))
 
@@ -210,12 +257,12 @@ async def pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     lang = await asyncio.to_thread(get_lang, update)
 
     if user.get("pdf_paid"):
         user["pdf_state"] = "awaiting_data"
-        save_user(user_id, user)
+        await asyncio.to_thread(save_user, user_id, user)
         text = get_msg(lang, "pdf_need_data")
     else:
         text = f"PDF-заявление (Mieterprofil) — {PDF_PRICE * 100} Stars (~5EUR)\n\nОплатите: /pay_stars_pdf"
@@ -225,7 +272,7 @@ async def pdf_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def vip_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     lang = await asyncio.to_thread(get_lang, update)
 
     if user.get("vip"):

@@ -299,13 +299,21 @@ async def send_holy_grail_alert(entry: dict, bot_username: str):
 
 
 async def run_channel_post():
-    posted = load_posted()
+    # load_posted/fetch_web_listings/fetch_rss_entries/analyze_listing/
+    # record_listing — все синхронные (файловый I/O, requests с таймаутами
+    # до 15с на несколько порталов и городов, синхронный Groq-клиент,
+    # синхронный Supabase). Эта задача крутится на ОСНОВНОМ event loop бота
+    # (см. scheduler.py's _run_async), поэтому без to_thread всё это время
+    # бот не отвечает ни одному живому пользователю — это самый дорогой
+    # источник блокировки из всех найденных при аудите, потенциально
+    # несколько минут раз в час.
+    posted = await asyncio.to_thread(load_posted)
 
     # 1. Сканируем порталы
-    entries = fetch_web_listings()
+    entries = await asyncio.to_thread(fetch_web_listings)
 
     # 2. Добавляем RSS как запасной источник
-    rss_entries = fetch_rss_entries()
+    rss_entries = await asyncio.to_thread(fetch_rss_entries)
     entries.extend(rss_entries)
 
     if not entries:
@@ -345,18 +353,15 @@ async def run_channel_post():
         price = entry.get("price") or extract_price(full_text)
         portal = entry.get("source", "")
 
-        analysis = analyze_listing(entry["title"], entry["summary"], entry["url"])
+        analysis = await asyncio.to_thread(analyze_listing, entry["title"], entry["summary"], entry["url"])
         if not analysis:
             continue
 
         score = extract_score(analysis)
 
-        is_grail, grail_reason = record_listing(
-            url=entry["url"],
-            city=city_key or "",
-            price=price or 0,
-            score=score,
-            text=full_text,
+        is_grail, grail_reason = await asyncio.to_thread(
+            record_listing,
+            entry["url"], city_key or "", price or 0, score, full_text,
         )
 
         if score < 4:
@@ -398,7 +403,7 @@ async def run_channel_post():
         await asyncio.sleep(2)
 
     posted["last_run"] = datetime.now(timezone.utc).isoformat()
-    save_posted(posted)
+    await asyncio.to_thread(save_posted, posted)
     logger.info("Done. Posted %d/%d listings", posted_count, len(to_post))
 
 

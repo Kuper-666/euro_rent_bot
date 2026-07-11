@@ -67,10 +67,14 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def ref_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update): return
     try:
-        events = []
-        with open("referral_events.jsonl", "r", encoding="utf-8") as f:
-            for line in f:
-                events.append(json.loads(line.strip()))
+        def _read_events():
+            events = []
+            with open("referral_events.jsonl", "r", encoding="utf-8") as f:
+                for line in f:
+                    events.append(json.loads(line.strip()))
+            return events
+
+        events = await asyncio.to_thread(_read_events)
 
         now = time.time()
         today = sum(1 for e in events if now - e.get("ts", 0) < 86400)
@@ -106,9 +110,13 @@ async def metrics_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         from rent_scanner.storage import Storage
         from rent_scanner.config import RuntimeConfig
-        config = RuntimeConfig.from_env()
-        storage = Storage(config.database_path)
-        stats = storage.full_stats()
+
+        def _fetch_stats():
+            config = RuntimeConfig.from_env()
+            storage = Storage(config.database_path)
+            return storage.full_stats()
+
+        stats = await asyncio.to_thread(_fetch_stats)
 
         top = list(stats["by_source"].items())[:5]
         top_text = "\n".join(f"  {src}: {cnt}" for src, cnt in top) if top else "  нет данных"
@@ -134,7 +142,7 @@ async def subscribers_count(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not _is_admin(update): return
     try:
         from email_newsletter import get_active_subscribers
-        subs = get_active_subscribers()
+        subs = await asyncio.to_thread(get_active_subscribers)
         await update.message.reply_text(f"📧 Подписчиков: {len(subs)}")
     except Exception as e:
         await update.message.reply_text(f"❌ {e}")

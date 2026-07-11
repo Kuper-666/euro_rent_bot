@@ -119,7 +119,11 @@ async def send_daily_post():
         me = await bot.get_me()
         bot_username = me.username
 
-        feed = feedparser.parse(RSS_FEED_URL)
+        # feedparser.parse — синхронный сетевой запрос к Google Alerts RSS.
+        # Эта задача крутится на основном event loop бота (через
+        # scheduler.py's _run_async), поэтому без to_thread бот не отвечает
+        # живым пользователям, пока RSS-фид грузится.
+        feed = await asyncio.to_thread(feedparser.parse, RSS_FEED_URL)
 
         if not feed.entries:
             await bot.send_message(
@@ -135,7 +139,7 @@ async def send_daily_post():
         link = entry.link
         summary = strip_html(entry.summary) if hasattr(entry, "summary") else "Подробнее по ссылке"
 
-        short_id = store_listing(link, title)
+        short_id = await asyncio.to_thread(store_listing, link, title)
 
         post_text = (
             f"{get_greeting()}! Свежее объявление:\n\n"

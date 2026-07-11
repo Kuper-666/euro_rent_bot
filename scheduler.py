@@ -51,7 +51,11 @@ async def _safe_send(chat_id, text, parse_mode=None, reply_markup=None):
 async def return_inactive_users(context=None):
     """Если юзер оплатил, но не писал 7 дней — напомнить."""
     from storage import load_data, save_data
-    data = load_data()
+    # load_data/save_data — синхронный full-table scan/overwrite Supabase.
+    # Эта задача крутится на ОСНОВНОМ event loop бота (см. _run_async выше),
+    # поэтому без to_thread она замораживает бота для ВСЕХ живых
+    # пользователей на время запроса, а не только влияет на рассылку.
+    data = await asyncio.to_thread(load_data)
     now = time.time()
     seven_days = 7 * 86400
     sent = 0
@@ -83,7 +87,7 @@ async def return_inactive_users(context=None):
         await asyncio.sleep(0.3)
 
     if sent:
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
         logger.info("Inactive reminders sent: %d", sent)
 
 
@@ -95,7 +99,7 @@ async def remind_last_free_check(context=None):
     """Напомнить тем, у кого осталась 1 бесплатная проверка."""
     from storage import load_data, save_data
     from config import FREE_LIMIT
-    data = load_data()
+    data = await asyncio.to_thread(load_data)
     sent = 0
 
     for user_id, user in data.items():
@@ -120,7 +124,7 @@ async def remind_last_free_check(context=None):
         await asyncio.sleep(0.3)
 
     if sent:
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
         logger.info("Limit reminders sent: %d", sent)
 
 
@@ -129,12 +133,20 @@ async def remind_last_free_check(context=None):
 # ============================================================================
 
 def update_last_activity(user_id: str):
-    """Вызывается при каждом сообщении пользователя."""
-    from storage import load_data, save_data
-    data = load_data()
-    if user_id in data:
-        data[user_id]["last_activity"] = time.time()
-        save_data(data)
+    """
+    Вызывается при каждом сообщении пользователя.
+
+    Раньше делала load_data()/save_data() — полный скан и перезапись ВСЕЙ
+    таблицы Users на каждое сообщение от любого пользователя. Заменено на
+    точечный get_user/save_user (SELECT/UPDATE по одному user_id), как и
+    остальной код после фикса get_lang().
+    """
+    from storage import get_user, save_user
+    user = get_user(user_id)
+    if not user:
+        return
+    user["last_activity"] = time.time()
+    save_user(user_id, user)
 
 
 # ============================================================================
@@ -153,7 +165,12 @@ async def weekly_email_digest(context=None):
 async def scan_web_portals(context=None):
     try:
         from web_scanner.alerts import run_web_scan
-        new_count = run_web_scan(city="berlin", max_price=2000)
+        # run_web_scan делает синхронные requests-запросы (до 15с таймаут
+        # каждый) на несколько порталов подряд — может занимать десятки
+        # секунд. Эта задача крутится на ОСНОВНОМ event loop бота
+        # (_run_async), поэтому без to_thread всё это время бот не отвечает
+        # ни одному живому пользователю.
+        new_count = await asyncio.to_thread(run_web_scan, "berlin", 2000)
         if new_count > 0:
             logger.info("Web scan: %d new listings found", new_count)
     except Exception as e:

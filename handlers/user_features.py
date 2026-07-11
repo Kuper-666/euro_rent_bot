@@ -94,8 +94,8 @@ def get_last_listing_text(user_id: str) -> str:
 
 async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    last_url = get_last_url(user_id)
-    fallback_text = get_last_listing_text(user_id)
+    last_url = await asyncio.to_thread(get_last_url, user_id)
+    fallback_text = await asyncio.to_thread(get_last_listing_text, user_id)
 
     if not last_url and not fallback_text:
         await update.message.reply_text(
@@ -104,7 +104,7 @@ async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
 
-    ok = await _add_favorite(user_id, last_url or fallback_text[:200], title="Из анализа")
+    ok = await asyncio.to_thread(add_favorite, user_id, last_url or fallback_text[:200], "Из анализа")
     if ok:
         await update.message.reply_text(
             "⭐ Добавлено в избранное!\n\nПосмотреть: /favorites",
@@ -116,7 +116,7 @@ async def favorite_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def favorites_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    favs = get_favorites(user_id)
+    favs = await asyncio.to_thread(get_favorites, user_id)
 
     if not favs:
         await update.message.reply_text(
@@ -159,7 +159,7 @@ async def track_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("❌ Отправьте URL.", reply_markup=kb(update))
         return
 
-    entry_id = add_tracker_entry(user_id, url, title=url[:80])
+    entry_id = await asyncio.to_thread(add_tracker_entry, user_id, url, url[:80])
     if entry_id:
         await update.message.reply_text(
             f"📋 Заявка #{entry_id} добавлена!\n\n"
@@ -173,7 +173,7 @@ async def track_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def mytracks_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    entries = get_tracker_entries(user_id)
+    entries = await asyncio.to_thread(get_tracker_entries, user_id)
 
     if not entries:
         await update.message.reply_text("📋 Пока пусто.\n\nДобавьте: /track ссылка", reply_markup=kb(update))
@@ -211,7 +211,7 @@ async def track_status_command(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     status = context.args[1]
-    if update_tracker_status(user_id, entry_id, status):
+    if await asyncio.to_thread(update_tracker_status, user_id, entry_id, status):
         await update.message.reply_text(
             f"✅ #{entry_id} → {STATUSES.get(status, status)}",
             reply_markup=kb(update)
@@ -234,7 +234,7 @@ async def set_work_address_command(update: Update, context: ContextTypes.DEFAULT
         return
 
     address = " ".join(context.args)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["work_address"] = "" if address.lower() == "clear" else address
     await _save_user(user_id, user)
     msg = "📍 Адрес удалён." if address.lower() == "clear" else f"📍 Сохранено: {address}"
@@ -282,17 +282,17 @@ async def set_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"/skip_profile — отмена",
         reply_markup=kb(update), parse_mode="HTML"
     )
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user["profile_state"] = "awaiting_profile"
-    await _save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
 
 
 async def skip_profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Отмена заполнения профиля."""
     user_id = str(update.effective_user.id)
-    user = get_user(user_id)
+    user = await asyncio.to_thread(get_user, user_id)
     user.pop("profile_state", None)
-    await _save_user(user_id, user)
+    await asyncio.to_thread(save_user, user_id, user)
     await update.message.reply_text("❌ Отменено.", reply_markup=kb(update))
 
 
@@ -313,7 +313,7 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def filters_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показывает и переключает фильтры."""
     user_id = str(update.effective_user.id)
-    filters = get_user_filters(user_id)
+    filters = await asyncio.to_thread(get_user_filters, user_id)
     f = "✅" if filters.get("filter_furnished") else "❌"
     p = "✅" if filters.get("filter_pets") else "❌"
     pk = "✅" if filters.get("filter_parking") else "❌"
@@ -345,7 +345,7 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
         )
         return
 
-    last_listing_text = get_last_listing_text(user_id)
+    last_listing_text = await asyncio.to_thread(get_last_listing_text, user_id)
     if not last_listing_text:
         await update.message.reply_text(
             "📝 Сначала проанализируйте объявление, потом /generate_letter.",
@@ -361,7 +361,8 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
     if letter_lang not in ("de", "en"):
         letter_lang = "de" if lang in ("ru", "de") else "en"
 
-    letter = generate_letter(profile, last_listing_text, lang=letter_lang)
+    # generate_letter — синхронный вызов Groq API
+    letter = await asyncio.to_thread(generate_letter, profile, last_listing_text, letter_lang)
 
     if letter:
         # Кнопка для копирования и PDF
@@ -375,9 +376,9 @@ async def generate_letter_command(update: Update, context: ContextTypes.DEFAULT_
             parse_mode="HTML"
         )
         # Сохраняем письмо для PDF
-        user = await _get_user(user_id)
+        user = await asyncio.to_thread(get_user, user_id)
         user["last_letter"] = letter
-        await _save_user(user_id, user)
+        await asyncio.to_thread(save_user, user_id, user)
     else:
         await update.message.reply_text(
             "❌ Не удалось сгенерировать письмо. Попробуйте позже.",
@@ -405,7 +406,7 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if context.args:
         landlord_message = " ".join(context.args)
     else:
-        last_listing_text = get_last_listing_text(user_id)
+        last_listing_text = await asyncio.to_thread(get_last_listing_text, user_id)
         if last_listing_text:
             landlord_message = last_listing_text
         else:
@@ -424,7 +425,8 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_lang = "de" if lang in ("ru", "de") else "en"
 
     from reply_generator import generate_reply
-    reply_text = generate_reply(profile, landlord_message, lang=reply_lang)
+    # generate_reply — синхронный вызов Groq API
+    reply_text = await asyncio.to_thread(generate_reply, profile, landlord_message, reply_lang)
 
     if reply_text:
         keyboard = InlineKeyboardMarkup([
@@ -435,9 +437,9 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-        user = await _get_user(user_id)
+        user = await asyncio.to_thread(get_user, user_id)
         user["last_letter"] = reply_text
-        await _save_user(user_id, user)
+        await asyncio.to_thread(save_user, user_id, user)
     else:
         await update.message.reply_text(
             "❌ Не удалось сгенерировать ответ. Попробуйте позже.",
@@ -446,6 +448,38 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 # ── Алерты ─────────────────────────────────────────────────────
+
+def _insert_alert_subscription(user_id: str, city: str, max_price: int) -> bool:
+    """Синхронная запись в Supabase (вызывается через to_thread)."""
+    from storage import _get_sb
+    sb = _get_sb()
+    if not sb:
+        return False
+    sb.table("AlertSubscriptions").insert({
+        "user_id": user_id, "city": city, "max_price": max_price, "active": True,
+    }).execute()
+    return True
+
+
+def _deactivate_alert_subscriptions(user_id: str) -> bool:
+    """Синхронное обновление в Supabase (вызывается через to_thread)."""
+    from storage import _get_sb
+    sb = _get_sb()
+    if not sb:
+        return False
+    sb.table("AlertSubscriptions").update({"active": False}).eq("user_id", user_id).execute()
+    return True
+
+
+def _fetch_alert_subscriptions(user_id: str) -> list[dict]:
+    """Синхронное чтение из Supabase (вызывается через to_thread)."""
+    from storage import _get_sb
+    sb = _get_sb()
+    if not sb:
+        return []
+    result = sb.table("AlertSubscriptions").select("*").eq("user_id", user_id).eq("active", True).execute()
+    return result.data or []
+
 
 async def subscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
@@ -461,53 +495,43 @@ async def subscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_
     city = context.args[0].lower()
     max_price = int(context.args[1]) if len(context.args) > 1 and context.args[1].isdigit() else 0
 
-    from storage import _get_sb
-    sb = _get_sb()
-    if sb:
-        try:
-            sb.table("AlertSubscriptions").insert({
-                "user_id": user_id, "city": city, "max_price": max_price, "active": True,
-            }).execute()
+    try:
+        ok = await asyncio.to_thread(_insert_alert_subscription, user_id, city, max_price)
+        if ok:
             price_str = f" до {max_price} EUR" if max_price else ""
             await update.message.reply_text(
                 f"✅ Алерты: {city}{price_str}", reply_markup=kb(update)
             )
-        except Exception as e:
-            logger.error("subscribe_alert error: %s", e)
-            await update.message.reply_text("❌ Ошибка.", reply_markup=kb(update))
+    except Exception as e:
+        logger.error("subscribe_alert error: %s", e)
+        await update.message.reply_text("❌ Ошибка.", reply_markup=kb(update))
 
 
 async def unsubscribe_alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    from storage import _get_sb
-    sb = _get_sb()
-    if sb:
-        try:
-            sb.table("AlertSubscriptions").update({"active": False}).eq("user_id", user_id).execute()
+    try:
+        ok = await asyncio.to_thread(_deactivate_alert_subscriptions, user_id)
+        if ok:
             await update.message.reply_text("✅ Отписаны от алертов.", reply_markup=kb(update))
-        except Exception as e:
-            logger.error("unsubscribe_alert error: %s", e)
+    except Exception as e:
+        logger.error("unsubscribe_alert error: %s", e)
 
 
 async def my_alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    from storage import _get_sb
-    sb = _get_sb()
-    if sb:
-        try:
-            result = sb.table("AlertSubscriptions").select("*").eq("user_id", user_id).eq("active", True).execute()
-            subs = result.data or []
-            if not subs:
-                await update.message.reply_text("🔔 Нет подписок.\n\nСоздать: /subscribe_alert город", reply_markup=kb(update))
-                return
-            text = "🔔 <b>Алерты:</b>\n\n"
-            for s in subs:
-                city = s.get("city", "?")
-                price = s.get("max_price", 0)
-                text += f"• {city} — {'до ' + str(int(price)) + ' EUR' if price else 'все'}\n"
-            await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
-        except Exception as e:
-            logger.error("my_alerts error: %s", e)
+    try:
+        subs = await asyncio.to_thread(_fetch_alert_subscriptions, user_id)
+        if not subs:
+            await update.message.reply_text("🔔 Нет подписок.\n\nСоздать: /subscribe_alert город", reply_markup=kb(update))
+            return
+        text = "🔔 <b>Алерты:</b>\n\n"
+        for s in subs:
+            city = s.get("city", "?")
+            price = s.get("max_price", 0)
+            text += f"• {city} — {'до ' + str(int(price)) + ' EUR' if price else 'все'}\n"
+        await update.message.reply_text(text, parse_mode="HTML", reply_markup=kb(update))
+    except Exception as e:
+        logger.error("my_alerts error: %s", e)
 
 
 # ── Обработка профиля в handle_message ─────────────────────────

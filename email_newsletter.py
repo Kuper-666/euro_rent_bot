@@ -282,12 +282,16 @@ def send_email(to_email: str, subject: str, html: str, plain: str) -> bool:
 
 
 async def run_weekly_digest():
-    subscribers = get_active_subscribers()
+    # get_active_subscribers/fetch_week_entries/analyze_for_digest/send_email
+    # синхронные (Supabase, requests/RSS, Groq, SMTP). Крутится на основном
+    # event loop бота (scheduler.py's _run_async) — без to_thread блокирует
+    # бота для всех живых пользователей на время выполнения.
+    subscribers = await asyncio.to_thread(get_active_subscribers)
     if not subscribers:
         logger.info("No active email subscribers")
         return
 
-    entries = fetch_week_entries()
+    entries = await asyncio.to_thread(fetch_week_entries)
     if not entries:
         logger.info("No entries found")
         return
@@ -297,7 +301,7 @@ async def run_weekly_digest():
 
     analyses = []
     for entry in top_entries:
-        analysis = analyze_for_digest(entry["title"], entry["summary"])
+        analysis = await asyncio.to_thread(analyze_for_digest, entry["title"], entry["summary"])
         analyses.append(analysis or entry["summary"][:200])
 
     me = await bot.get_me() if bot else None
@@ -310,7 +314,7 @@ async def run_weekly_digest():
     sent = 0
     failed = 0
     for sub in subscribers:
-        success = send_email(sub["email"], subject, html, plain)
+        success = await asyncio.to_thread(send_email, sub["email"], subject, html, plain)
         if success:
             sent += 1
             logger.info(f"Sent to {sub['email']}")

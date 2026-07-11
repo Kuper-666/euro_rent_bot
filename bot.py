@@ -122,9 +122,6 @@ from rent_scanner.formatting import create_url_token, resolve_url_token
 
 
 async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_text: str, user_id: str, lang: str, source_url: str = "") -> None:
-    data = load_data()
-    user = get_user_data(data, user_id)
-
     is_admin = False
     ADMIN_ID = int(os.getenv("ADMIN_ID", "-1"))
     if update.effective_user and update.effective_user.id == ADMIN_ID:
@@ -153,19 +150,17 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         # (для генерации писем) — раньше здесь всегда писался обрывок
         # listing_text даже когда пользователь присылал ссылку, из-за чего
         # "В избранное" сохраняло текст объявления вместо самой ссылки.
-        track_last_url(user_id, source_url, listing_text[:2000])
+        await asyncio.to_thread(track_last_url, user_id, source_url, listing_text[:2000])
 
         # Определяем город и цену для трендов
         city_key = detect_city(listing_text)
         price = extract_price(listing_text)
         if city_key and price:
-            record_price(city_key, price)
-        record_listing(
-            url=listing_text[:200],
-            city=city_key or "",
-            price=price or 0,
-            score=extract_score(result) if result else 5,
-            text=listing_text,
+            await asyncio.to_thread(record_price, city_key, price)
+        await asyncio.to_thread(
+            record_listing,
+            listing_text[:200], city_key or "", price or 0,
+            extract_score(result) if result else 5, listing_text,
         )
 
         # Добавляем примечание о городе
@@ -182,10 +177,15 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         city_note += f"\n💰 Цена {price} EUR — ниже средней"
 
         if is_admin:
-            save_data(data)
+            # Только у админов есть смысл трогать всю таблицу — сюда попадают
+            # редко (только когда сообщение прислал сам админ/модератор группы).
+            data = await asyncio.to_thread(load_data)
+            await asyncio.to_thread(save_data, data)
         else:
-            # Атомарное обновление пользователя
-            user = get_user(user_id)
+            # Точечный доступ к одному пользователю — раньше здесь ещё
+            # дополнительно грузилась ВСЯ таблица через load_data(), хотя
+            # результат нигде не читался до этой самой перезаписи.
+            user = await asyncio.to_thread(get_user, user_id)
             expire_unlimited_if_needed(user)
             if not can_use(user):
                 ref_code = user.get("ref_code", "")
@@ -197,12 +197,12 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 log_referral_event("limit_ref_shown", user_id)
                 return
             use_check(user)
-            save_user(user_id, user)
+            await asyncio.to_thread(save_user, user_id, user)
 
             # Обработка реферала
             if user.get("free_used", 0) == 1 and user.get("referred_by"):
                 referrer_id = user["referred_by"]
-                referrer = get_user(referrer_id)
+                referrer = await asyncio.to_thread(get_user, referrer_id)
                 referrals = referrer.setdefault("referrals", [])
                 if user_id not in referrals:
                     referrals.append(user_id)
@@ -212,7 +212,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         referrer["last_paid_at"] = time.time()
                     elif reward > 0:
                         referrer["balance"] = referrer.get("balance", 0) + reward
-                    save_user(referrer_id, referrer)
+                    await asyncio.to_thread(save_user, referrer_id, referrer)
                     try:
                         n = len(referrals)
                         progress = ""
@@ -382,8 +382,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await btn_map[text](update, context)
         return
 
-    update_last_activity(user_id)
-    data = load_data()
+    await asyncio.to_thread(update_last_activity, user_id)
+    data = await asyncio.to_thread(load_data)
     user = get_user_data(data, user_id)
 
     followup = check_followups(user, lang)
@@ -394,12 +394,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if pdf_state == "awaiting_data" and is_pdf_state_expired(user):
         user.pop("pdf_state", None)
         user.pop("pdf_started_at", None)
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
         pdf_state = None
     if pdf_state == "awaiting_data":
         user.pop("pdf_state", None)
         user.pop("pdf_started_at", None)
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
         pdf_data = parse_pdf_data(update.message.text)
         if not pdf_data:
             await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
@@ -427,7 +427,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user.pop("vip_state", None)
         user["vip"] = True
         user["vip_criteria"] = update.message.text
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
         await update.message.reply_text(
             f"✅ *VIP активирован!*\n\nКритерии сохранены:\n{update.message.text}\n\nЯ буду присылать подборку каждый день!",
             reply_markup=kb(update),
@@ -439,7 +439,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     profile_state = user.get("profile_state")
     if profile_state == "awaiting_profile":
         user.pop("profile_state", None)
-        save_user(user_id, user)
+        await asyncio.to_thread(save_user, user_id, user)
         lines = [line.strip() for line in update.message.text.strip().split("\n") if line.strip()]
         fields = ["full_name", "profession", "income", "employer", "move_in_date", "occupants", "pets", "rental_duration", "preferred_letter_lang"]
         profile_data = {}
@@ -447,7 +447,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             if i < len(lines):
                 profile_data[field] = lines[i].lstrip("0123456789. ")
         if profile_data:
-            save_profile(user_id, profile_data)
+            await asyncio.to_thread(save_profile, user_id, profile_data)
             await update.message.reply_text(
                 "✅ Профиль сохранён!\n\n"
                 "Теперь вы можете:\n"
@@ -479,6 +479,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
         listing_text = await fetch_url_text_async(user_text)
         if listing_text.startswith("ERROR"):
+            # Логируем реальную причину (таймаут / коннекшн / антибот-блок /
+            # другое) — иначе на сервере нет никакой зацепки, почему именно
+            # этот сайт не спарсился, и диагностика следующего похожего
+            # случая начинается с нуля.
+            logging.warning("fetch_url_text failed for %s: %s", user_text, listing_text)
             await update.message.reply_text(
                 "❌ Не удалось загрузить страницу (сайт блокирует парсер).\n\n"
                 "Скопируйте текст объявления и отправьте его сюда.",
@@ -495,7 +500,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("❌ Текст слишком короткий. Отправьте полное объявление.", reply_markup=kb(update))
         return
 
-    user_city = get_user_city(user_id)
+    user_city = await asyncio.to_thread(get_user_city, user_id)
     if user_city:
         detected = detect_city(listing_text)
         if detected and detected != user_city:
@@ -531,8 +536,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     user_id = str(update.effective_user.id)
     lang = await asyncio.to_thread(get_lang, update)
-    data = load_data()
-    user = get_user_data(data, user_id)
+    # Точечный доступ к одному пользователю вместо полного load_data() —
+    # data целиком нигде дальше не использовался, только user из неё.
+    user = await asyncio.to_thread(get_user, user_id)
 
     if not can_use(user):
         expire_unlimited_if_needed(user)
@@ -565,7 +571,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     # Проверка фильтра города
-    user_city = get_user_city(user_id)
+    user_city = await asyncio.to_thread(get_user_city, user_id)
     if user_city:
         detected = detect_city(listing_text)
         if detected and detected != user_city:
@@ -608,9 +614,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
             uid = str(query.from_user.id)
             try:
-                user = get_user(uid)
+                user = await asyncio.to_thread(get_user, uid)
                 user["lang"] = new_lang
-                save_user(uid, user)
+                await asyncio.to_thread(save_user, uid, user)
             except Exception as e:
                 logger.error("Failed to persist lang=%s for user=%s: %s", new_lang, uid, e)
                 try:
@@ -643,7 +649,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 await query.edit_message_reply_markup(reply_markup=None)
             except Exception:
                 pass
-            user = get_user(user_id)
+            user = await asyncio.to_thread(get_user, user_id)
             remaining = calc_remaining(user)
             await context.bot.send_message(
                 chat_id=int(user_id),
@@ -686,7 +692,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
             ])
 
-            user = get_user(user_id)
+            user = await asyncio.to_thread(get_user, user_id)
 
             try:
                 if not can_use(user):
@@ -814,7 +820,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "Письмо" после анализа
         elif data_prefix == "gen_letter":
             await query.answer()
-            profile = get_profile(user_id)
+            profile = await asyncio.to_thread(get_profile, user_id)
             filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
             if filled < 2:
                 await context.bot.send_message(
@@ -822,7 +828,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     text="📝 Для генерации письма заполните профиль.\n\nИспользуйте: /set_profile",
                 )
             else:
-                last_listing_text = get_last_listing_text(user_id)
+                last_listing_text = await asyncio.to_thread(get_last_listing_text, user_id)
                 if not last_listing_text:
                     await context.bot.send_message(
                         chat_id=int(user_id),
@@ -833,7 +839,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     letter_lang = profile.get("preferred_letter_lang", "")
                     if letter_lang not in ("de", "en"):
                         letter_lang = "de" if lang in ("ru", "de") else "en"
-                    letter = generate_letter(profile, last_listing_text, lang=letter_lang)
+                    # generate_letter — синхронный вызов Groq API
+                    letter = await asyncio.to_thread(generate_letter, profile, last_listing_text, letter_lang)
                     if letter:
                         keyboard = InlineKeyboardMarkup([
                             [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
@@ -844,9 +851,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                             text=f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{letter}",
                             reply_markup=keyboard, parse_mode="HTML",
                         )
-                        user = get_user(user_id)
+                        user = await asyncio.to_thread(get_user, user_id)
                         user["last_letter"] = letter
-                        save_user(user_id, user)
+                        await asyncio.to_thread(save_user, user_id, user)
                     else:
                         await context.bot.send_message(
                             chat_id=int(user_id),
@@ -855,8 +862,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         # Кнопка "В избранное"
         elif data_prefix == "fav_save":
-            last_url = get_last_url(user_id)
-            fallback_text = get_last_listing_text(user_id)
+            last_url = await asyncio.to_thread(get_last_url, user_id)
+            fallback_text = await asyncio.to_thread(get_last_listing_text, user_id)
             if last_url or fallback_text:
                 from user_features import add_favorite
                 ok = await asyncio.to_thread(add_favorite, user_id, last_url or fallback_text[:200], "Из анализа")
@@ -874,8 +881,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Кнопка "PDF письма"
         elif data_prefix == "pdf_letter":
             await query.answer()
-            profile = get_profile(user_id)
-            last_letter = get_user(user_id).get("last_letter", "")
+            profile = await asyncio.to_thread(get_profile, user_id)
+            user_for_letter = await asyncio.to_thread(get_user, user_id)
+            last_letter = user_for_letter.get("last_letter", "")
             if last_letter:
                 pdf_data = {
                     "name": profile.get("full_name", ""),
@@ -911,7 +919,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang = await asyncio.to_thread(get_lang, update)
 
     user_id = str(update.effective_user.id)
-    data = load_data()
+    # load_data — синхронный full-table scan; используется дальше в этой же
+    # функции для линейного поиска по ref_code (см. ref_ deep-link ветку),
+    # поэтому не заменяем на point-lookup, а просто не блокируем event loop.
+    data = await asyncio.to_thread(load_data)
 
     if user_id not in data:
         data[user_id] = {
@@ -923,22 +934,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "total_checks": 0,
             "email": "",
         }
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
     elif not data[user_id].get("ref_code"):
         data[user_id]["ref_code"] = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
-        save_data(data)
+        await asyncio.to_thread(save_data, data)
 
     if context.args and len(context.args) > 0:
         payload = context.args[0][:512]  # Ограничение длины payload
         if payload.startswith("an_"):
             # Новый формат: короткий токен
             token = payload[len("an_"):]
-            url = resolve_url_token(token)
+            url = await asyncio.to_thread(resolve_url_token, token)
             if url and is_url(url):
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
                 listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
                     # Парсер не смог загрузить — предлагаем скопировать текст
+                    logging.warning("fetch_url_text failed for %s: %s", url, listing_text)
                     await update.message.reply_text(
                         f"❌ Не удалось загрузить страницу автоматически.\n\n"
                         f"📋 Ссылка: {url}\n\n"
@@ -976,6 +988,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await update.message.reply_text(get_msg(lang, "fetching_url"), reply_markup=kb(update))
                 listing_text = await fetch_url_text_async(url)
                 if listing_text.startswith("ERROR"):
+                    logging.warning("fetch_url_text failed for %s: %s", url, listing_text)
                     await update.message.reply_text(
                         f"❌ Не удалось загрузить страницу автоматически.\n\n"
                         f"📋 Ссылка: {url}\n\n"
@@ -1010,7 +1023,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if referrer_id and referrer_id != user_id:
                 user = get_user_data(data, user_id)
                 user["referred_by"] = referrer_id
-                save_data(data)
+                await asyncio.to_thread(save_data, data)
                 log_referral_event("ref_link_clicked", user_id, {"referrer": referrer_id})
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
@@ -1046,8 +1059,9 @@ async def revolut_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
+    # Точечный доступ к одному пользователю вместо полного load_data() —
+    # data целиком нигде дальше не использовался.
+    user = await asyncio.to_thread(get_user, user_id)
     lang = await asyncio.to_thread(get_lang, update)
 
     ADMIN_ID = int(os.getenv("ADMIN_ID", "-1"))
@@ -1082,14 +1096,15 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def ref_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
-    data = load_data()
-    user = get_user_data(data, user_id)
+    # Точечный доступ вместо полного load_data()/save_data() — здесь всегда
+    # читался/писался только один пользователь.
+    user = await asyncio.to_thread(get_user, user_id)
 
     ref_code = user.get("ref_code")
     if not ref_code:
         ref_code = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
         user["ref_code"] = ref_code
-        save_data(data)
+        await asyncio.to_thread(save_user, user_id, user)
 
     bot_username = context.bot.username
     ref_link = f"https://t.me/{bot_username}?start={ref_code}"
