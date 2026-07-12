@@ -177,8 +177,14 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                         city_note += f"\n💰 Цена {price} EUR — ниже средней"
 
         if is_admin:
-            # Только у админов есть смысл трогать всю таблицу — сюда попадают
-            # редко (только когда сообщение прислал сам админ/модератор группы).
+            # У админа нет смысла применять лимиты/рефералку, но переменная
+            # user всё равно нужна ниже по коду (calc_remaining, ref_code,
+            # work_address и т.д.) — раньше она присваивалась ТОЛЬКО в
+            # ветке else, и любой анализ объявления от самого админа падал
+            # с UnboundLocalError: "cannot access local variable 'user'".
+            user = await asyncio.to_thread(get_user, user_id)
+            # load_data/save_data тут не про этого пользователя — это
+            # прежнее поведение для админ-пути, оставлено как есть.
             data = await asyncio.to_thread(load_data)
             await asyncio.to_thread(save_data, data)
         else:
@@ -269,7 +275,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         clean_result = re.sub(r'<[^>]+>', '', result)
         safe_result = html.escape(clean_result)
         safe_footer = html.escape(get_msg(lang, "affiliate_footer"))
-        remaining_text = "∞" if user["balance"] == -1 else html.escape(str(remaining))
+        remaining_text = "∞" if user.get("balance", 0) == -1 else html.escape(str(remaining))
         admin_note = html.escape("\n\nАдмин: проверка бесплатная") if is_admin else ""
         safe_balance = html.escape(f"\n\nОсталось проверок: ") + remaining_text
         ref_code = user.get("ref_code", "")

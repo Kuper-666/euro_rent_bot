@@ -91,6 +91,20 @@ class TestUseCheck(unittest.TestCase):
         use_check(user)
         self.assertEqual(user["balance"], -1)
 
+    def test_empty_user_dict_does_not_crash(self):
+        """
+        Regression: use_check used to read user["balance"]/user["free_used"]
+        directly (no .get), which raised KeyError for a brand-new user with
+        no DB record yet -- e.g. someone messaging the bot directly without
+        ever pressing /start, or get_user() returning {} because Supabase
+        has no row for them yet. process_listing surfaced this as
+        "Ошибка: 'balance'" in the chat.
+        """
+        user = {}
+        use_check(user)
+        self.assertEqual(user["free_used"], 1)
+        self.assertEqual(user["total_checks"], 1)
+
 
 class TestCalcRemaining(unittest.TestCase):
     def test_unlimited(self):
@@ -275,13 +289,22 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
     @patch("bot.load_data")
     @patch("bot.client")
     async def test_admin_bypass(self, mock_client, mock_load, mock_save):
+        """
+        Regression: this test previously used the default chat_type="private",
+        so `if not is_admin and update.effective_chat.type in ["group",
+        "supergroup"]:` was never true, get_chat_member was never actually
+        consulted, and the test silently exercised the non-admin path the
+        whole time despite its name and the mocked "administrator" status.
+        Using chat_type="group" here makes it genuinely test the group-
+        moderator admin bypass.
+        """
         user = make_user(free_used=3, balance=0)
         mock_load.return_value = {"123": user}
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content="Analysis"))]
         mock_client.chat.completions.create.return_value = mock_response
 
-        update = make_update(text="Wohnung Berlin")
+        update = make_update(text="Wohnung Berlin", chat_type="group")
         ctx = make_context()
         ctx.bot.get_chat_member.return_value = MagicMock(status="administrator")
 
@@ -290,6 +313,45 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(user["free_used"], 3)
         update.message.reply_text.assert_called()
+        # reply_text is ALSO called from the except-block on failure (with
+        # get_msg(lang, "error").format(...)) -- assert_called() alone
+        # would stay green even if process_listing crashed internally, as
+        # it did for the ADMIN_ID path below. Check the actual text.
+        sent_text = update.message.reply_text.call_args_list[-1][0][0]
+        self.assertNotIn("Ошибка:", sent_text)
+
+    @patch("bot.save_data")
+    @patch("bot.load_data")
+    @patch("bot.get_user")
+    @patch("bot.client")
+    async def test_admin_id_own_analysis_does_not_crash(self, mock_client, mock_get_user, mock_load, mock_save):
+        """
+        Регрессия: process_listing присваивал переменную `user` ТОЛЬКО в
+        ветке else (не-админ), но использовал её дальше по коду (в т.ч.
+        remaining = calc_remaining(user), user.get("ref_code") и т.д.)
+        независимо от того, админ это или нет. Когда сообщение прислал сам
+        ADMIN_ID (не просто модератор группы, как в test_admin_bypass выше,
+        а владелец бота лично), process_listing падал с:
+        UnboundLocalError: cannot access local variable 'user' where it is
+        not associated with a value -- и пользователь видел это в чате как
+        "Ошибка: cannot access local variable 'user'...".
+        """
+        os.environ["ADMIN_ID"] = "999"
+        mock_load.return_value = {}
+        mock_get_user.return_value = {"balance": -1, "free_used": 10, "ref_code": "ref_admin"}
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="Analysis for the admin"))]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        update = make_update(user_id=999, text="Wohnung Berlin")
+        ctx = make_context()
+
+        with patch("bot.extract_score", return_value=5):
+            await self.bot_module.process_listing(update, ctx, "Wohnung Berlin", "999", "ru")
+
+        sent_text = update.message.reply_text.call_args_list[-1][0][0]
+        self.assertNotIn("Ошибка:", sent_text)
+        self.assertIn("Analysis for the admin", sent_text)
 
 
 # ── successful_payment ────────────────────────────────────────────
