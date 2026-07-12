@@ -303,7 +303,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
                 reply_markup=kb(update)
             )
         else:
-            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error").format(str(e)[:200]), reply_markup=kb(update))
 
 
 def check_followups(user: dict, lang: str) -> str:
@@ -526,7 +526,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
         logging.error(f"process_listing error for user {user_id}: {e}")
         try:
-            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error").format(str(e)[:200]), reply_markup=kb(update))
         except Exception:
             pass
 
@@ -589,7 +589,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     except Exception as e:
         logging.error(f"process_listing (photo) error for user {user_id}: {e}")
         try:
-            await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "error").format(str(e)[:200]), reply_markup=kb(update))
         except Exception:
             pass
 
@@ -963,7 +963,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 except Exception as e:
                     logging.error("process_listing (start token) error for user %s: %s", user_id, e)
                     try:
-                        await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
+                        await update.message.reply_text(get_msg(lang, "error").format(str(e)[:200]), reply_markup=kb(update))
                     except Exception:
                         pass
                 return
@@ -1001,7 +1001,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 except Exception as e:
                     logging.error(f"process_listing (start) error for user {user_id}: {e}")
                     try:
-                        await update.message.reply_text(get_msg(lang, "error"), reply_markup=kb(update))
+                        await update.message.reply_text(get_msg(lang, "error").format(str(e)[:200]), reply_markup=kb(update))
                     except Exception:
                         pass
                 return
