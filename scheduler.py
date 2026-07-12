@@ -12,12 +12,16 @@ import time
 import asyncio
 import logging
 import random
-import pytz
+from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Ссылка на application заполняется при register_jobs
+# Ссылка на application — устанавливается в register_jobs(), служит
+# fallback'ом для _get_bot() на случай прямого вызова job-функции без
+# CallbackContext (например, из админ-команды). Обычный путь через
+# job_queue всегда передаёт настоящий context с context.bot — это основной
+# источник bot в _get_bot(), _application лишь подстраховка.
 _application = None
 
 
@@ -25,17 +29,34 @@ _application = None
 # УТИЛИТЫ
 # ============================================================================
 
-def _get_bot():
-    """Возвращает bot из Application."""
+def _get_bot(context=None):
+    """
+    Возвращает bot из переданного CallbackContext.
+
+    РАНЬШЕ здесь читалась модульная переменная `_application`, которую
+    должен был выставлять внешний код (аналог set_application() из старой
+    APScheduler-версии) — но при переходе на job_queue эта установка нигде
+    не была добавлена, поэтому `_application` всегда оставалась None, и
+    _get_bot() всегда возвращал None. Из-за этого _safe_send() тихо ничего
+    не отправляла ни разу: return_inactive_users, remind_last_free_check и
+    send_promo_to_group годами выполнялись "успешно" (без ошибок, иногда
+    даже логируя "sent: N"), но ни одно сообщение реально не уходило.
+
+    job_queue уже передаёт в каждый callback настоящий CallbackContext с
+    рабочим context.bot — используем его напрямую, без глобального стейта.
+    """
+    if context is not None and getattr(context, "bot", None) is not None:
+        return context.bot
     if _application:
         return _application.bot
     return None
 
 
-async def _safe_send(chat_id, text, parse_mode=None, reply_markup=None):
+async def _safe_send(chat_id, text, parse_mode=None, reply_markup=None, context=None):
     """Отправка сообщения с обработкой ошибок."""
-    bot = _get_bot()
+    bot = _get_bot(context)
     if not bot:
+        logger.warning("_safe_send: no bot available (context=%s), message to %s not sent", context, chat_id)
         return
     try:
         await bot.send_message(chat_id=chat_id, text=text,
@@ -67,11 +88,30 @@ async def return_inactive_users(context=None):
 
         if balance <= 0 or not last_paid:
             continue
-        if last_paid < now - seven_days:
+        # Не напоминаем бесконечно давно оплатившим — после ~2 месяцев без
+        # активности это уже не "давно не виделись", а скорее ушедший
+        # пользователь, для которого разовое напоминание вряд ли поможет.
+        #
+        # РАНЬШЕ здесь стояло `if last_paid < now - seven_days: continue` —
+        # то есть пропускались все, кто оплатил РАНЬШЕ чем 7 дней назад.
+        # Но ниже требуется last_activity/last_paid старше 7 дней — то есть
+        # функция одновременно требовала "оплатил недавно (< 7 дней)" И
+        # "не появлялся давно (>= 7 дней)", что почти никогда не совпадает
+        # одновременно. Из-за этого основной сценарий, для которого функция
+        # существует — "оплатил и пропал больше недели назад" — никогда не
+        # проходил фильтр.
+        sixty_days = 60 * 86400
+        if last_paid < now - sixty_days:
             continue
         if last_activity and (now - last_activity) < seven_days:
             continue
         if not last_activity and (now - last_paid) < seven_days:
+            continue
+        # last_reminder записывался, но нигде не проверялся — без этой
+        # проверки неактивный пользователь получал бы одно и то же "давно
+        # не виделись" каждые 6 часов (интервал этой задачи) до тех пор,
+        # пока не появится в боте. Раз в 7 дней достаточно.
+        if user.get("last_reminder", 0) > now - seven_days:
             continue
 
         remaining = user.get("balance", 0)
@@ -80,7 +120,8 @@ async def return_inactive_users(context=None):
             f"👋 Привет! Давно не виделись.\n\n"
             f"У тебя есть {remaining} проверок. "
             f"Хочешь проанализировать новое объявление?\n\n"
-            f"Просто отправь ссылку или текст — я разберу за 5 секунд!"
+            f"Просто отправь ссылку или текст — я разберу за 5 секунд!",
+            context=context,
         )
         sent += 1
         user["last_reminder"] = now
@@ -117,7 +158,8 @@ async def remind_last_free_check(context=None):
             "Пакеты:\n"
             "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
             "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
+            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19",
+            context=context,
         )
         sent += 1
         user["last_limit_reminder"] = time.time()
@@ -189,7 +231,7 @@ async def scan_telegram_channels(context=None):
             from rent_scanner.config import RuntimeConfig
             config = RuntimeConfig.from_env()
             scanner = RentScanner(config)
-            bot = _get_bot()
+            bot = _get_bot(context)
             stats = await run_channel_scan(scanner.user_client, bot)
             logger.info("Telegram channel scan: %s", stats)
         except Exception as e:
@@ -256,7 +298,7 @@ async def send_promo_to_group(context=None):
     if not GROUP_ID:
         return
     text = random.choice(PROMO_MESSAGES)
-    await _safe_send(GROUP_ID, text, parse_mode="Markdown")
+    await _safe_send(GROUP_ID, text, parse_mode="Markdown", context=context)
 
 
 # ============================================================================
@@ -284,16 +326,30 @@ def register_jobs(application):
     следующий запуск всё равно произойдёт.
     """
     jq = application.job_queue
+    global _application
+    _application = application
 
-    # Группа: 10:00 и 18:00 по Берлину
-    berlin = pytz.timezone("Europe/Berlin")
-    jq.run_daily(send_group_digest, time=berlin.localize(datetime(2026, 1, 1, 10, 0)).time(),
+    # Группа: 10:00 и 18:00 по Берлину.
+    #
+    # ВАЖНО: используем zoneinfo, не pytz — pytz.timezone(...).localize(...)
+    # "замораживает" DST-офсет на момент создания объекта (здесь — зима,
+    # 1 января), и job_queue переиспользует этот же tzinfo для вычисления
+    # времени запуска в течение всего года, включая лето, когда офсет
+    # должен быть другим (CEST = UTC+2, а не CET = UTC+1). zoneinfo.ZoneInfo
+    # пересчитывает офсет правильно для любой даты с одним и тем же объектом.
+    #
+    # Также используем .timetz(), а не .time() — .time() отбрасывает tzinfo
+    # целиком, из-за чего PTB интерпретирует время как UTC (см. документацию
+    # JobQueue.run_daily: "If the timezone is None, the default timezone of
+    # the bot will be used, which is UTC"), а не как Europe/Berlin.
+    berlin = ZoneInfo("Europe/Berlin")
+    jq.run_daily(send_group_digest, time=datetime(2026, 1, 1, 10, 0, tzinfo=berlin).timetz(),
                  name="group_digest_10")
-    jq.run_daily(send_group_digest, time=berlin.localize(datetime(2026, 1, 1, 18, 0)).time(),
+    jq.run_daily(send_group_digest, time=datetime(2026, 1, 1, 18, 0, tzinfo=berlin).timetz(),
                  name="group_digest_18")
 
     # Промо: 15:00 по Берлину
-    jq.run_daily(send_promo_to_group, time=berlin.localize(datetime(2026, 1, 1, 15, 0)).time(),
+    jq.run_daily(send_promo_to_group, time=datetime(2026, 1, 1, 15, 0, tzinfo=berlin).timetz(),
                  name="promo_15")
 
     # Каждый час: канал, порталы, напоминания
@@ -310,8 +366,12 @@ def register_jobs(application):
     jq.run_repeating(return_inactive_users, interval=21600, first=300,
                      name="return_inactive_users")
 
-    # Понедельник 10:00: email-дайджест
-    jq.run_daily(weekly_email_digest, time=berlin.localize(datetime(2026, 1, 1, 10, 0)).time(),
-                 days=(0,), name="weekly_email_digest")
+    # Понедельник 10:00: email-дайджест.
+    # ВАЖНО: в python-telegram-bot v20+ дни недели в run_daily идут
+    # 0=воскресенье..6=суббота (изменено с 0=понедельник в более старых
+    # версиях) — days=(0,) запускало бы задачу по ВОСКРЕСЕНЬЯМ, а не по
+    # понедельникам. Понедельник — это 1.
+    jq.run_daily(weekly_email_digest, time=datetime(2026, 1, 1, 10, 0, tzinfo=berlin).timetz(),
+                 days=(1,), name="weekly_email_digest")
 
     logger.info("All jobs registered in job_queue")

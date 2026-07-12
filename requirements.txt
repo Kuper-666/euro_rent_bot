@@ -1,4 +1,4 @@
-python-telegram-bot
+python-telegram-bot[job-queue]
 groq
 flask
 asgiref
@@ -10,9 +10,8 @@ fpdf2
 supabase
 feedparser
 python-dotenv
-schedule
-apscheduler
 pytz
+tzdata
 telethon
 langdetect
 pandas
