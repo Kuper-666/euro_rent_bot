@@ -285,9 +285,9 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["123"]["balance"], 4)
         update.message.reply_text.assert_called()
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    @patch("bot.client")
+    @patch("handlers.listing_analyzer.save_data")
+    @patch("handlers.listing_analyzer.load_data")
+    @patch("handlers.listing_analyzer.client")
     async def test_admin_bypass(self, mock_client, mock_load, mock_save):
         """
         Regression: this test previously used the default chat_type="private",
@@ -320,10 +320,10 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
         sent_text = update.message.reply_text.call_args_list[-1][0][0]
         self.assertNotIn("Ошибка:", sent_text)
 
-    @patch("bot.save_data")
-    @patch("bot.load_data")
-    @patch("bot.get_user")
-    @patch("bot.client")
+    @patch("handlers.listing_analyzer.save_data")
+    @patch("handlers.listing_analyzer.load_data")
+    @patch("handlers.listing_analyzer.get_user")
+    @patch("handlers.listing_analyzer.client")
     async def test_admin_id_own_analysis_does_not_crash(self, mock_client, mock_get_user, mock_load, mock_save):
         """
         Регрессия: process_listing присваивал переменную `user` ТОЛЬКО в
@@ -346,7 +346,7 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=999, text="Wohnung Berlin")
         ctx = make_context()
 
-        with patch("bot.extract_score", return_value=5):
+        with patch("handlers.listing_analyzer.extract_score", return_value=5):
             await self.bot_module.process_listing(update, ctx, "Wohnung Berlin", "999", "ru")
 
         sent_text = update.message.reply_text.call_args_list[-1][0][0]
@@ -385,9 +385,9 @@ class TestHandlePhoto(unittest.IsolatedAsyncioTestCase):
             with patch("bot.check_rate_limit", return_value=(True, 0)):
                 with patch("bot.ocr_from_photo", return_value="Wohnung Berlin 3 Zimmer 1200 EUR"):
                     with patch("bot.get_user_city", return_value=None):
-                        with patch("bot.client") as mock_client:
+                        with patch("handlers.listing_analyzer.client") as mock_client:
                             mock_client.chat.completions.create.return_value = mock_response
-                            with patch("bot.extract_score", return_value=5):
+                            with patch("handlers.listing_analyzer.extract_score", return_value=5):
                                 await self.bot_module.handle_photo(update, ctx)
 
         sent_text = update.message.reply_text.call_args_list[-1][0][0]
