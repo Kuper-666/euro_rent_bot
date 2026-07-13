@@ -1248,5 +1248,46 @@ class TestCallbackDataCoverage(unittest.TestCase):
             )
 
 
+# ── storage schema round-trip ───────────────────────────────────────
+
+class TestStorageSchemaRoundTrip(unittest.TestCase):
+    """
+    Регрессия: last_reminder/last_limit_reminder существовали в коде
+    scheduler.py (читались и писались в user dict), но отсутствовали в
+    _user_to_row/_row_to_user -- в Supabase-режиме эти поля полностью
+    терялись при каждом save_data()/load_data(), из-за чего анти-спам
+    защита от повторной отправки одного и того же напоминания никогда не
+    переживала следующий запуск планировщика.
+
+    Этот тест не проверяет конкретные поля по имени (чтобы не плодить
+    список вручную при каждом новом поле) -- вместо этого проверяет
+    инвариант: всё, что кладёт в user dict _row_to_user(_user_to_row(...)),
+    должно совпадать с тем, что было передано, для полей, которые
+    scheduler.py/bot.py реально читают и пишут.
+    """
+
+    def test_last_reminder_fields_survive_round_trip(self):
+        from storage import _user_to_row, _row_to_user
+        user = {
+            "balance": 5,
+            "last_paid_at": 1000.0,
+            "last_activity": 2000.0,
+            "last_reminder": 3000.5,
+            "last_limit_reminder": 4000.5,
+        }
+        row = _user_to_row("123", user)
+        restored = _row_to_user(row)
+        self.assertEqual(restored["last_reminder"], 3000.5)
+        self.assertEqual(restored["last_limit_reminder"], 4000.5)
+
+    def test_last_reminder_fields_default_to_zero(self):
+        from storage import _user_to_row, _row_to_user
+        user = {"balance": 5}
+        row = _user_to_row("123", user)
+        restored = _row_to_user(row)
+        self.assertEqual(restored.get("last_reminder", 0), 0)
+        self.assertEqual(restored.get("last_limit_reminder", 0), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

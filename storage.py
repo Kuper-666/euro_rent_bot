@@ -89,6 +89,8 @@ def _user_to_row(uid: str, info: dict) -> dict:
         "last_letter": info.get("last_letter", ""),
         "last_listing_url": info.get("last_listing_url", ""),
         "last_listing_text": info.get("last_listing_text", ""),
+        "last_reminder": info.get("last_reminder", 0),
+        "last_limit_reminder": info.get("last_limit_reminder", 0),
     }
 
 
@@ -126,6 +128,8 @@ def _row_to_user(row: dict) -> dict:
         "last_letter": row.get("last_letter", ""),
         "last_listing_url": row.get("last_listing_url", ""),
         "last_listing_text": row.get("last_listing_text", ""),
+        "last_reminder": row.get("last_reminder", 0),
+        "last_limit_reminder": row.get("last_limit_reminder", 0),
     }
 
 
