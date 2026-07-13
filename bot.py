@@ -591,7 +591,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await update.message.reply_text(get_msg(lang, "analyzing"), reply_markup=kb(update))
     try:
-        await process_listing(update, context, listing_text, user_id, lang, source_url=source_url)
+        # Фото не имеет исходного URL по определению (это OCR-путь) —
+        # раньше здесь передавался source_url, который в handle_photo вообще
+        # никогда не присваивался (скопировано из handle_message без учёта
+        # разницы), что гарантированно ломало КАЖДЫЙ анализ по фото с
+        # NameError: name 'source_url' is not defined.
+        await process_listing(update, context, listing_text, user_id, lang, source_url="")
     except Exception as e:
         logging.error(f"process_listing (photo) error for user {user_id}: {e}")
         try:

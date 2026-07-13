@@ -354,6 +354,48 @@ class TestProcessListing(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Analysis for the admin", sent_text)
 
 
+# ── handle_photo ────────────────────────────────────────────────
+
+class TestHandlePhoto(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression: handle_photo called process_listing(..., source_url=source_url),
+    but `source_url` was NEVER assigned anywhere in handle_photo (it only
+    makes sense for the URL-fetch path in handle_message, which handle_photo
+    doesn't have -- this is an OCR path). This was a guaranteed NameError on
+    every single photo sent to the bot: "name 'source_url' is not defined".
+    No test previously covered handle_photo's success path end-to-end, so
+    this went unnoticed.
+    """
+
+    def setUp(self):
+        import bot as bot_module
+        self.bot_module = bot_module
+
+    async def test_photo_analysis_does_not_raise_nameerror(self):
+        update = make_update(user_id=456)
+        update.message.photo = [MagicMock(file_id="abc123")]
+        ctx = make_context()
+        ctx.bot.get_file = AsyncMock(return_value=MagicMock())
+        ctx.bot.get_file.return_value.download_as_bytearray = AsyncMock(return_value=bytearray(b"fake"))
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="Photo analysis result"))]
+
+        with patch("bot.get_user", return_value={"balance": 5}):
+            with patch("bot.check_rate_limit", return_value=(True, 0)):
+                with patch("bot.ocr_from_photo", return_value="Wohnung Berlin 3 Zimmer 1200 EUR"):
+                    with patch("bot.get_user_city", return_value=None):
+                        with patch("bot.client") as mock_client:
+                            mock_client.chat.completions.create.return_value = mock_response
+                            with patch("bot.extract_score", return_value=5):
+                                await self.bot_module.handle_photo(update, ctx)
+
+        sent_text = update.message.reply_text.call_args_list[-1][0][0]
+        self.assertNotIn("source_url", sent_text)
+        self.assertNotIn("Ошибка:", sent_text)
+        self.assertIn("Photo analysis result", sent_text)
+
+
 # ── successful_payment ────────────────────────────────────────────
 
 class TestSuccessfulPayment(unittest.IsolatedAsyncioTestCase):
