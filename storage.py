@@ -147,6 +147,10 @@ def load_data():
                     data[uid] = _row_to_user(row)
                 return data
             except Exception as e:
+                err_str = str(e)
+                if "PGRST204" in err_str:
+                    logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    return _load_json()
                 logger.warning(f"Supabase load attempt {attempt+1} failed: {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))
@@ -177,10 +181,13 @@ def save_data(data):
                         sb.table(SUPABASE_TABLE).insert(row_data).execute()
                 return
             except Exception as e:
+                err_str = str(e)
+                if "PGRST204" in err_str:
+                    logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    break
                 logger.warning(f"Supabase save attempt {attempt+1} failed: {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))
-        logger.error("Supabase save failed after 3 attempts, falling back to JSON")
     _save_json(data)
 
 
@@ -198,6 +205,13 @@ def save_user(user_id: str, user_data: dict):
                     sb.table(SUPABASE_TABLE).insert(row_data).execute()
                 return
             except Exception as e:
+                err_str = str(e)
+                # PGRST204 = column не существует в схеме — повторные попытки
+                # бессмысленны, сразу fallback в JSON. Иначе 3 ретрая с sleep
+                # блокируют вызывающий поток на несколько секунд зря.
+                if "PGRST204" in err_str:
+                    logger.error("Supabase schema mismatch (missing column), falling back to JSON: %s", e)
+                    break
                 logger.warning(f"Supabase save_user attempt {attempt+1} for {user_id}: {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))
@@ -218,6 +232,10 @@ def get_user(user_id: str) -> dict:
                     return _row_to_user(result.data[0])
                 return {}
             except Exception as e:
+                err_str = str(e)
+                if "PGRST204" in err_str:
+                    logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    break
                 logger.warning(f"Supabase get_user attempt {attempt+1} for {user_id}: {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))
