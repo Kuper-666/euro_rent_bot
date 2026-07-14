@@ -625,8 +625,40 @@ if __name__ == "__main__":
                     asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
             return jsonify({"ok": True})
         # Set webhook
+        #
+        # ВАЖНО: allowed_updates передаётся ЯВНО. Если не указать его,
+        # Telegram сохраняет предыдущую настройку с прошлого вызова
+        # setWebhook — если тот прошлый вызов был сделан без callback_query
+        # в списке (например, вручную через curl/браузер при отладке),
+        # кнопки могли бы молча перестать доходить до бота, при том что
+        # текстовые сообщения продолжали бы работать.
+        #
+        # Также Telegram автоматически отключает webhook после достаточного
+        # числа неудачных попыток доставки подряд (типично — если сервис на
+        # Render был недоступен несколько секунд/минут во время передеплоя).
+        # Код ранее вызывал set_webhook() один раз при старте и не проверял
+        # результат — если Telegram уже "выключил" доставку из-за таких
+        # сбоев, бот никак не узнавал об этом и не переустанавливал
+        # webhook заново, что могло приводить к полной тишине без единой
+        # ошибки в логах Render (апдейт не долетает до процесса вообще).
         async def set_webhook():
-            await application.bot.set_webhook(WEBHOOK_URL + f"/{TELEGRAM_TOKEN}")
+            full_url = WEBHOOK_URL + f"/{TELEGRAM_TOKEN}"
+            await application.bot.set_webhook(
+                full_url,
+                allowed_updates=["message", "callback_query", "chat_member",
+                                  "my_chat_member", "pre_checkout_query"],
+                drop_pending_updates=False,
+            )
+            # Логируем реальное состояние сразу после установки — чтобы при
+            # следующем деплое можно было проверить доставку прямо в логах
+            # Render, без ручного похода на api.telegram.org/getWebhookInfo.
+            info = await application.bot.get_webhook_info()
+            logging.info(
+                "Webhook info after set: url=%s pending_update_count=%s "
+                "last_error_date=%s last_error_message=%s",
+                info.url, info.pending_update_count,
+                info.last_error_date, info.last_error_message,
+            )
         loop.run_until_complete(set_webhook())
         logging.info(f"Webhook set to {WEBHOOK_URL}/{TELEGRAM_TOKEN}")
         # Run Flask in a thread
