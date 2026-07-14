@@ -18,9 +18,7 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ChatMemberHandler, PreCheckoutQueryHandler, filters, ContextTypes
 )
-from groq import Groq
-
-from config import TELEGRAM_TOKEN, GROQ_API_KEY, PDF_PRICE, VIP_PRICE
+from config import TELEGRAM_TOKEN, PDF_PRICE, VIP_PRICE
 from messages import get_msg
 from storage import save_user, get_user
 from user_features import save_profile, get_profile
@@ -77,8 +75,6 @@ from listing_features import (
 )
 from scheduler import update_last_activity, register_jobs
 from web import app
-
-client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 _flood_tracker = {}  # user_id -> (count, window_start)
 MAX_MESSAGES_PER_MINUTE = 10
@@ -170,7 +166,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         await update.message.reply_text(get_msg(lang, "pdf_generating"), reply_markup=kb(update))
         try:
-            pdf_bytes = generate_mieterprofil_pdf(pdf_data)
+            # Синхронная CPU-bound генерация PDF; без to_thread блокирует
+            # event loop бота для всех остальных пользователей на время
+            # генерации (тот же класс проблемы, что чинился по всему
+            # проекту ранее).
+            pdf_bytes = await asyncio.to_thread(generate_mieterprofil_pdf, pdf_data)
             await update.message.reply_document(
                 document=BytesIO(pdf_bytes),
                 filename="Mieterprofil.pdf",
@@ -179,7 +179,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         except Exception as e:
             logging.error(f"PDF generation error: {e}")
-            await update.message.reply_text(get_msg(lang, "pdf_error").format(e), reply_markup=kb(update))
+            await update.message.reply_text(get_msg(lang, "pdf_error").format(str(e)[:200]), reply_markup=kb(update))
         return
 
     vip_state = user.get("vip_state")
@@ -660,7 +660,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     "income": profile.get("income", ""),
                     "occupants": profile.get("occupants", ""),
                 }
-                pdf_bytes = generate_mieterprofil_pdf(pdf_data, cover_letter=last_letter)
+                pdf_bytes = await asyncio.to_thread(generate_mieterprofil_pdf, pdf_data, last_letter)
                 await context.bot.send_document(
                     chat_id=int(user_id),
                     document=BytesIO(pdf_bytes),
@@ -790,6 +790,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 user["referred_by"] = referrer_id
                 await asyncio.to_thread(save_data, data)
                 log_referral_event("ref_link_clicked", user_id, {"referrer": referrer_id})
+        elif payload == "help":
+            # group_help отправляет кнопку "Открыть помощь в личке" с этим
+            # payload'ом, но раньше он не обрабатывался вообще — попадал в
+            # обычное приветствие вместо реального раздела помощи, то есть
+            # кнопка технически не падала, но не делала того, что обещала.
+            await update.message.reply_text(get_msg(lang, "help"), reply_markup=kb(update))
+            return
 
     logo_path = os.path.join(os.path.dirname(__file__), "icons", "start.png")
     if os.path.exists(logo_path):

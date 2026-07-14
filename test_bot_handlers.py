@@ -2,8 +2,9 @@ import os
 import sys
 import time
 import json
+import asyncio
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock
+from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock, ANY
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -385,10 +386,11 @@ class TestHandlePhoto(unittest.IsolatedAsyncioTestCase):
             with patch("bot.check_rate_limit", return_value=(True, 0)):
                 with patch("bot.ocr_from_photo", return_value="Wohnung Berlin 3 Zimmer 1200 EUR"):
                     with patch("bot.get_user_city", return_value=None):
-                        with patch("handlers.listing_analyzer.client") as mock_client:
-                            mock_client.chat.completions.create.return_value = mock_response
-                            with patch("handlers.listing_analyzer.extract_score", return_value=5):
-                                await self.bot_module.handle_photo(update, ctx)
+                        with patch("handlers.listing_analyzer.get_user", return_value={"balance": 5}):
+                            with patch("handlers.listing_analyzer.client") as mock_client:
+                                mock_client.chat.completions.create.return_value = mock_response
+                                with patch("handlers.listing_analyzer.extract_score", return_value=5):
+                                    await self.bot_module.handle_photo(update, ctx)
 
         sent_text = update.message.reply_text.call_args_list[-1][0][0]
         self.assertNotIn("source_url", sent_text)
@@ -844,6 +846,45 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         call_kwargs = ctx.bot.send_message.call_args[1]
         self.assertEqual(call_kwargs["chat_id"], 123)
 
+    @patch("bot.get_profile", return_value={"full_name": "Test"})
+    @patch("bot.get_user", return_value={"last_letter": "Some cover letter text"})
+    async def test_pdf_letter_does_not_block_event_loop(self, mock_get_user, mock_get_profile):
+        """
+        Regression: generate_mieterprofil_pdf (synchronous, CPU-bound PDF
+        generation) used to be called directly inside the async pdf_letter
+        branch, blocking the bot's entire event loop -- and therefore every
+        other user's request -- for the duration of PDF generation.
+        Confirmed via a concurrent-ticker test: a parallel task fully
+        stalled during the blocking call and resumed immediately once
+        wrapped in asyncio.to_thread.
+        """
+        update = make_update(user_id=123)
+        update.callback_query.data = "pdf_letter"
+        ctx = make_context()
+
+        tick_count = {"n": 0}
+
+        def slow_pdf_gen(data, cover_letter=""):
+            time.sleep(0.3)
+            return b"fake pdf bytes"
+
+        async def ticker():
+            for _ in range(5):
+                tick_count["n"] += 1
+                await asyncio.sleep(0.05)
+
+        with patch("bot.generate_mieterprofil_pdf", side_effect=slow_pdf_gen):
+            await asyncio.gather(
+                self.bot_module.handle_callback(update, ctx),
+                ticker(),
+            )
+
+        # If the PDF generation had blocked the event loop, the ticker
+        # would not have been able to advance concurrently and tick_count
+        # would be far lower than 5 by the time handle_callback finished.
+        self.assertEqual(tick_count["n"], 5)
+        ctx.bot.send_document.assert_called_once()
+
 
 # ── Last analyzed listing tracking (favorites / letters) ───────────
 
@@ -1287,6 +1328,105 @@ class TestStorageSchemaRoundTrip(unittest.TestCase):
         restored = _row_to_user(row)
         self.assertEqual(restored.get("last_reminder", 0), 0)
         self.assertEqual(restored.get("last_limit_reminder", 0), 0)
+
+
+# ── pay_stars_* invoice commands ────────────────────────────────────
+
+class TestPayStarsInvoiceCommands(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression: pay_stars_pdf was the only one of the five pay_stars_*
+    invoice commands (3, 9, 19, pdf, vip) missing a try/except around
+    reply_invoice() -- if Telegram's Payments API failed for any reason
+    (network blip, transient error), this one command would raise an
+    unhandled exception instead of gracefully showing "Не удалось создать
+    счёт." like its four siblings.
+    """
+
+    async def test_pay_stars_pdf_handles_invoice_failure_gracefully(self):
+        import handlers.payments as payments
+        update = make_update()
+        update.message.reply_invoice = AsyncMock(side_effect=Exception("Telegram API error"))
+        ctx = make_context()
+        await payments.pay_stars_pdf(update, ctx)
+        update.message.reply_text.assert_called_once_with(
+            "Не удалось создать счёт.", reply_markup=ANY
+        )
+
+    async def test_pay_stars_pdf_success_path_unaffected(self):
+        import handlers.payments as payments
+        update = make_update()
+        update.message.reply_invoice = AsyncMock()
+        ctx = make_context()
+        await payments.pay_stars_pdf(update, ctx)
+        update.message.reply_invoice.assert_called_once()
+        update.message.reply_text.assert_not_called()
+
+
+# ── channel_poster: blocking calls ──────────────────────────────────
+
+class TestChannelPosterBlocking(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression: post_to_channel and send_holy_grail_alert called
+    create_url_token (a synchronous Supabase select+insert) directly inside
+    async functions that run on the bot's main event loop via the
+    scheduler's hourly job_queue task -- blocking the whole bot for every
+    live user for the duration of the Supabase round-trip, once per
+    listing posted (up to 5 per run).
+    """
+
+    async def test_post_to_channel_does_not_block_event_loop(self):
+        import channel_poster
+        channel_poster.bot = MagicMock()
+        channel_poster.bot.send_message = AsyncMock()
+
+        tick_count = {"n": 0}
+
+        def slow_create_url_token(url):
+            time.sleep(0.3)
+            return "tok123"
+
+        async def ticker():
+            for _ in range(5):
+                tick_count["n"] += 1
+                await asyncio.sleep(0.05)
+
+        with patch("channel_poster.create_url_token", side_effect=slow_create_url_token):
+            await asyncio.gather(
+                channel_poster.post_to_channel(12345, "test text", "testbot", "https://example.com/x"),
+                ticker(),
+            )
+
+        self.assertEqual(tick_count["n"], 5)
+        channel_poster.bot.send_message.assert_called_once()
+
+    async def test_send_holy_grail_alert_does_not_block_event_loop(self):
+        import channel_poster
+        channel_poster.bot = MagicMock()
+        channel_poster.bot.send_message = AsyncMock()
+        channel_poster.POST_TARGET = -100123456
+        channel_poster.CITY_CHANNELS = {}
+
+        tick_count = {"n": 0}
+
+        def slow_create_url_token(url):
+            time.sleep(0.3)
+            return "tok123"
+
+        async def ticker():
+            for _ in range(5):
+                tick_count["n"] += 1
+                await asyncio.sleep(0.05)
+
+        entry = {"url": "https://example.com/x", "city": "berlin", "price": 1000, "score": 9, "grail_reason": "great deal"}
+        with patch("channel_poster.create_url_token", side_effect=slow_create_url_token):
+            with patch("channel_poster.format_holy_grail_alert", return_value="alert text"):
+                await asyncio.gather(
+                    channel_poster.send_holy_grail_alert(entry, "testbot"),
+                    ticker(),
+                )
+
+        self.assertEqual(tick_count["n"], 5)
+        channel_poster.bot.send_message.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -256,7 +256,12 @@ async def post_to_channel(chat_id: int, text: str, bot_username: str, listing_ur
     if not bot or not chat_id:
         return False
 
-    analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(listing_url)}"
+    # create_url_token — синхронный Supabase-вызов; без to_thread блокирует
+    # event loop бота (планировщик работает на основном loop) для всех
+    # живых пользователей, пока идёт запрос — тот же класс проблемы, что
+    # была исправлена по всему проекту ранее.
+    token = await asyncio.to_thread(create_url_token, listing_url)
+    analyze_url = f"https://t.me/{bot_username}?start=an_{token}"
     keyboard = [
         [InlineKeyboardButton("🔍 Полный анализ", url=analyze_url)],
         [InlineKeyboardButton("🤖 Начать с ботом", url=f"https://t.me/{bot_username}")],
@@ -283,7 +288,8 @@ async def send_holy_grail_alert(entry: dict, bot_username: str):
     if city in CITY_CHANNELS:
         channel_ids.add(CITY_CHANNELS[city])
 
-    analyze_url = f"https://t.me/{bot_username}?start=an_{create_url_token(entry['url'])}"
+    token = await asyncio.to_thread(create_url_token, entry["url"])
+    analyze_url = f"https://t.me/{bot_username}?start=an_{token}"
     keyboard = [
         [InlineKeyboardButton("⚡ ЗАБРАТЬ!", url=analyze_url)],
         [InlineKeyboardButton("🤖 Анализ в боте", url=f"https://t.me/{bot_username}")],

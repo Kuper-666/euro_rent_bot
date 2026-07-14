@@ -49,12 +49,15 @@ async def pay_stars_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def pay_stars_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_invoice(
-        title="PDF заявление (Mieterprofil)", description="Готовое PDF-заявление.",
-        payload="pay_stars_pdf", provider_token="", currency="XTR",
-        prices=[LabeledPrice(label="PDF заявление", amount=PDF_PRICE * 100)],
-        need_name=False, need_phone_number=False, need_email=False,
-    )
+    try:
+        await update.message.reply_invoice(
+            title="PDF заявление (Mieterprofil)", description="Готовое PDF-заявление.",
+            payload="pay_stars_pdf", provider_token="", currency="XTR",
+            prices=[LabeledPrice(label="PDF заявление", amount=PDF_PRICE * 100)],
+            need_name=False, need_phone_number=False, need_email=False,
+        )
+    except Exception:
+        await update.message.reply_text("Не удалось создать счёт.", reply_markup=kb(update))
 
 
 async def pay_stars_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
