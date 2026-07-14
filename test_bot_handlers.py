@@ -720,10 +720,10 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         saved = {}
         def capture_save(uid, data):
             saved.update({uid: dict(data)})
-        with patch("bot.get_user", return_value=dict(user_data)):
-            with patch("bot.save_user", side_effect=capture_save):
-                with patch("utils.load_data", return_value={"123": dict(user_data)}):
-                    await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_lang.get_user", return_value=dict(user_data)):
+            with patch("handlers.callbacks_lang.save_user", side_effect=capture_save):
+                from handlers.callbacks_lang import handle_lang_switch
+                await handle_lang_switch(update, ctx)
         return saved
 
     async def test_lang_ru_saves(self):
@@ -750,10 +750,10 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "lang_en"
         ctx = make_context()
-        with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
-            with patch("bot.save_user"):
-                with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
-                    await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_lang.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("handlers.callbacks_lang.save_user"):
+                from handlers.callbacks_lang import handle_lang_switch
+                await handle_lang_switch(update, ctx)
         update.callback_query.answer.assert_called_once()
         call_args = update.callback_query.answer.call_args
         self.assertIn("English", call_args[0][0])
@@ -765,10 +765,10 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         update.callback_query.data = "lang_ru"
         update.callback_query.edit_message_reply_markup = AsyncMock()
         ctx = make_context()
-        with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
-            with patch("bot.save_user"):
-                with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
-                    await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_lang.get_user", return_value={"free_used": 0, "balance": 0}):
+            with patch("handlers.callbacks_lang.save_user"):
+                from handlers.callbacks_lang import handle_lang_switch
+                await handle_lang_switch(update, ctx)
         update.callback_query.edit_message_reply_markup.assert_called_once_with(reply_markup=None)
         ctx.bot.send_message.assert_called_once()
         call_kwargs = ctx.bot.send_message.call_args[1]
@@ -792,10 +792,10 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
             call_order.append("save_user")
 
         ctx = make_context()
-        with patch("bot.get_user", side_effect=record_get_user):
-            with patch("bot.save_user", side_effect=record_save_user):
-                with patch("utils.load_data", return_value={"123": {"free_used": 0, "balance": 0}}):
-                    await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_lang.get_user", side_effect=record_get_user):
+            with patch("handlers.callbacks_lang.save_user", side_effect=record_save_user):
+                from handlers.callbacks_lang import handle_lang_switch
+                await handle_lang_switch(update, ctx)
 
         self.assertEqual(call_order[0], "answer", f"answer() must be first, got order: {call_order}")
 
@@ -804,8 +804,9 @@ class TestLanguageCallback(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "lang_en"
         ctx = make_context()
-        with patch("bot.get_user", side_effect=Exception("Supabase unavailable")):
-            await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_lang.get_user", side_effect=Exception("Supabase unavailable")):
+            from handlers.callbacks_lang import handle_lang_switch
+            await handle_lang_switch(update, ctx)
         ctx.bot.send_message.assert_called_once()
         call_kwargs = ctx.bot.send_message.call_args[1]
         self.assertEqual(call_kwargs["chat_id"], 123)
@@ -824,7 +825,8 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         update.callback_query.data = "skip_ad"
         update.callback_query.edit_message_reply_markup = AsyncMock()
         ctx = make_context()
-        await self.bot_module.handle_callback(update, ctx)
+        from handlers.callbacks_listing import handle_skip_ad
+        await handle_skip_ad(update, ctx)
         update.callback_query.answer.assert_called_once()
 
     @patch("bot.load_data")
@@ -832,22 +834,24 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "copy"
         ctx = make_context()
-        await self.bot_module.handle_callback(update, ctx)
+        from handlers.callbacks_listing import handle_copy
+        await handle_copy(update, ctx)
         self.assertTrue(update.callback_query.answer.called)
 
-    @patch("bot.get_user", return_value={"free_used": 0, "balance": 5})
+    @patch("handlers.callbacks_listing.get_user", return_value={"free_used": 0, "balance": 5})
     async def test_new_callback_sends_message(self, mock_get_user):
         update = make_update(user_id=123)
         update.callback_query.data = "new"
         update.callback_query.edit_message_reply_markup = AsyncMock()
         ctx = make_context()
-        await self.bot_module.handle_callback(update, ctx)
+        from handlers.callbacks_listing import handle_new_listing
+        await handle_new_listing(update, ctx)
         ctx.bot.send_message.assert_called_once()
         call_kwargs = ctx.bot.send_message.call_args[1]
         self.assertEqual(call_kwargs["chat_id"], 123)
 
-    @patch("bot.get_profile", return_value={"full_name": "Test"})
-    @patch("bot.get_user", return_value={"last_letter": "Some cover letter text"})
+    @patch("handlers.callbacks_features.get_profile", return_value={"full_name": "Test"})
+    @patch("handlers.callbacks_features.get_user", return_value={"last_letter": "Some cover letter text"})
     async def test_pdf_letter_does_not_block_event_loop(self, mock_get_user, mock_get_profile):
         """
         Regression: generate_mieterprofil_pdf (synchronous, CPU-bound PDF
@@ -873,15 +877,13 @@ class TestCallbackHandler(unittest.IsolatedAsyncioTestCase):
                 tick_count["n"] += 1
                 await asyncio.sleep(0.05)
 
-        with patch("bot.generate_mieterprofil_pdf", side_effect=slow_pdf_gen):
+        with patch("handlers.callbacks_features.generate_mieterprofil_pdf", side_effect=slow_pdf_gen):
+            from handlers.callbacks_features import handle_pdf_letter
             await asyncio.gather(
-                self.bot_module.handle_callback(update, ctx),
+                handle_pdf_letter(update, ctx),
                 ticker(),
             )
 
-        # If the PDF generation had blocked the event loop, the ticker
-        # would not have been able to advance concurrently and tick_count
-        # would be far lower than 5 by the time handle_callback finished.
         self.assertEqual(tick_count["n"], 5)
         ctx.bot.send_document.assert_called_once()
 
@@ -905,9 +907,10 @@ class TestLastListingTracking(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "fav_save"
         ctx = make_context()
-        with patch("user_features.add_favorite") as mock_add_fav:
+        with patch("handlers.callbacks_features.add_favorite") as mock_add_fav:
             mock_add_fav.return_value = True
-            await self.bot_module.handle_callback(update, ctx)
+            from handlers.callbacks_features import handle_fav_save
+            await handle_fav_save(update, ctx)
         mock_add_fav.assert_called_once()
         saved_url = mock_add_fav.call_args[0][1]
         self.assertEqual(saved_url, "https://example.com/listing/42")
@@ -921,11 +924,12 @@ class TestLastListingTracking(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "gen_letter"
         ctx = make_context()
-        with patch("bot.get_profile", return_value={"full_name": "A", "profession": "B", "income": "C", "employer": "D"}):
-            with patch("bot.generate_letter", return_value="Dear Sir/Madam...") as mock_gen:
-                with patch("bot.get_user", return_value={"free_used": 0, "balance": 0}):
-                    with patch("bot.save_user"):
-                        await self.bot_module.handle_callback(update, ctx)
+        with patch("handlers.callbacks_features.get_profile", return_value={"full_name": "A", "profession": "B", "income": "C", "employer": "D"}):
+            with patch("handlers.callbacks_features.generate_letter", return_value="Dear Sir/Madam...") as mock_gen:
+                with patch("handlers.callbacks_features.get_user", return_value={"free_used": 0, "balance": 0}):
+                    with patch("handlers.callbacks_features.save_user"):
+                        from handlers.callbacks_features import handle_gen_letter
+                        await handle_gen_letter(update, ctx)
         mock_gen.assert_called_once()
         listing_text_arg = mock_gen.call_args[0][1]
         self.assertEqual(listing_text_arg, "Some scraped ad text here")
@@ -939,9 +943,10 @@ class TestLastListingTracking(unittest.IsolatedAsyncioTestCase):
         update = make_update(user_id=123)
         update.callback_query.data = "fav_save"
         ctx = make_context()
-        with patch("user_features.add_favorite") as mock_add_fav:
+        with patch("handlers.callbacks_features.add_favorite") as mock_add_fav:
             mock_add_fav.return_value = True
-            await self.bot_module.handle_callback(update, ctx)
+            from handlers.callbacks_features import handle_fav_save
+            await handle_fav_save(update, ctx)
         mock_add_fav.assert_called_once()
         saved_value = mock_add_fav.call_args[0][1]
         self.assertIn("Raw pasted ad text", saved_value)
@@ -1259,7 +1264,7 @@ class TestStartCommand(unittest.IsolatedAsyncioTestCase):
 
 class TestCallbackDataCoverage(unittest.TestCase):
     def test_all_inline_button_callbacks_are_handled(self):
-        """Every callback_data from keyboards should match a branch in handle_callback."""
+        """Every callback_data from keyboards should match a registered CallbackQueryHandler pattern."""
         from services.keyboards import get_analysis_inline_buttons
         inline_kb = get_analysis_inline_buttons()
         all_callbacks = set()
@@ -1272,7 +1277,7 @@ class TestCallbackDataCoverage(unittest.TestCase):
 
         known_prefixes = {
             "new", "analyze_ad", "analyze_rss", "skip_ad", "copy",
-            "share", "pdf", "filter", "fav_save", "fav_del",
+            "share", "pdf", "show_pay_", "filter", "fav_save", "fav_del",
             "track", "gen_letter", "copy_letter", "pdf_letter",
         }
         known_starts = set()
@@ -1285,7 +1290,7 @@ class TestCallbackDataCoverage(unittest.TestCase):
             found = prefix in known_starts
             self.assertTrue(
                 found,
-                f"callback_data '{cb}' has no handler branch in handle_callback"
+                f"callback_data '{cb}' has no registered handler"
             )
 
 

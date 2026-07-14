@@ -19,13 +19,19 @@ from telegram.ext import (
     ChatMemberHandler, PreCheckoutQueryHandler, filters, ContextTypes
 )
 from config import TELEGRAM_TOKEN, PDF_PRICE, VIP_PRICE
+from handlers.callbacks_lang import handle_lang_switch
+from handlers.callbacks_listing import (
+    handle_new_listing, handle_analyze_ad, handle_skip_ad,
+    handle_copy, handle_share, handle_pdf, handle_show_pay,
+)
+from handlers.callbacks_features import (
+    handle_filter_toggle, handle_fav_delete, handle_track_status,
+    handle_gen_letter, handle_fav_save, handle_copy_letter,
+    handle_pdf_letter,
+)
 from messages import get_msg
 from storage import save_user, get_user
 from user_features import save_profile, get_profile
-from user_features import (
-    get_user_filters, save_user_filters,
-    remove_favorite, update_tracker_status, STATUSES,
-)
 from utils import (
     load_data, save_data, get_lang, get_user_data,
     can_use, is_url, fetch_url_text, fetch_url_text_async, ocr_from_photo,
@@ -359,325 +365,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             pass
 
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        query = update.callback_query
-        logger.info("Callback received: data=%s user=%s", query.data, query.from_user.id if query.from_user else "?")
-        if not update.effective_user or not query.data:
-            return
-        
-        data_prefix = query.data.split(":")[0] if ":" in query.data else query.data
-
-        # Кнопка "Язык". answer() ПЕРВЫМ — до БД (Telegram invalidates callback ~10s)
-        if data_prefix.startswith("lang_"):
-            new_lang = data_prefix.split("_", 1)[1]
-            lang_names = {"ru": "Русский", "uk": "Українська", "en": "English", "de": "Deutsch", "pl": "Polski"}
-            try:
-                await query.answer(f"✅ Язык изменён: {lang_names.get(new_lang, new_lang)}", show_alert=True)
-            except Exception as e:
-                logger.warning("answerCallbackQuery failed for lang_%s: %s", new_lang, e)
-
-            uid = str(query.from_user.id)
-            try:
-                user = await asyncio.to_thread(get_user, uid)
-                user["lang"] = new_lang
-                await asyncio.to_thread(save_user, uid, user)
-            except Exception as e:
-                logger.error("Failed to persist lang=%s for user=%s: %s", new_lang, uid, e)
-                try:
-                    await context.bot.send_message(chat_id=int(uid), text="Не удалось сохранить язык, попробуйте ещё раз.")
-                except Exception:
-                    pass
-                return
-
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                pass
-            try:
-                await context.bot.send_message(
-                    chat_id=int(uid),
-                    text=get_msg(new_lang, "start"),
-                    reply_markup=kb(update, chat_type="private", lang=new_lang),
-                )
-            except Exception as e:
-                logger.warning("Failed to send post-language-switch message: %s", e)
-            return
-
-        lang = await asyncio.to_thread(get_lang, update)
-        user_id = str(update.effective_user.id)
-
-        # Кнопка "Ещё одно объявление" — в личку
-        if data_prefix == "new":
-            await query.answer()
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                pass
-            user = await asyncio.to_thread(get_user, user_id)
-            remaining = calc_remaining(user)
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=(
-                    "🔍 Готов к анализу!\n\n"
-                    "Отправьте ссылку на объявление или текст.\n"
-                    f"Осталось проверок: {remaining}"
-                ),
-                reply_markup=kb(update, chat_type="private"),
-            )
-
-        # Кнопка "Проанализировать" из группы — открываем бота в личке
-        elif data_prefix in ("analyze_ad", "analyze_rss"):
-            await query.answer()
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                pass
-
-            token_or_short_id = query.data.split(":", 1)[1] if ":" in query.data else ""
-            bot_username = context.bot.username
-
-            rss_url = await asyncio.to_thread(resolve_url_token, token_or_short_id)
-
-            if not rss_url:
-                try:
-                    from daily_poster import get_listing
-                    listing = await asyncio.to_thread(get_listing, token_or_short_id)
-                    rss_url = listing.get("url", "")
-                except Exception:
-                    pass
-
-            if rss_url and is_url(rss_url):
-                new_token = await asyncio.to_thread(create_url_token, rss_url)
-                analyze_url = f"https://t.me/{bot_username}?start=an_{new_token}"
-            else:
-                analyze_url = f"https://t.me/{bot_username}"
-
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔍 Открыть бота для анализа", url=analyze_url)]
-            ])
-
-            user = await asyncio.to_thread(get_user, user_id)
-
-            try:
-                if not can_use(user):
-                    await context.bot.send_message(
-                        chat_id=int(user_id),
-                        text=(
-                            "❌ У вас закончились проверки.\n\n"
-                            "Пакеты:\n"
-                            "3 проверки — 300 Stars (~3EUR) -> /pay_3\n"
-                            "10 проверок — 900 Stars (~9EUR) -> /pay_9\n"
-                            "Безлимит/мес — 1900 Stars (~19EUR) -> /pay_19"
-                        ),
-                        reply_markup=keyboard,
-                    )
-                else:
-                    await context.bot.send_message(
-                        chat_id=int(user_id),
-                        text="🔍 Нажмите кнопку ниже, чтобы получить полный разбор объявления в личке!",
-                        reply_markup=keyboard,
-                    )
-            except Exception as e:
-                logger.error("analyze_rss reply failed: %s", e)
-
-        # Кнопка "Пропустить"
-        elif data_prefix == "skip_ad":
-            await query.answer()
-            try:
-                await query.edit_message_reply_markup(reply_markup=None)
-            except Exception:
-                pass
-
-        # Кнопка "Скопировать"
-        elif data_prefix == "copy":
-            await query.answer("Скопируйте текст выше", show_alert=True)
-
-        # Кнопка "Поделиться"
-        elif data_prefix == "share":
-            await query.answer()
-            bot_username = context.bot.username
-            share_url = f"https://t.me/share/url?url=https://t.me/{bot_username}&text=🏠+EuroRent+AI+-+AI-бот+для+разбора+объявлений+по+аренде+в+Европе!"
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=f"📤 {get_msg(lang, 'share_text')}\n\n{share_url}",
-                reply_markup=kb(update, chat_type="private"),
-            )
-
-        # Кнопка "PDF"
-        elif data_prefix == "pdf":
-            await query.answer()
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=get_msg(lang, "pay_pdf"),
-                reply_markup=kb(update, chat_type="private"),
-            )
-
-        # Кнопки оплаты
-        elif data_prefix.startswith("show_pay_"):
-            await query.answer()
-            plan = data_prefix.replace("show_pay_", "")
-            msg_key = f"pay_{plan}" if plan != "pdf" else "pay_pdf"
-            if plan == "vip":
-                msg_key = "vip_intro"
-            await context.bot.send_message(
-                chat_id=int(user_id),
-                text=get_msg(lang, msg_key),
-                reply_markup=kb(update, chat_type="private"),
-            )
-
-        # Фильтры: переключение
-        elif data_prefix == "filter":
-            filter_type = query.data.split(":")[1] if ":" in query.data else ""
-            if filter_type in ("furnished", "pets", "parking"):
-                user_filters = await asyncio.to_thread(get_user_filters, user_id)
-                field = f"filter_{filter_type}"
-                new_val = not user_filters.get(field, False)
-                user_filters[field] = new_val
-                await asyncio.to_thread(
-                    save_user_filters,
-                    user_id,
-                    furnished=user_filters.get("filter_furnished", False),
-                    pets=user_filters.get("filter_pets", False),
-                    parking=user_filters.get("filter_parking", False),
-                )
-                icon = "✅" if new_val else "❌"
-                label = {"furnished": "Мебель", "pets": "Питомцы", "parking": "Парковка"}[filter_type]
-                await query.answer(f"{label}: {icon}", show_alert=False)
-                furnished = "✅" if user_filters.get("filter_furnished") else "❌"
-                pets_f = "✅" if user_filters.get("filter_pets") else "❌"
-                parking = "✅" if user_filters.get("filter_parking") else "❌"
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(f"🪑 Мебель: {furnished}", callback_data="filter:furnished")],
-                    [InlineKeyboardButton(f"🐾 Питомцы: {pets_f}", callback_data="filter:pets")],
-                    [InlineKeyboardButton(f"🅿️ Парковка: {parking}", callback_data="filter:parking")],
-                ])
-                try:
-                    await query.edit_message_reply_markup(reply_markup=keyboard)
-                except Exception:
-                    pass
-
-        # Удаление из избранного
-        elif data_prefix == "fav_del":
-            fav_id = int(query.data.split(":")[1]) if ":" in query.data else 0
-            if fav_id and await asyncio.to_thread(remove_favorite, user_id, fav_id):
-                await query.answer("Удалено из избранного", show_alert=False)
-                try:
-                    await query.edit_message_reply_markup(reply_markup=None)
-                except Exception:
-                    pass
-            else:
-                await query.answer("Ошибка удаления", show_alert=True)
-
-        # Смена статуса в трекере
-        elif data_prefix == "track":
-            parts = query.data.split(":")
-            if len(parts) == 3:
-                entry_id = int(parts[1])
-                new_status = parts[2]
-                if await asyncio.to_thread(update_tracker_status, user_id, entry_id, new_status):
-                    await query.answer(f"Статус: {STATUSES.get(new_status, new_status)}", show_alert=False)
-                else:
-                    await query.answer("Ошибка", show_alert=True)
-            else:
-                await query.answer()
-
-        # Кнопка "Письмо" после анализа
-        elif data_prefix == "gen_letter":
-            await query.answer()
-            profile = await asyncio.to_thread(get_profile, user_id)
-            filled = sum(1 for f in ["full_name", "profession", "income", "employer"] if profile.get(f))
-            if filled < 2:
-                await context.bot.send_message(
-                    chat_id=int(user_id),
-                    text="📝 Для генерации письма заполните профиль.\n\nИспользуйте: /set_profile",
-                )
-            else:
-                last_listing_text = await asyncio.to_thread(get_last_listing_text, user_id)
-                if not last_listing_text:
-                    await context.bot.send_message(
-                        chat_id=int(user_id),
-                        text="📝 Сначала проанализируйте объявление, потом /generate_letter.",
-                    )
-                else:
-                    await context.bot.send_message(chat_id=int(user_id), text="📝 Генерирую письмо...")
-                    letter_lang = profile.get("preferred_letter_lang", "")
-                    if letter_lang not in ("de", "en"):
-                        letter_lang = "de" if lang in ("ru", "de") else "en"
-                    # generate_letter — синхронный вызов Groq API
-                    letter = await asyncio.to_thread(generate_letter, profile, last_listing_text, letter_lang)
-                    if letter:
-                        keyboard = InlineKeyboardMarkup([
-                            [InlineKeyboardButton("📋 Копировать", callback_data="copy_letter")],
-                            [InlineKeyboardButton("📄 Скачать PDF", callback_data="pdf_letter")],
-                        ])
-                        await context.bot.send_message(
-                            chat_id=int(user_id),
-                            text=f"📝 <b>Мотивационное письмо ({letter_lang.upper()}):</b>\n\n{letter}",
-                            reply_markup=keyboard, parse_mode="HTML",
-                        )
-                        user = await asyncio.to_thread(get_user, user_id)
-                        user["last_letter"] = letter
-                        await asyncio.to_thread(save_user, user_id, user)
-                    else:
-                        await context.bot.send_message(
-                            chat_id=int(user_id),
-                            text="❌ Не удалось сгенерировать письмо. Попробуйте позже.",
-                        )
-
-        # Кнопка "В избранное"
-        elif data_prefix == "fav_save":
-            last_url = await asyncio.to_thread(get_last_url, user_id)
-            fallback_text = await asyncio.to_thread(get_last_listing_text, user_id)
-            if last_url or fallback_text:
-                from user_features import add_favorite
-                ok = await asyncio.to_thread(add_favorite, user_id, last_url or fallback_text[:200], "Из анализа")
-                if ok:
-                    await query.answer("⭐ Добавлено в избранное!", show_alert=False)
-                else:
-                    await query.answer("Ошибка", show_alert=True)
-            else:
-                await query.answer("Нет объявления для сохранения", show_alert=True)
-
-        # Кнопка "Копировать письмо"
-        elif data_prefix == "copy_letter":
-            await query.answer("Скопируйте текст выше", show_alert=True)
-
-        # Кнопка "PDF письма"
-        elif data_prefix == "pdf_letter":
-            await query.answer()
-            profile = await asyncio.to_thread(get_profile, user_id)
-            user_for_letter = await asyncio.to_thread(get_user, user_id)
-            last_letter = user_for_letter.get("last_letter", "")
-            if last_letter:
-                pdf_data = {
-                    "name": profile.get("full_name", ""),
-                    "dob": "",
-                    "phone": "",
-                    "email": "",
-                    "address": "",
-                    "employer": profile.get("employer", ""),
-                    "income": profile.get("income", ""),
-                    "occupants": profile.get("occupants", ""),
-                }
-                pdf_bytes = await asyncio.to_thread(generate_mieterprofil_pdf, pdf_data, last_letter)
-                await context.bot.send_document(
-                    chat_id=int(user_id),
-                    document=BytesIO(pdf_bytes),
-                    filename="Cover_Letter_Mieterprofil.pdf",
-                    caption="📄 Письмо + Mieterprofil PDF",
-                )
-            else:
-                await query.answer("Сначала сгенерируйте письмо", show_alert=True)
-
-    except Exception as e:
-        logger.error(f"handle_callback error: {e}", exc_info=True)
-        try:
-            await query.answer("Произошла ошибка", show_alert=True)
-        except Exception:
-            pass
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user:
         return
@@ -889,7 +576,21 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("rules", group_rules, groups))
     application.add_handler(ChatMemberHandler(welcome_new_member, ChatMemberHandler.CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(handle_city_selection, pattern=r'^select_city:'))
-    application.add_handler(CallbackQueryHandler(handle_callback))
+    application.add_handler(CallbackQueryHandler(handle_lang_switch, pattern=r'^lang_'))
+    application.add_handler(CallbackQueryHandler(handle_new_listing, pattern=r'^new$'))
+    application.add_handler(CallbackQueryHandler(handle_analyze_ad, pattern=r'^(analyze_ad|analyze_rss):'))
+    application.add_handler(CallbackQueryHandler(handle_skip_ad, pattern=r'^skip_ad$'))
+    application.add_handler(CallbackQueryHandler(handle_copy, pattern=r'^copy$'))
+    application.add_handler(CallbackQueryHandler(handle_share, pattern=r'^share$'))
+    application.add_handler(CallbackQueryHandler(handle_pdf, pattern=r'^pdf$'))
+    application.add_handler(CallbackQueryHandler(handle_show_pay, pattern=r'^show_pay_'))
+    application.add_handler(CallbackQueryHandler(handle_filter_toggle, pattern=r'^filter:'))
+    application.add_handler(CallbackQueryHandler(handle_fav_delete, pattern=r'^fav_del:'))
+    application.add_handler(CallbackQueryHandler(handle_track_status, pattern=r'^track:'))
+    application.add_handler(CallbackQueryHandler(handle_gen_letter, pattern=r'^gen_letter$'))
+    application.add_handler(CallbackQueryHandler(handle_fav_save, pattern=r'^fav_save$'))
+    application.add_handler(CallbackQueryHandler(handle_copy_letter, pattern=r'^copy_letter$'))
+    application.add_handler(CallbackQueryHandler(handle_pdf_letter, pattern=r'^pdf_letter$'))
     application.add_handler(MessageHandler(filters.PHOTO & priv, handle_photo))
     application.add_handler(MessageHandler(
         filters.ChatType.GROUPS & filters.Regex(r'^(?i:привет|здравствуй|hello|hi|добрый день|доброе утро|добрый вечер|ку|хай)'),
