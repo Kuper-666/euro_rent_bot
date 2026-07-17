@@ -34,7 +34,7 @@ from storage import save_user, get_user
 from user_features import save_profile, get_profile
 from utils import (
     load_data, save_data, get_lang, get_user_data,
-    can_use, is_url, fetch_url_text, fetch_url_text_async, ocr_from_photo,
+    can_use, is_url, fetch_url_text_async, ocr_from_photo,
     calc_remaining, check_rate_limit,
     is_pdf_state_expired, validate_pdf_data, expire_unlimited_if_needed
 )
@@ -145,8 +145,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     await asyncio.to_thread(update_last_activity, user_id)
-    data = await asyncio.to_thread(load_data)
-    user = get_user_data(data, user_id)
+    user = await asyncio.to_thread(get_user, user_id)
 
     followup = check_followups(user, lang)
     if followup:
@@ -156,12 +155,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if pdf_state == "awaiting_data" and is_pdf_state_expired(user):
         user.pop("pdf_state", None)
         user.pop("pdf_started_at", None)
-        await asyncio.to_thread(save_data, data)
+        await asyncio.to_thread(save_user, user_id, user)
         pdf_state = None
     if pdf_state == "awaiting_data":
         user.pop("pdf_state", None)
         user.pop("pdf_started_at", None)
-        await asyncio.to_thread(save_data, data)
+        await asyncio.to_thread(save_user, user_id, user)
         pdf_data = parse_pdf_data(update.message.text)
         if not pdf_data:
             await update.message.reply_text("❌ Не удалось распознать данные. Попробуйте ещё раз.", reply_markup=kb(update))
@@ -193,7 +192,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user.pop("vip_state", None)
         user["vip"] = True
         user["vip_criteria"] = update.message.text
-        await asyncio.to_thread(save_data, data)
+        await asyncio.to_thread(save_user, user_id, user)
         await update.message.reply_text(
             f"✅ *VIP активирован!*\n\nКритерии сохранены:\n{update.message.text}\n\nЯ буду присылать подборку каждый день!",
             reply_markup=kb(update),
@@ -492,6 +491,69 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
 
 
+async def run_health_checks(application, webhook_url: str, telegram_token: str) -> tuple[bool, dict]:
+    """
+    Реальная проверка состояния бота, а не просто "процесс жив".
+
+    render.yaml использует "/" как healthCheckPath, но это статичная
+    HTML-страница из web.py, которая всегда отвечает 200, даже если
+    Supabase недоступен, webhook отключён Telegram'ом, или задачи
+    планировщика не зарегистрированы — то есть Render считает сервис
+    "здоровым", пока сам бот может быть полностью нефункционален. Именно
+    это привело к долгому поиску причины "кнопки не отвечают": ни один
+    автоматический сигнал не показывал проблему, приходилось вручную
+    сверять логи в момент нажатия кнопки.
+
+    Вынесена в отдельную функцию модульного уровня (а не определена
+    инлайн внутри Flask route в main()), чтобы её можно было протестировать
+    напрямую с моком application, без поднятия реального Flask/event loop.
+
+    Возвращает (overall_ok, checks_dict).
+    """
+    checks = {}
+
+    # 1. Supabase — реальный лёгкий запрос, не просто "заданы ли переменные
+    # окружения". get_user на заведомо несуществующий id не создаёт записей
+    # и работает в обоих режимах (Supabase/JSON).
+    try:
+        from storage import get_user, _get_mode
+        t0 = time.time()
+        await asyncio.to_thread(get_user, "__healthcheck__")
+        checks["storage"] = {
+            "ok": True,
+            "mode": _get_mode(),
+            "latency_ms": round((time.time() - t0) * 1000, 1),
+        }
+    except Exception as e:
+        checks["storage"] = {"ok": False, "error": str(e)[:200]}
+
+    # 2. Webhook — сверяем с тем, что реально знает Telegram, а не просто с
+    # тем, что бот думает, что установил при старте.
+    try:
+        info = await application.bot.get_webhook_info()
+        expected_url = f"{webhook_url}/{telegram_token}"
+        checks["webhook"] = {
+            "ok": not info.last_error_message and info.url == expected_url,
+            "url_matches_expected": info.url == expected_url,
+            "pending_update_count": info.pending_update_count,
+            "last_error_message": info.last_error_message,
+            "last_error_date": info.last_error_date.isoformat() if info.last_error_date else None,
+        }
+    except Exception as e:
+        checks["webhook"] = {"ok": False, "error": str(e)[:200]}
+
+    # 3. Планировщик — job_queue реально содержит задачи, значит
+    # register_jobs() отработал при старте без исключения.
+    try:
+        jobs = application.job_queue.jobs() if application.job_queue else []
+        checks["scheduler"] = {"ok": len(jobs) > 0, "job_count": len(jobs)}
+    except Exception as e:
+        checks["scheduler"] = {"ok": False, "error": str(e)[:200]}
+
+    overall_ok = all(c.get("ok") for c in checks.values())
+    return overall_ok, checks
+
+
 def run_flask():
     import os
     port = int(os.environ.get("PORT", 10000))
@@ -624,6 +686,15 @@ if __name__ == "__main__":
                 if update:
                     asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
             return jsonify({"ok": True})
+
+        @app.get("/health")
+        def health():
+            overall_ok, checks = asyncio.run_coroutine_threadsafe(
+                run_health_checks(application, WEBHOOK_URL, TELEGRAM_TOKEN), loop
+            ).result(timeout=15)
+            status_code = 200 if overall_ok else 503
+            return jsonify({"ok": overall_ok, "checks": checks}), status_code
+
         # Set webhook
         #
         # ВАЖНО: allowed_updates передаётся ЯВНО. Если не указать его,

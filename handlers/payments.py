@@ -189,11 +189,13 @@ def _check_admin(update: Update) -> bool:
 
 async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
-    user_id = str(update.effective_user.id)
-    user = await asyncio.to_thread(get_user, user_id)
+    # /pay_done_3 <user_id> — начисляет 3 проверки указанному пользователю.
+    # Без аргумента начисляет самому себе (для тестов).
+    target_id = context.args[0] if context.args else str(update.effective_user.id)
+    user = await asyncio.to_thread(get_user, target_id)
     user["balance"] = user.get("balance", 0) + 3
     user["last_paid_at"] = time.time()
-    await asyncio.to_thread(save_user, user_id, user)
+    await asyncio.to_thread(save_user, target_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_3").format(remaining), reply_markup=kb(update))
@@ -201,11 +203,11 @@ async def pay_done_3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
-    user_id = str(update.effective_user.id)
-    user = await asyncio.to_thread(get_user, user_id)
+    target_id = context.args[0] if context.args else str(update.effective_user.id)
+    user = await asyncio.to_thread(get_user, target_id)
     user["balance"] = user.get("balance", 0) + 10
     user["last_paid_at"] = time.time()
-    await asyncio.to_thread(save_user, user_id, user)
+    await asyncio.to_thread(save_user, target_id, user)
     remaining = user["balance"] + max(0, FREE_LIMIT - user.get("free_used", 0))
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_9").format(remaining), reply_markup=kb(update))
@@ -213,34 +215,34 @@ async def pay_done_9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def pay_done_19(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
-    user_id = str(update.effective_user.id)
-    user = await asyncio.to_thread(get_user, user_id)
+    target_id = context.args[0] if context.args else str(update.effective_user.id)
+    user = await asyncio.to_thread(get_user, target_id)
     user["balance"] = -1
     user["last_paid_at"] = time.time()
-    await asyncio.to_thread(save_user, user_id, user)
+    await asyncio.to_thread(save_user, target_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pay_done_19"), reply_markup=kb(update))
 
 
 async def pay_done_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
-    user_id = str(update.effective_user.id)
-    user = await asyncio.to_thread(get_user, user_id)
+    target_id = context.args[0] if context.args else str(update.effective_user.id)
+    user = await asyncio.to_thread(get_user, target_id)
     user["pdf_paid"] = True
     user["pdf_state"] = "awaiting_data"
     user["pdf_started_at"] = time.time()
-    await asyncio.to_thread(save_user, user_id, user)
+    await asyncio.to_thread(save_user, target_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "pdf_need_data"), reply_markup=kb(update))
 
 
 async def pay_done_vip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _check_admin(update): return
-    user_id = str(update.effective_user.id)
-    user = await asyncio.to_thread(get_user, user_id)
+    target_id = context.args[0] if context.args else str(update.effective_user.id)
+    user = await asyncio.to_thread(get_user, target_id)
     user["vip"] = True
     user["vip_state"] = "awaiting_criteria"
-    await asyncio.to_thread(save_user, user_id, user)
+    await asyncio.to_thread(save_user, target_id, user)
     lang = await asyncio.to_thread(get_lang, update)
     await update.message.reply_text(get_msg(lang, "vip_ask_criteria"), reply_markup=kb(update))
 

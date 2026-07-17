@@ -3,6 +3,8 @@ import json
 import time
 import logging
 
+from alerting import alert_admin
+
 logger = logging.getLogger(__name__)
 
 DATA_FILE = "users_data.json"
@@ -150,11 +152,23 @@ def load_data():
                 err_str = str(e)
                 if "PGRST204" in err_str:
                     logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    alert_admin(
+                        "pgrst204",
+                        "Supabase: колонка отсутствует в схеме (PGRST204). "
+                        "Бот переключился на локальный JSON — данные не персистентны "
+                        "между рестартами. Нужно применить миграцию в Supabase Dashboard.\n\n"
+                        f"Детали: {err_str[:200]}",
+                    )
                     return _load_json()
                 logger.warning(f"Supabase load attempt {attempt+1} failed: {e}")
                 if attempt < 2:
                     time.sleep(1 * (attempt + 1))
         logger.error("Supabase load failed after 3 attempts, falling back to JSON")
+        alert_admin(
+            "supabase_load_down",
+            "Supabase недоступен (3 попытки исчерпаны) — load_data() упал на "
+            "локальный JSON. Проверь статус Supabase и сетевую доступность.",
+        )
         return _load_json()
     return _load_json()
 
@@ -184,6 +198,13 @@ def save_data(data):
                 err_str = str(e)
                 if "PGRST204" in err_str:
                     logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    alert_admin(
+                        "pgrst204",
+                        "Supabase: колонка отсутствует в схеме (PGRST204). "
+                        "Бот переключился на локальный JSON — данные не персистентны "
+                        "между рестартами. Нужно применить миграцию в Supabase Dashboard.\n\n"
+                        f"Детали: {err_str[:200]}",
+                    )
                     break
                 logger.warning(f"Supabase save attempt {attempt+1} failed: {e}")
                 if attempt < 2:
@@ -211,6 +232,13 @@ def save_user(user_id: str, user_data: dict):
                 # блокируют вызывающий поток на несколько секунд зря.
                 if "PGRST204" in err_str:
                     logger.error("Supabase schema mismatch (missing column), falling back to JSON: %s", e)
+                    alert_admin(
+                        "pgrst204",
+                        "Supabase: колонка отсутствует в схеме (PGRST204). "
+                        "Бот переключился на локальный JSON — данные не персистентны "
+                        "между рестартами. Нужно применить миграцию в Supabase Dashboard.\n\n"
+                        f"Детали: {err_str[:200]}",
+                    )
                     break
                 logger.warning(f"Supabase save_user attempt {attempt+1} for {user_id}: {e}")
                 if attempt < 2:
@@ -235,6 +263,13 @@ def get_user(user_id: str) -> dict:
                 err_str = str(e)
                 if "PGRST204" in err_str:
                     logger.error("Supabase schema mismatch, falling back to JSON: %s", e)
+                    alert_admin(
+                        "pgrst204",
+                        "Supabase: колонка отсутствует в схеме (PGRST204). "
+                        "Бот переключился на локальный JSON — данные не персистентны "
+                        "между рестартами. Нужно применить миграцию в Supabase Dashboard.\n\n"
+                        f"Детали: {err_str[:200]}",
+                    )
                     break
                 logger.warning(f"Supabase get_user attempt {attempt+1} for {user_id}: {e}")
                 if attempt < 2:

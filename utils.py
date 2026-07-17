@@ -157,7 +157,7 @@ def fetch_url_text(url: str) -> str:
                 import time
                 time.sleep(1 * (attempt + 1))
                 continue
-            return "ERROR: Timeout — сайт не ответил за 30 секунд"
+            return "ERROR: Timeout — сайт не ответил за 15 секунд"
         except requests.exceptions.ConnectionError as e:
             if attempt < 2:
                 import time
@@ -171,7 +171,7 @@ def fetch_url_text(url: str) -> str:
 async def fetch_url_text_async(url: str) -> str:
     """Async версия fetch_url_text — не блокирует event loop."""
     import asyncio
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, fetch_url_text, url)
 
 

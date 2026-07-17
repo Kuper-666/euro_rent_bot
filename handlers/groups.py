@@ -140,6 +140,18 @@ async def handle_group_listing(update: Update, context: ContextTypes.DEFAULT_TYP
         pass
 
     if not is_group_admin:
+        # Обычные пользователи — перенаправляем в личку с ботом
+        if has_url:
+            lang = await asyncio.to_thread(get_lang, update)
+            listing_url = text.strip().split()[0]
+            token = await asyncio.to_thread(create_url_token, listing_url)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 Проверить скрытые платежи", callback_data=f"analyze_ad:{token}")]
+            ])
+            await update.message.reply_text(
+                get_msg(lang, "group_redirect"),
+                reply_markup=keyboard,
+            )
         return
 
     bot_username = context.bot.username

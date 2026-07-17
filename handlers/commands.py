@@ -210,6 +210,10 @@ async def group_faq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = " ".join(context.args)
     await update.message.reply_text("🤔 Думаю...")
 
+    if not client:
+        await update.message.reply_text("❌ Анализатор временно недоступен.")
+        return
+
     try:
         system_prompt = (
             "Ты — эксперт по аренде жилья в Европе. Отвечай на вопросы экспатов "

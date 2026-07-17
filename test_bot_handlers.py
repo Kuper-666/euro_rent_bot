@@ -1367,6 +1367,138 @@ class TestPayStarsInvoiceCommands(unittest.IsolatedAsyncioTestCase):
         update.message.reply_text.assert_not_called()
 
 
+# ── /health endpoint ─────────────────────────────────────────────────
+
+class TestHealthChecks(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression coverage for run_health_checks -- the / healthCheckPath used
+    by Render is a static page that always returns 200 regardless of actual
+    bot health, so this is the only automated signal for "the bot can
+    actually do its job" (Supabase reachable, webhook delivering, scheduler
+    registered). These tests lock in the pass/fail logic for each of the
+    three checks and the overall status combination.
+    """
+
+    async def test_all_healthy(self):
+        import bot as bot_module
+        application = MagicMock()
+        fake_info = MagicMock()
+        fake_info.last_error_message = None
+        fake_info.url = "https://example.onrender.com/123:ABC"
+        fake_info.pending_update_count = 0
+        fake_info.last_error_date = None
+        application.bot.get_webhook_info = AsyncMock(return_value=fake_info)
+        application.job_queue.jobs.return_value = (MagicMock(),) * 9
+
+        with patch("storage.get_user", return_value={}):
+            ok, checks = await bot_module.run_health_checks(
+                application, "https://example.onrender.com", "123:ABC"
+            )
+
+        self.assertTrue(ok)
+        self.assertTrue(checks["storage"]["ok"])
+        self.assertTrue(checks["webhook"]["ok"])
+        self.assertTrue(checks["scheduler"]["ok"])
+        self.assertEqual(checks["scheduler"]["job_count"], 9)
+
+    async def test_webhook_delivery_failure_reported(self):
+        """
+        The exact scenario diagnosed in the 'buttons don't respond, zero
+        log lines' investigation: Telegram has a last_error_message and a
+        growing pending_update_count. The other two checks staying healthy
+        must not mask this -- overall_ok must be False.
+        """
+        import bot as bot_module
+        application = MagicMock()
+        fake_info = MagicMock()
+        fake_info.last_error_message = "Wrong response from the webhook: 502 Bad Gateway"
+        fake_info.url = "https://example.onrender.com/123:ABC"
+        fake_info.pending_update_count = 47
+        fake_info.last_error_date = None
+        application.bot.get_webhook_info = AsyncMock(return_value=fake_info)
+        application.job_queue.jobs.return_value = (MagicMock(),) * 9
+
+        with patch("storage.get_user", return_value={}):
+            ok, checks = await bot_module.run_health_checks(
+                application, "https://example.onrender.com", "123:ABC"
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(checks["webhook"]["ok"])
+        self.assertEqual(checks["webhook"]["pending_update_count"], 47)
+        self.assertIn("502", checks["webhook"]["last_error_message"])
+        # The other checks being fine shouldn't be hidden either -- callers
+        # reading the response should see exactly which check(s) failed.
+        self.assertTrue(checks["storage"]["ok"])
+        self.assertTrue(checks["scheduler"]["ok"])
+
+    async def test_webhook_url_mismatch_flagged_even_without_error(self):
+        """Telegram reports no delivery error, but the registered URL doesn't
+        match what this deploy expects (e.g. stale webhook from a previous
+        Render service URL) -- must still fail the check."""
+        import bot as bot_module
+        application = MagicMock()
+        fake_info = MagicMock()
+        fake_info.last_error_message = None
+        fake_info.url = "https://old-service-name.onrender.com/123:ABC"
+        fake_info.pending_update_count = 0
+        fake_info.last_error_date = None
+        application.bot.get_webhook_info = AsyncMock(return_value=fake_info)
+        application.job_queue.jobs.return_value = (MagicMock(),)
+
+        with patch("storage.get_user", return_value={}):
+            ok, checks = await bot_module.run_health_checks(
+                application, "https://example.onrender.com", "123:ABC"
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(checks["webhook"]["url_matches_expected"])
+
+    async def test_storage_failure_reported(self):
+        import bot as bot_module
+        application = MagicMock()
+        fake_info = MagicMock()
+        fake_info.last_error_message = None
+        fake_info.url = "https://example.onrender.com/123:ABC"
+        fake_info.pending_update_count = 0
+        fake_info.last_error_date = None
+        application.bot.get_webhook_info = AsyncMock(return_value=fake_info)
+        application.job_queue.jobs.return_value = (MagicMock(),)
+
+        with patch("storage.get_user", side_effect=Exception("Connection refused")):
+            ok, checks = await bot_module.run_health_checks(
+                application, "https://example.onrender.com", "123:ABC"
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(checks["storage"]["ok"])
+        self.assertIn("Connection refused", checks["storage"]["error"])
+
+    async def test_scheduler_not_registered_reported(self):
+        """job_queue.jobs() returning empty means register_jobs() either
+        never ran or raised before registering anything -- e.g. the
+        UnboundLocalError-style bugs found earlier in this project could
+        have silently prevented jobs from being scheduled."""
+        import bot as bot_module
+        application = MagicMock()
+        fake_info = MagicMock()
+        fake_info.last_error_message = None
+        fake_info.url = "https://example.onrender.com/123:ABC"
+        fake_info.pending_update_count = 0
+        fake_info.last_error_date = None
+        application.bot.get_webhook_info = AsyncMock(return_value=fake_info)
+        application.job_queue.jobs.return_value = ()
+
+        with patch("storage.get_user", return_value={}):
+            ok, checks = await bot_module.run_health_checks(
+                application, "https://example.onrender.com", "123:ABC"
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(checks["scheduler"]["ok"])
+        self.assertEqual(checks["scheduler"]["job_count"], 0)
+
+
 # ── channel_poster: blocking calls ──────────────────────────────────
 
 class TestChannelPosterBlocking(unittest.IsolatedAsyncioTestCase):

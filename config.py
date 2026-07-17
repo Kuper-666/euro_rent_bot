@@ -36,5 +36,6 @@ NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai
 # Travel time calculator (OpenStreetMap OSRM)
 OSRM_URL = os.getenv("OSRM_URL", "http://router.project-osrm.org")
 
-if not TELEGRAM_TOKEN or not GROQ_API_KEY:
-    logger.warning("TELEGRAM_TOKEN or GROQ_API_KEY not set — bot will not start")
+if not TELEGRAM_TOKEN:
+    logger.error("TELEGRAM_TOKEN not set — bot cannot start")
+    raise SystemExit("TELEGRAM_TOKEN is required")

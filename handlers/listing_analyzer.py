@@ -45,6 +45,13 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         except Exception:
             pass
 
+    if not client:
+        await update.message.reply_text(
+            "⚠️ Анализатор временно недоступен (не настроен API-ключ).",
+            reply_markup=kb(update),
+        )
+        return
+
     try:
         system_prompt = get_msg(lang, "system_prompt")
         full_prompt = f"{system_prompt}\n\nListing text:\n{listing_text}"
@@ -83,8 +90,6 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
 
         if is_admin:
             user = await asyncio.to_thread(get_user, user_id)
-            data = await asyncio.to_thread(load_data)
-            await asyncio.to_thread(save_data, data)
         else:
             user = await asyncio.to_thread(get_user, user_id)
             expire_unlimited_if_needed(user)
