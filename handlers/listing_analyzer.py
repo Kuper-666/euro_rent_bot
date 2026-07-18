@@ -18,6 +18,7 @@ from utils import (
     can_use, use_check, calc_remaining, expire_unlimited_if_needed, load_data, save_data,
 )
 from services.keyboards import kb, get_analysis_inline_buttons, split_message
+from metrics import log_event
 from handlers.user_features import track_last_url
 from handlers.commands import log_referral_event
 from listing_features import (
@@ -195,8 +196,10 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
             await update.message.reply_text(part, reply_markup=markup, parse_mode="HTML")
+        log_event("analysis_completed", user_id=user_id)
 
     except Exception as e:
+        log_event("analysis_failed", user_id=user_id, error=str(e)[:200])
         if "insufficient_quota" in str(e) or "429" in str(e):
             await update.message.reply_text(
                 "Извините, анализатор сейчас перегружен.\n\n"

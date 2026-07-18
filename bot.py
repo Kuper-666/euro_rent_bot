@@ -19,6 +19,7 @@ from telegram.ext import (
     ChatMemberHandler, PreCheckoutQueryHandler, filters, ContextTypes
 )
 from config import TELEGRAM_TOKEN, PDF_PRICE, VIP_PRICE
+from metrics import log_event
 from handlers.callbacks_lang import handle_lang_switch
 from handlers.callbacks_listing import (
     handle_new_listing, handle_analyze_ad, handle_skip_ad,
@@ -80,6 +81,7 @@ from listing_features import (
     POPULAR_CITIES, list_cities, set_user_city
 )
 from scheduler import update_last_activity, register_jobs
+from health import run_health_checks
 from web import app
 
 _flood_tracker = {}  # user_id -> (count, window_start)
@@ -386,6 +388,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "email": "",
         }
         await asyncio.to_thread(save_data, data)
+        log_event("new_user", user_id=user_id)
     elif not data[user_id].get("ref_code"):
         data[user_id]["ref_code"] = f"ref_{hashlib.sha256(f'{user_id}eurorent2024'.encode()).hexdigest()[:8]}"
         await asyncio.to_thread(save_data, data)
@@ -489,69 +492,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         with open(logo_path, "rb") as photo:
             await update.message.reply_photo(photo=photo)
     await update.message.reply_text(get_msg(lang, "start"), reply_markup=kb(update))
-
-
-async def run_health_checks(application, webhook_url: str, telegram_token: str) -> tuple[bool, dict]:
-    """
-    Реальная проверка состояния бота, а не просто "процесс жив".
-
-    render.yaml использует "/" как healthCheckPath, но это статичная
-    HTML-страница из web.py, которая всегда отвечает 200, даже если
-    Supabase недоступен, webhook отключён Telegram'ом, или задачи
-    планировщика не зарегистрированы — то есть Render считает сервис
-    "здоровым", пока сам бот может быть полностью нефункционален. Именно
-    это привело к долгому поиску причины "кнопки не отвечают": ни один
-    автоматический сигнал не показывал проблему, приходилось вручную
-    сверять логи в момент нажатия кнопки.
-
-    Вынесена в отдельную функцию модульного уровня (а не определена
-    инлайн внутри Flask route в main()), чтобы её можно было протестировать
-    напрямую с моком application, без поднятия реального Flask/event loop.
-
-    Возвращает (overall_ok, checks_dict).
-    """
-    checks = {}
-
-    # 1. Supabase — реальный лёгкий запрос, не просто "заданы ли переменные
-    # окружения". get_user на заведомо несуществующий id не создаёт записей
-    # и работает в обоих режимах (Supabase/JSON).
-    try:
-        from storage import get_user, _get_mode
-        t0 = time.time()
-        await asyncio.to_thread(get_user, "__healthcheck__")
-        checks["storage"] = {
-            "ok": True,
-            "mode": _get_mode(),
-            "latency_ms": round((time.time() - t0) * 1000, 1),
-        }
-    except Exception as e:
-        checks["storage"] = {"ok": False, "error": str(e)[:200]}
-
-    # 2. Webhook — сверяем с тем, что реально знает Telegram, а не просто с
-    # тем, что бот думает, что установил при старте.
-    try:
-        info = await application.bot.get_webhook_info()
-        expected_url = f"{webhook_url}/{telegram_token}"
-        checks["webhook"] = {
-            "ok": not info.last_error_message and info.url == expected_url,
-            "url_matches_expected": info.url == expected_url,
-            "pending_update_count": info.pending_update_count,
-            "last_error_message": info.last_error_message,
-            "last_error_date": info.last_error_date.isoformat() if info.last_error_date else None,
-        }
-    except Exception as e:
-        checks["webhook"] = {"ok": False, "error": str(e)[:200]}
-
-    # 3. Планировщик — job_queue реально содержит задачи, значит
-    # register_jobs() отработал при старте без исключения.
-    try:
-        jobs = application.job_queue.jobs() if application.job_queue else []
-        checks["scheduler"] = {"ok": len(jobs) > 0, "job_count": len(jobs)}
-    except Exception as e:
-        checks["scheduler"] = {"ok": False, "error": str(e)[:200]}
-
-    overall_ok = all(c.get("ok") for c in checks.values())
-    return overall_ok, checks
 
 
 def run_flask():

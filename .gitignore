@@ -57,3 +57,4 @@ Docs.txt
 # OS
 .DS_Store
 Thumbs.db
+metrics_events.jsonl

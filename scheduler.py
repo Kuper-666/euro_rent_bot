@@ -317,6 +317,65 @@ async def run_channel_poster(context=None):
 # РЕГИСТРАЦИЯ ЗАДАЧ
 # ============================================================================
 
+async def send_daily_admin_report(context=None):
+    """
+    Ежедневная сводка админу: новые пользователи, анализы (успешные/
+    неудачные), платежи, сработавшие алерты за сутки, плюс текущее
+    состояние health-check. Раз в день, не троттлится (в отличие от
+    alert_admin) — это плановый отчёт, а не реакция на конкретный сбой.
+
+    ВАЖНО: метрики читаются из metrics.py, который хранит события в
+    локальном JSONL-файле на эфемерном диске Render — если бот
+    перезапускался в течение дня, часть событий могла быть потеряна
+    (см. docstring metrics.py). Отчёт остаётся полезным индикатором
+    тренда, но не абсолютно точным счётчиком.
+    """
+    admin_id = os.getenv("ADMIN_ID", "")
+    if not admin_id or not context or not context.application:
+        return
+
+    from metrics import get_daily_summary
+    from health import run_health_checks
+
+    summary = get_daily_summary(hours=24)
+
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    token = os.getenv("TELEGRAM_TOKEN", "")
+    health_line = "—"
+    if webhook_url:
+        try:
+            ok, checks = await run_health_checks(context.application, webhook_url, token)
+            if ok:
+                health_line = "✅ всё в порядке"
+            else:
+                failed = [name for name, c in checks.items() if not c.get("ok")]
+                health_line = f"⚠️ проблемы: {', '.join(failed)}"
+        except Exception as e:
+            health_line = f"⚠️ не удалось проверить: {str(e)[:100]}"
+
+    alerts_text = ", ".join(summary["alerts_fired"]) if summary["alerts_fired"] else "нет"
+
+    text = (
+        f"📊 <b>Отчёт за сутки</b>\n\n"
+        f"👤 Новых пользователей: {summary['new_users']}\n"
+        f"✅ Анализов успешно: {summary['analyses_completed']}\n"
+        f"❌ Анализов с ошибкой: {summary['analyses_failed']}\n"
+        f"📷 Анализов по фото: {summary['photos_analyzed']}\n"
+        f"📄 PDF сгенерировано: {summary['pdfs_generated']}\n"
+        f"📝 Писем сгенерировано: {summary['letters_generated']}\n"
+        f"💳 Оплат: {summary['payments_completed']}\n\n"
+        f"🚨 Алерты за сутки: {alerts_text}\n"
+        f"🩺 Health-check сейчас: {health_line}"
+    )
+
+    try:
+        await context.application.bot.send_message(
+            chat_id=int(admin_id), text=text, parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.warning("Failed to send daily admin report: %s", e)
+
+
 def register_jobs(application):
     """Регистрирует все задачи в job_queue приложения.
 
@@ -373,5 +432,9 @@ def register_jobs(application):
     # понедельникам. Понедельник — это 1.
     jq.run_daily(weekly_email_digest, time=datetime(2026, 1, 1, 10, 0, tzinfo=berlin).timetz(),
                  days=(1,), name="weekly_email_digest")
+
+    # Ежедневный отчёт админу — 23:00 по Берлину, конец дня.
+    jq.run_daily(send_daily_admin_report, time=datetime(2026, 1, 1, 23, 0, tzinfo=berlin).timetz(),
+                 name="daily_admin_report")
 
     logger.info("All jobs registered in job_queue")

@@ -11,6 +11,7 @@ from storage import save_user, get_user
 from utils import get_lang
 from messages import get_msg
 from services.keyboards import kb
+from metrics import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,7 @@ async def _save_paid_user(user_id: str, user: dict, update: Update, context: Con
 async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = str(update.effective_user.id)
     payload = update.message.successful_payment.invoice_payload
+    log_event("payment_completed", user_id=user_id, plan=payload)
 
     try:
         user = await asyncio.to_thread(get_user, user_id)

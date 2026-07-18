@@ -67,6 +67,11 @@ def alert_admin(alert_key: str, message: str) -> None:
         )
         if resp.status_code == 200:
             _last_alert_sent[alert_key] = now
+            try:
+                from metrics import log_event
+                log_event("alert_fired", alert_key=alert_key)
+            except Exception:
+                pass
         else:
             logger.warning("alert_admin: Telegram API returned %s: %s", resp.status_code, resp.text[:200])
     except Exception as e:

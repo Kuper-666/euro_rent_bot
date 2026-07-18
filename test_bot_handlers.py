@@ -10,6 +10,14 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from utils import can_use, use_check, get_user_data, calc_remaining, validate_pdf_data, is_pdf_state_expired
 
+# Redirect metrics logging to a temp file for the whole test run. Several
+# tests exercise real bot code paths (start(), process_listing(),
+# successful_payment()) that now call metrics.log_event() internally --
+# without this redirect, every test run would append to the project's
+# actual metrics_events.jsonl as an unintended side effect.
+import metrics as _metrics_module
+_metrics_module.METRICS_FILE = "/tmp/test_suite_metrics_events.jsonl"
+
 
 # ── Helpers ───────────────────────────────────────────────────────
 
@@ -1564,6 +1572,162 @@ class TestChannelPosterBlocking(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(tick_count["n"], 5)
         channel_poster.bot.send_message.assert_called_once()
+
+
+# ── metrics: event logging + daily summary ──────────────────────────
+
+class TestMetrics(unittest.TestCase):
+    """
+    metrics.py is a lightweight append-only JSONL event log feeding the
+    daily admin report. Known limitation documented in the module itself:
+    the file lives on Render's ephemeral disk, so events are lost across a
+    process restart -- these tests cover the aggregation logic itself,
+    not that limitation (which isn't something code can fix).
+    """
+
+    def setUp(self):
+        import metrics
+        self.metrics = metrics
+        self._orig_file = metrics.METRICS_FILE
+        self.tmp_file = "/tmp/test_metrics_events_unittest.jsonl"
+        metrics.METRICS_FILE = self.tmp_file
+        if os.path.exists(self.tmp_file):
+            os.remove(self.tmp_file)
+
+    def tearDown(self):
+        self.metrics.METRICS_FILE = self._orig_file
+        if os.path.exists(self.tmp_file):
+            os.remove(self.tmp_file)
+
+    def test_empty_file_returns_zeros(self):
+        summary = self.metrics.get_daily_summary()
+        self.assertEqual(summary["new_users"], 0)
+        self.assertEqual(summary["alerts_fired"], [])
+
+    def test_logs_and_aggregates_events(self):
+        self.metrics.log_event("new_user", user_id="1")
+        self.metrics.log_event("new_user", user_id="2")
+        self.metrics.log_event("analysis_completed", user_id="1")
+        self.metrics.log_event("analysis_failed", user_id="2", error="timeout")
+        self.metrics.log_event("payment_completed", user_id="1", plan="pay_stars_3")
+
+        summary = self.metrics.get_daily_summary()
+        self.assertEqual(summary["new_users"], 2)
+        self.assertEqual(summary["analyses_completed"], 1)
+        self.assertEqual(summary["analyses_failed"], 1)
+        self.assertEqual(summary["payments_completed"], 1)
+
+    def test_alerts_fired_deduplicated_by_key(self):
+        self.metrics.log_event("alert_fired", alert_key="pgrst204")
+        self.metrics.log_event("alert_fired", alert_key="pgrst204")
+        self.metrics.log_event("alert_fired", alert_key="health_check_failed")
+
+        summary = self.metrics.get_daily_summary()
+        self.assertEqual(summary["alerts_fired"], ["health_check_failed", "pgrst204"])
+
+    def test_events_older_than_window_excluded(self):
+        old_ts = time.time() - 30 * 3600
+        with open(self.tmp_file, "w") as f:
+            f.write(json.dumps({"ts": old_ts, "type": "new_user"}) + "\n")
+        self.metrics.log_event("new_user")
+
+        summary = self.metrics.get_daily_summary(hours=24)
+        self.assertEqual(summary["new_users"], 1)
+
+    def test_corrupted_line_does_not_crash(self):
+        with open(self.tmp_file, "w") as f:
+            f.write("not valid json at all\n")
+        self.metrics.log_event("new_user")
+
+        summary = self.metrics.get_daily_summary()
+        self.assertEqual(summary["new_users"], 1)
+
+    def test_log_event_failure_does_not_raise(self):
+        """log_event must never crash the caller even if writing fails
+        (e.g. disk full, permission error) -- same principle as
+        alert_admin's own safe-failure guarantee."""
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            self.metrics.log_event("new_user")  # should not raise
+
+
+# ── scheduler: daily admin report ───────────────────────────────────
+
+class TestDailyAdminReport(unittest.IsolatedAsyncioTestCase):
+
+    async def test_sends_formatted_report_with_metrics_and_health(self):
+        import scheduler as scheduler_module
+        context = MagicMock()
+        application = MagicMock()
+        application.bot.send_message = AsyncMock()
+        context.application = application
+
+        fake_summary = {
+            "new_users": 5, "analyses_completed": 20, "analyses_failed": 2,
+            "photos_analyzed": 3, "pdfs_generated": 1, "letters_generated": 2,
+            "payments_completed": 1, "alerts_fired": ["pgrst204"],
+        }
+
+        async def fake_health_check(*a, **k):
+            return True, {"storage": {"ok": True}, "webhook": {"ok": True}, "scheduler": {"ok": True}}
+
+        with patch("os.getenv", side_effect=lambda k, d=None: {
+            "ADMIN_ID": "999", "WEBHOOK_URL": "https://example.onrender.com", "TELEGRAM_TOKEN": "123:ABC"
+        }.get(k, d)):
+            with patch("metrics.get_daily_summary", return_value=fake_summary):
+                with patch("health.run_health_checks", side_effect=fake_health_check):
+                    await scheduler_module.send_daily_admin_report(context)
+
+        application.bot.send_message.assert_called_once()
+        call_kwargs = application.bot.send_message.call_args[1]
+        self.assertEqual(call_kwargs["chat_id"], 999)
+        text = call_kwargs["text"]
+        self.assertIn("5", text)
+        self.assertIn("pgrst204", text)
+        self.assertIn("всё в порядке", text)
+
+    async def test_reports_unhealthy_state(self):
+        import scheduler as scheduler_module
+        context = MagicMock()
+        application = MagicMock()
+        application.bot.send_message = AsyncMock()
+        context.application = application
+
+        fake_summary = {
+            "new_users": 0, "analyses_completed": 0, "analyses_failed": 0,
+            "photos_analyzed": 0, "pdfs_generated": 0, "letters_generated": 0,
+            "payments_completed": 0, "alerts_fired": [],
+        }
+
+        async def fake_health_check(*a, **k):
+            return False, {"storage": {"ok": True}, "webhook": {"ok": False}, "scheduler": {"ok": True}}
+
+        with patch("os.getenv", side_effect=lambda k, d=None: {
+            "ADMIN_ID": "999", "WEBHOOK_URL": "https://example.onrender.com", "TELEGRAM_TOKEN": "123:ABC"
+        }.get(k, d)):
+            with patch("metrics.get_daily_summary", return_value=fake_summary):
+                with patch("health.run_health_checks", side_effect=fake_health_check):
+                    await scheduler_module.send_daily_admin_report(context)
+
+        text = application.bot.send_message.call_args[1]["text"]
+        self.assertIn("webhook", text)
+
+    async def test_no_admin_id_does_not_send(self):
+        import scheduler as scheduler_module
+        context = MagicMock()
+        context.application = MagicMock()
+        context.application.bot.send_message = AsyncMock()
+
+        with patch("os.getenv", side_effect=lambda k, d=None: d):
+            await scheduler_module.send_daily_admin_report(context)
+
+        context.application.bot.send_message.assert_not_called()
+
+    async def test_no_application_does_not_crash(self):
+        import scheduler as scheduler_module
+        await scheduler_module.send_daily_admin_report(None)
+        context = MagicMock()
+        context.application = None
+        await scheduler_module.send_daily_admin_report(context)  # should not raise
 
 
 if __name__ == "__main__":
