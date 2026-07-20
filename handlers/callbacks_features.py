@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes
 
 from storage import get_user, save_user
 from utils import get_lang
+from telegram_retry import safe_send
 from user_features import (
     get_user_filters, save_user_filters, remove_favorite,
     get_profile, update_tracker_status, add_favorite,
@@ -168,7 +169,8 @@ async def handle_pdf_letter(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "occupants": profile.get("occupants", ""),
         }
         pdf_bytes = await asyncio.to_thread(generate_mieterprofil_pdf, pdf_data, last_letter)
-        await context.bot.send_document(
+        await safe_send(
+            context.bot.send_document,
             chat_id=int(user_id),
             document=BytesIO(pdf_bytes),
             filename="Cover_Letter_Mieterprofil.pdf",

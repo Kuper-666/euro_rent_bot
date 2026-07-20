@@ -1,5 +1,15 @@
 import os
 import sys
+
+# Must be set before any project module is imported: config.py now raises
+# SystemExit if TELEGRAM_TOKEN is missing (a recent fix requiring it at
+# startup, previously only a warning). Without this, running the test
+# suite depends on the external shell already having these set, which is
+# fragile -- confirmed this broke a full test run when the env wasn't
+# pre-set.
+os.environ.setdefault("TELEGRAM_TOKEN", "123456789:test-token-for-unit-tests")
+os.environ.setdefault("GROQ_API_KEY", "test-groq-key-for-unit-tests")
+
 import time
 import json
 import asyncio
@@ -1728,6 +1738,99 @@ class TestDailyAdminReport(unittest.IsolatedAsyncioTestCase):
         context = MagicMock()
         context.application = None
         await scheduler_module.send_daily_admin_report(context)  # should not raise
+
+
+# ── telegram_retry: safe_send ───────────────────────────────────────
+
+class TestSafeSend(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression coverage for telegram_retry.safe_send, the centralized retry
+    wrapper for outgoing Telegram API calls. None of the ~159 send/reply
+    call sites across the project previously retried on a transient
+    network failure -- a single TimedOut/NetworkError meant the message
+    was simply lost.
+
+    One of these tests (test_bad_request_does_not_retry) caught a real bug
+    during development: in this version of python-telegram-bot,
+    BadRequest is unexpectedly a subclass of NetworkError
+    (issubclass(BadRequest, NetworkError) == True), so an
+    except (TimedOut, NetworkError) clause silently catches BadRequest too
+    unless excluded explicitly first.
+    """
+
+    async def test_succeeds_immediately_without_retry(self):
+        from telegram_retry import safe_send
+        fn = AsyncMock(return_value="ok")
+        result = await safe_send(fn, "arg", kw="x")
+        self.assertEqual(result, "ok")
+        self.assertEqual(fn.call_count, 1)
+
+    async def test_retries_on_timed_out_then_succeeds(self):
+        from telegram_retry import safe_send
+        from telegram.error import TimedOut
+        fn = AsyncMock(side_effect=[TimedOut(), "ok"])
+        result = await safe_send(fn)
+        self.assertEqual(result, "ok")
+        self.assertEqual(fn.call_count, 2)
+
+    async def test_retries_on_network_error_then_succeeds(self):
+        from telegram_retry import safe_send
+        from telegram.error import NetworkError
+        fn = AsyncMock(side_effect=[NetworkError("connection reset"), "ok"])
+        result = await safe_send(fn)
+        self.assertEqual(result, "ok")
+        self.assertEqual(fn.call_count, 2)
+
+    async def test_respects_retry_after_duration(self):
+        from telegram_retry import safe_send
+        from telegram.error import RetryAfter
+        fn = AsyncMock(side_effect=[RetryAfter(retry_after=0), "ok"])
+        result = await safe_send(fn)
+        self.assertEqual(result, "ok")
+        self.assertEqual(fn.call_count, 2)
+
+    async def test_retry_after_timedelta_does_not_crash(self):
+        from telegram_retry import safe_send
+        from telegram.error import RetryAfter
+        from datetime import timedelta
+
+        class FakeRetryAfterWithTimedelta(RetryAfter):
+            def __init__(self):
+                Exception.__init__(self, "flood control")
+                self._retry_after = timedelta(seconds=0)
+
+            @property
+            def retry_after(self):
+                return self._retry_after
+
+        fn = AsyncMock(side_effect=[FakeRetryAfterWithTimedelta(), "ok"])
+        result = await safe_send(fn)
+        self.assertEqual(result, "ok")
+        self.assertEqual(fn.call_count, 2)
+
+    async def test_bad_request_does_not_retry(self):
+        from telegram_retry import safe_send
+        from telegram.error import BadRequest
+        fn = AsyncMock(side_effect=BadRequest("chat not found"))
+        with self.assertRaises(BadRequest):
+            await safe_send(fn)
+        self.assertEqual(fn.call_count, 1)
+
+    async def test_forbidden_does_not_retry(self):
+        from telegram_retry import safe_send
+        from telegram.error import Forbidden
+        fn = AsyncMock(side_effect=Forbidden("bot was blocked by the user"))
+        with self.assertRaises(Forbidden):
+            await safe_send(fn)
+        self.assertEqual(fn.call_count, 1)
+
+    async def test_raises_after_exhausting_retries(self):
+        from telegram_retry import safe_send
+        from telegram.error import TimedOut
+        fn = AsyncMock(side_effect=TimedOut())
+        with self.assertRaises(TimedOut):
+            await safe_send(fn, max_retries=2)
+        self.assertEqual(fn.call_count, 2)
 
 
 if __name__ == "__main__":

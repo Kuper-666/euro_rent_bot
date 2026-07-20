@@ -14,6 +14,7 @@ import logging
 import random
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, timedelta
+from telegram_retry import safe_send
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +54,24 @@ def _get_bot(context=None):
 
 
 async def _safe_send(chat_id, text, parse_mode=None, reply_markup=None, context=None):
-    """Отправка сообщения с обработкой ошибок."""
+    """
+    Отправка сообщения с ретраями через telegram_retry.safe_send.
+
+    Раньше единичный TimedOut/NetworkError от Telegram (нередкое явление
+    для сетевого окружения Render) означал, что напоминание/промо/дайджест
+    просто не доходил до пользователя без какой-либо попытки повторить —
+    эта функция глушила ЛЮБОЕ исключение одинаково, включая временные
+    сетевые сбои, которые обычно решаются повтором через секунду-другую.
+    """
     bot = _get_bot(context)
     if not bot:
         logger.warning("_safe_send: no bot available (context=%s), message to %s not sent", context, chat_id)
         return
     try:
-        await bot.send_message(chat_id=chat_id, text=text,
-                               parse_mode=parse_mode, reply_markup=reply_markup)
+        await safe_send(bot.send_message, chat_id=chat_id, text=text,
+                         parse_mode=parse_mode, reply_markup=reply_markup)
     except Exception as e:
-        logger.warning("Failed to send to %s: %s", chat_id, e)
+        logger.warning("Failed to send to %s after retries: %s", chat_id, e)
 
 
 # ============================================================================

@@ -20,6 +20,7 @@ from telegram.ext import (
 )
 from config import TELEGRAM_TOKEN, PDF_PRICE, VIP_PRICE
 from metrics import log_event
+from telegram_retry import safe_send
 from handlers.callbacks_lang import handle_lang_switch
 from handlers.callbacks_listing import (
     handle_new_listing, handle_analyze_ad, handle_skip_ad,
@@ -178,7 +179,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             # генерации (тот же класс проблемы, что чинился по всему
             # проекту ранее).
             pdf_bytes = await asyncio.to_thread(generate_mieterprofil_pdf, pdf_data)
-            await update.message.reply_document(
+            await safe_send(
+                update.message.reply_document,
                 document=BytesIO(pdf_bytes),
                 filename="Mieterprofil.pdf",
                 caption=get_msg(lang, "pdf_done"),

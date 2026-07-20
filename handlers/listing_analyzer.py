@@ -19,6 +19,7 @@ from utils import (
 )
 from services.keyboards import kb, get_analysis_inline_buttons, split_message
 from metrics import log_event
+from telegram_retry import safe_send
 from handlers.user_features import track_last_url
 from handlers.commands import log_referral_event
 from listing_features import (
@@ -195,7 +196,7 @@ async def process_listing(update: Update, context: ContextTypes.DEFAULT_TYPE, li
         parts = split_message(full_text)
         for i, part in enumerate(parts):
             markup = get_analysis_inline_buttons() if i == len(parts) - 1 else None
-            await update.message.reply_text(part, reply_markup=markup, parse_mode="HTML")
+            await safe_send(update.message.reply_text, part, reply_markup=markup, parse_mode="HTML")
         log_event("analysis_completed", user_id=user_id)
 
     except Exception as e:
