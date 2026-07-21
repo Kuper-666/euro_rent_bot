@@ -36,6 +36,12 @@ NEWSLETTER_FROM = os.getenv("NEWSLETTER_FROM", "EuroRent AI <noreply@eurorent.ai
 # Travel time calculator (OpenStreetMap OSRM)
 OSRM_URL = os.getenv("OSRM_URL", "http://router.project-osrm.org")
 
+# Mobile app EuroRent Lens — shared secret for /api/* endpoints.
+# Without it anyone who discovers the bot URL could call Groq for free
+# via /api/analyze. Cloud Function passes this key in X-Api-Key header
+# (stored in Firebase Functions config, not in the app itself).
+MOBILE_API_KEY = os.getenv("MOBILE_API_KEY", "")
+
 if not TELEGRAM_TOKEN:
     logger.error("TELEGRAM_TOKEN not set — bot cannot start")
     raise SystemExit("TELEGRAM_TOKEN is required")

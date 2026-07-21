@@ -276,3 +276,175 @@ def get_user(user_id: str) -> dict:
                     time.sleep(1 * (attempt + 1))
     data = _load_json()
     return data.get(user_id, {})
+
+
+# ── Mobile app account linking (EuroRent Lens) ──────────────────────
+#
+# Связывает Google-аккаунт мобильного приложения с Telegram user_id, чтобы
+# баланс/лимиты проверок были общими между ботом и приложением (решение:
+# один и тот же лимит бесплатных проверок, а не отдельный для мобильных).
+# Таблица создаётся migrate_mobile_links.sql. JSON-фоллбек — отдельный
+# файл, а не users_data.json, чтобы не путать структуру данных.
+
+MOBILE_LINKS_TABLE = "MobileLinks"
+MOBILE_LINKS_JSON_FILE = "mobile_links.json"
+
+
+def _load_mobile_links_json() -> dict:
+    try:
+        if os.path.exists(MOBILE_LINKS_JSON_FILE):
+            with open(MOBILE_LINKS_JSON_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning("Failed to load mobile_links.json: %s", e)
+    return {}
+
+
+def _save_mobile_links_json(data: dict) -> None:
+    try:
+        import tempfile
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=".", suffix=".tmp")
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp_path, MOBILE_LINKS_JSON_FILE)
+    except Exception as e:
+        logger.warning("Failed to save mobile_links.json: %s", e)
+
+
+def link_mobile_account(google_user_id: str, telegram_user_id: str, email: str = "") -> bool:
+    """Привязывает google_user_id мобильного приложения к telegram_user_id."""
+    if _get_mode() == "supabase":
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                row = {
+                    "google_user_id": google_user_id,
+                    "telegram_user_id": telegram_user_id,
+                    "email": email,
+                }
+                existing = sb.table(MOBILE_LINKS_TABLE).select("google_user_id").eq(
+                    "google_user_id", google_user_id
+                ).execute()
+                if existing.data:
+                    sb.table(MOBILE_LINKS_TABLE).update(row).eq(
+                        "google_user_id", google_user_id
+                    ).execute()
+                else:
+                    sb.table(MOBILE_LINKS_TABLE).insert(row).execute()
+                return True
+            except Exception as e:
+                err_str = str(e)
+                if "PGRST204" in err_str or "PGRST205" in err_str:
+                    logger.error("MobileLinks table/schema issue, falling back to JSON: %s", e)
+                    alert_admin(
+                        "mobile_links_schema",
+                        "Таблица MobileLinks недоступна в Supabase (не создана или "
+                        "устарела схема). Нужно применить migrate_mobile_links.sql.\n\n"
+                        f"Детали: {err_str[:200]}",
+                    )
+                    break
+                logger.warning("Supabase link_mobile_account attempt %d: %s", attempt + 1, e)
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
+    data = _load_mobile_links_json()
+    data[google_user_id] = {"telegram_user_id": telegram_user_id, "email": email}
+    _save_mobile_links_json(data)
+    return True
+
+
+def resolve_mobile_account(google_user_id: str):
+    """Возвращает telegram_user_id, привязанный к google_user_id, либо None."""
+    if _get_mode() == "supabase":
+        for attempt in range(3):
+            try:
+                sb = _get_supabase()
+                result = sb.table(MOBILE_LINKS_TABLE).select("telegram_user_id").eq(
+                    "google_user_id", google_user_id
+                ).execute()
+                if result.data:
+                    return result.data[0]["telegram_user_id"]
+                return None
+            except Exception as e:
+                err_str = str(e)
+                if "PGRST204" in err_str or "PGRST205" in err_str:
+                    logger.error("MobileLinks table/schema issue, falling back to JSON: %s", e)
+                    break
+                logger.warning("Supabase resolve_mobile_account attempt %d: %s", attempt + 1, e)
+                if attempt < 2:
+                    time.sleep(1 * (attempt + 1))
+    data = _load_mobile_links_json()
+    entry = data.get(google_user_id)
+    return entry["telegram_user_id"] if entry else None
+
+
+def save_mobile_analysis(telegram_user_id: str, listing_text: str, analysis: str,
+                          city: str = "", price: float = None, score: int = None) -> None:
+    """Сохраняет запись в персональную историю анализов мобильного приложения."""
+    if _get_mode() == "supabase":
+        try:
+            sb = _get_supabase()
+            sb.table("MobileAnalysisHistory").insert({
+                "telegram_user_id": telegram_user_id,
+                "listing_text": listing_text[:5000],
+                "analysis": analysis,
+                "city": city,
+                "price": price,
+                "score": score,
+            }).execute()
+            return
+        except Exception as e:
+            logger.warning("save_mobile_analysis failed: %s", e)
+    # JSON fallback — append-only, локальный, не персистентен между рестартами
+    try:
+        import tempfile
+        path = "mobile_analysis_history.json"
+        data = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data.append({
+            "telegram_user_id": telegram_user_id,
+            "listing_text": listing_text[:5000],
+            "analysis": analysis,
+            "city": city, "price": price, "score": score,
+            "created_at": time.time(),
+        })
+        data = data[-500:]  # не даём файлу расти бесконечно
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=".", suffix=".tmp")
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    except Exception as e:
+        logger.warning("save_mobile_analysis JSON fallback failed: %s", e)
+
+
+def get_mobile_analysis_history(telegram_user_id: str, limit: int = 20) -> list:
+    """Возвращает последние `limit` записей истории для этого пользователя,
+    отсортированные от новых к старым."""
+    if _get_mode() == "supabase":
+        try:
+            sb = _get_supabase()
+            result = (
+                sb.table("MobileAnalysisHistory")
+                .select("*")
+                .eq("telegram_user_id", telegram_user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+        except Exception as e:
+            logger.warning("get_mobile_analysis_history failed: %s", e)
+            return []
+    path = "mobile_analysis_history.json"
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        filtered = [d for d in data if d.get("telegram_user_id") == telegram_user_id]
+        filtered.sort(key=lambda d: d.get("created_at", 0), reverse=True)
+        return filtered[:limit]
+    except Exception as e:
+        logger.warning("get_mobile_analysis_history JSON fallback failed: %s", e)
+        return []
