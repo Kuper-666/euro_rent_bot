@@ -442,8 +442,37 @@ def register_jobs(application):
     jq.run_daily(weekly_email_digest, time=datetime(2026, 1, 1, 10, 0, tzinfo=berlin).timetz(),
                  days=(1,), name="weekly_email_digest")
 
+# ============================================================================
+# 10. REDDIT МОНИТОРИНГ (каждые 6 часов, только чтение)
+# ============================================================================
+
+async def scan_reddit(context=None):
+    """Сканирует Reddit на посты об аренде жилья. Только чтение, без комментариев.
+
+    Запускается раз в 6 часов через job_queue.
+    Сохраняет отчёт в data/reddit_report.txt.
+    При находках отправляет админу ссылки.
+    """
+    try:
+        from reddit_monitor import monitor
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, monitor)
+    except Exception as e:
+        logger.warning("Reddit monitor error: %s", e)
+
+
+# ============================================================================
+# 11. РЕГИСТРАЦИЯ ЗАДАЧ
+# ============================================================================
+
+
     # Ежедневный отчёт админу — 23:00 по Берлину, конец дня.
     jq.run_daily(send_daily_admin_report, time=datetime(2026, 1, 1, 23, 0, tzinfo=berlin).timetz(),
                  name="daily_admin_report")
+
+    # Каждые 6 часов: Reddit мониторинг (только чтение, без авто-постинга).
+    # Сохраняет отчёт в data/reddit_report.txt и отправляет админу при находках.
+    jq.run_repeating(scan_reddit, interval=21600, first=360,
+                     name="reddit_monitor")
 
     logger.info("All jobs registered in job_queue")

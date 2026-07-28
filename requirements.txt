@@ -16,3 +16,4 @@ telethon
 langdetect
 pandas
 openpyxl
+praw
