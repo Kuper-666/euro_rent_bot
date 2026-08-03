@@ -9,6 +9,11 @@ import sys
 # pre-set.
 os.environ.setdefault("TELEGRAM_TOKEN", "123456789:test-token-for-unit-tests")
 os.environ.setdefault("GROQ_API_KEY", "test-groq-key-for-unit-tests")
+# config.MOBILE_API_KEY is read once at import time too, same as the two
+# above -- setting it only in TestMobileApiEndpoints.setUp() was too late,
+# since config.py (and web.py's `from config import MOBILE_API_KEY`) had
+# already imported and cached the empty default by then.
+os.environ.setdefault("MOBILE_API_KEY", "test_mobile_secret")
 
 import time
 import json
@@ -1831,6 +1836,187 @@ class TestSafeSend(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(TimedOut):
             await safe_send(fn, max_retries=2)
         self.assertEqual(fn.call_count, 2)
+
+
+# ── web.py: mobile app API (EuroRent Lens) ──────────────────────────
+
+class TestMobileApiEndpoints(unittest.TestCase):
+    """
+    Regression coverage for the HTTP API the EuroRent Lens mobile app
+    calls (previously untested). Includes the Telegram-verification flow
+    (request-verification / verify-telegram / link-status), which closes
+    a real identity-spoofing gap: /api/link-account alone accepted any
+    telegram_user_id from the client with no proof of ownership, so
+    anyone could link their Google account to someone else's Telegram ID
+    and (if balances/limits were ever wired to it) see or affect someone
+    else's data.
+    """
+
+    def setUp(self):
+        import web
+        self.web = web
+        self.web.app.testing = True
+        self.client = self.web.app.test_client()
+        self.web._verification_codes.clear()
+
+    def _make_fake_bot_module(self, send_side_effect=None):
+        fake_bot_module = MagicMock()
+        fake_bot_module.application.bot.send_message = AsyncMock(side_effect=send_side_effect)
+        import asyncio
+        loop = asyncio.new_event_loop()
+        import threading
+        t = threading.Thread(target=loop.run_forever, daemon=True)
+        t.start()
+        fake_bot_module.loop = loop
+        return fake_bot_module
+
+    def test_analyze_requires_api_key(self):
+        resp = self.client.post("/api/analyze", json={"text": "x", "user_id": "u1"})
+        self.assertEqual(resp.status_code, 401)
+
+    def test_analyze_rejects_wrong_api_key(self):
+        resp = self.client.post("/api/analyze", headers={"X-Api-Key": "wrong"},
+                                 json={"text": "x", "user_id": "u1"})
+        self.assertEqual(resp.status_code, 401)
+
+    def test_analyze_requires_text_and_user_id(self):
+        resp = self.client.post("/api/analyze", headers={"X-Api-Key": "test_mobile_secret"}, json={})
+        self.assertEqual(resp.status_code, 400)
+
+    def test_analyze_success_saves_history(self):
+        fake_groq_response = MagicMock()
+        fake_groq_response.status_code = 200
+        fake_groq_response.json.return_value = {
+            "choices": [{"message": {"content": "🏙 Berlin\nRisk Score: 8\n1200 EUR"}}]
+        }
+        with patch("requests.post", return_value=fake_groq_response):
+            with patch("storage.save_mobile_analysis") as mock_save:
+                resp = self.client.post(
+                    "/api/analyze", headers={"X-Api-Key": "test_mobile_secret"},
+                    json={"text": "Wohnung Berlin", "user_id": "u1", "lang": "ru"},
+                )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["city"], "Berlin")
+        mock_save.assert_called_once()
+
+    def test_request_verification_rejects_non_numeric_id(self):
+        resp = self.client.post(
+            "/api/request-verification", headers={"X-Api-Key": "test_mobile_secret"},
+            json={"telegram_user_id": "not_a_number"},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_request_verification_sends_code(self):
+        fake_bot_module = self._make_fake_bot_module()
+        with patch.dict("sys.modules", {"bot": fake_bot_module}):
+            resp = self.client.post(
+                "/api/request-verification", headers={"X-Api-Key": "test_mobile_secret"},
+                json={"telegram_user_id": "999888777"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["ok"])
+        fake_bot_module.application.bot.send_message.assert_called_once()
+
+    def test_request_verification_send_failure_cleans_up_code(self):
+        """If Telegram send fails (invalid ID, bot blocked, etc), the
+        pending code must not be left dangling in memory."""
+        fake_bot_module = self._make_fake_bot_module(
+            send_side_effect=Exception("Forbidden: bot was blocked by the user")
+        )
+        with patch.dict("sys.modules", {"bot": fake_bot_module}):
+            resp = self.client.post(
+                "/api/request-verification", headers={"X-Api-Key": "test_mobile_secret"},
+                json={"telegram_user_id": "777888999"},
+            )
+        self.assertEqual(resp.status_code, 502)
+        self.assertNotIn("777888999", self.web._verification_codes)
+
+    def test_verify_telegram_wrong_code_rejected(self):
+        self.web._verification_codes["999888777"] = {
+            "code": "123456", "expires_at": time.time() + 300, "attempts": 0,
+        }
+        resp = self.client.post(
+            "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+            json={"google_user_id": "g1", "email": "a@b.com",
+                  "telegram_user_id": "999888777", "code": "000000"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.get_json()["ok"])
+
+    def test_verify_telegram_correct_code_links_account(self):
+        self.web._verification_codes["999888777"] = {
+            "code": "123456", "expires_at": time.time() + 300, "attempts": 0,
+        }
+        with patch("storage.link_mobile_account", return_value=True) as mock_link:
+            resp = self.client.post(
+                "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+                json={"google_user_id": "g1", "email": "a@b.com",
+                      "telegram_user_id": "999888777", "code": "123456"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json()["ok"])
+        mock_link.assert_called_once_with("g1", "999888777", "a@b.com")
+
+    def test_verify_telegram_code_is_one_time_use(self):
+        self.web._verification_codes["999888777"] = {
+            "code": "123456", "expires_at": time.time() + 300, "attempts": 0,
+        }
+        with patch("storage.link_mobile_account", return_value=True):
+            self.client.post(
+                "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+                json={"google_user_id": "g1", "email": "a@b.com",
+                      "telegram_user_id": "999888777", "code": "123456"},
+            )
+        # Reusing the same code a second time must fail
+        resp = self.client.post(
+            "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+            json={"google_user_id": "g1", "email": "a@b.com",
+                  "telegram_user_id": "999888777", "code": "123456"},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_verify_telegram_expired_code_rejected(self):
+        self.web._verification_codes["999888777"] = {
+            "code": "123456", "expires_at": time.time() - 1, "attempts": 0,
+        }
+        resp = self.client.post(
+            "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+            json={"google_user_id": "g1", "email": "a@b.com",
+                  "telegram_user_id": "999888777", "code": "123456"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("no pending verification", resp.get_json()["error"])
+
+    def test_verify_telegram_rate_limits_after_five_attempts(self):
+        self.web._verification_codes["999888777"] = {
+            "code": "123456", "expires_at": time.time() + 300, "attempts": 0,
+        }
+        last_resp = None
+        for _ in range(6):
+            last_resp = self.client.post(
+                "/api/verify-telegram", headers={"X-Api-Key": "test_mobile_secret"},
+                json={"google_user_id": "g1", "email": "a@b.com",
+                      "telegram_user_id": "999888777", "code": "000000"},
+            )
+        self.assertEqual(last_resp.status_code, 429)
+
+    def test_link_status_returns_linked_id(self):
+        with patch("storage.resolve_mobile_account", return_value="999888777"):
+            resp = self.client.get(
+                "/api/link-status?google_user_id=g1",
+                headers={"X-Api-Key": "test_mobile_secret"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["telegram_user_id"], "999888777")
+
+    def test_link_status_returns_empty_when_not_linked(self):
+        with patch("storage.resolve_mobile_account", return_value=None):
+            resp = self.client.get(
+                "/api/link-status?google_user_id=g_unlinked",
+                headers={"X-Api-Key": "test_mobile_secret"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["telegram_user_id"], "")
 
 
 if __name__ == "__main__":
