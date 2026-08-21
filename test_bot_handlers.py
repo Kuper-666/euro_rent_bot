@@ -2019,5 +2019,100 @@ class TestMobileApiEndpoints(unittest.TestCase):
         self.assertEqual(resp.get_json()["telegram_user_id"], "")
 
 
+# ── scheduler: proactive health check job ───────────────────────────
+
+class TestCheckBotHealthJob(unittest.IsolatedAsyncioTestCase):
+    """
+    Regression: check_bot_health (and its registration in register_jobs)
+    disappeared entirely from scheduler.py during a merge -- no syntax
+    error, no test failure signaled it, because the tests covering it had
+    also been lost in the same merge. This class restores that coverage,
+    so if the function or its job_queue.run_repeating() registration goes
+    missing again, test_register_jobs / this class's own tests fail loudly
+    instead of silently disabling proactive health alerting.
+    """
+
+    async def test_healthy_does_not_alert(self):
+        import scheduler as scheduler_module
+        context = MagicMock()
+        context.application = MagicMock()
+
+        async def healthy(*args, **kwargs):
+            return True, {"storage": {"ok": True}, "webhook": {"ok": True}, "scheduler": {"ok": True}}
+
+        with patch("os.getenv", side_effect=lambda k, d=None: "https://example.onrender.com" if k == "WEBHOOK_URL" else d):
+            with patch("health.run_health_checks", side_effect=healthy):
+                with patch("alerting.alert_admin") as mock_alert:
+                    await scheduler_module.check_bot_health(context)
+
+        mock_alert.assert_not_called()
+
+    async def test_unhealthy_alerts_with_failure_details(self):
+        import scheduler as scheduler_module
+        context = MagicMock()
+        context.application = MagicMock()
+
+        async def broken(*args, **kwargs):
+            return False, {
+                "storage": {"ok": True},
+                "webhook": {"ok": False, "pending_update_count": 47, "last_error_message": "502 Bad Gateway"},
+                "scheduler": {"ok": True},
+            }
+
+        with patch("os.getenv", side_effect=lambda k, d=None: "https://example.onrender.com" if k == "WEBHOOK_URL" else d):
+            with patch("health.run_health_checks", side_effect=broken):
+                with patch("alerting.alert_admin") as mock_alert:
+                    await scheduler_module.check_bot_health(context)
+
+        mock_alert.assert_called_once()
+        alert_key, alert_msg = mock_alert.call_args[0]
+        self.assertEqual(alert_key, "health_check_failed")
+        self.assertIn("webhook", alert_msg)
+        self.assertIn("502 Bad Gateway", alert_msg)
+
+    async def test_skips_in_polling_mode(self):
+        """No WEBHOOK_URL means the bot runs in polling mode, where
+        get_webhook_info() would always show an empty url -- checking it
+        would be meaningless and could produce false-positive alerts."""
+        import scheduler as scheduler_module
+        context = MagicMock()
+        context.application = MagicMock()
+
+        with patch("os.getenv", side_effect=lambda k, d=None: d):
+            with patch("health.run_health_checks") as mock_check:
+                with patch("alerting.alert_admin") as mock_alert:
+                    await scheduler_module.check_bot_health(context)
+
+        mock_check.assert_not_called()
+        mock_alert.assert_not_called()
+
+    async def test_no_application_does_not_crash(self):
+        """Defensive: if context or context.application is missing (e.g.
+        called manually without a real job_queue context), the job should
+        no-op rather than raise."""
+        import scheduler as scheduler_module
+        await scheduler_module.check_bot_health(None)
+        context = MagicMock()
+        context.application = None
+        await scheduler_module.check_bot_health(context)  # should not raise
+
+    def test_check_bot_health_is_registered_in_register_jobs(self):
+        """Directly guards against the exact failure mode that happened:
+        check_bot_health existing as a function but never being wired into
+        job_queue, or the reverse (registered but the function deleted)."""
+        import scheduler as scheduler_module
+        self.assertTrue(hasattr(scheduler_module, "check_bot_health"),
+                         "check_bot_health function is missing from scheduler.py")
+
+        application = MagicMock()
+        jq = MagicMock()
+        application.job_queue = jq
+        scheduler_module.register_jobs(application)
+
+        registered_repeating_funcs = [c.args[0] for c in jq.run_repeating.call_args_list]
+        self.assertIn(scheduler_module.check_bot_health, registered_repeating_funcs,
+                      "check_bot_health is not registered via job_queue.run_repeating in register_jobs")
+
+
 if __name__ == "__main__":
     unittest.main()

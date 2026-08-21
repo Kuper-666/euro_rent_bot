@@ -451,6 +451,11 @@ def register_jobs(application):
     jq.run_repeating(scan_reddit, interval=21600, first=360,
                      name="reddit_monitor")
 
+    # Каждые 5 минут: проактивная проверка здоровья (webhook/Supabase/
+    # планировщик) с алертом админу при обнаружении проблемы.
+    jq.run_repeating(check_bot_health, interval=300, first=90,
+                     name="check_bot_health")
+
     logger.info("All jobs registered in job_queue")
 
 
@@ -471,3 +476,53 @@ async def scan_reddit(context=None):
         await loop.run_in_executor(None, monitor)
     except Exception as e:
         logger.warning("Reddit monitor error: %s", e)
+
+
+# ============================================================================
+# 11. ПРОАКТИВНАЯ ПРОВЕРКА ЗДОРОВЬЯ (каждые 5 минут)
+# ============================================================================
+
+async def check_bot_health(context=None):
+    """
+    Проактивная проверка каждые 5 минут — та же логика, что и HTTP-эндпоинт
+    /health, но с алертом, а не пассивным 200/503 в ответ на чей-то запрос.
+    Раньше единственным способом узнать о сломанном webhook/Supabase/
+    планировщике было либо кому-то вручную дёрнуть /health, либо ждать
+    жалобы от пользователей.
+
+    РЕГРЕССИЯ: эта функция целиком исчезла из файла при одном из мержей
+    (вместе с её регистрацией и регистрацией daily_admin_report/
+    reddit_monitor, которые оказались случайно вложены в тело
+    scan_reddit из-за ошибки отступов) — восстановлена по описанию из
+    предыдущей сессии, где она уже была реализована и протестирована.
+    Обнаружено через inspect.getsource(), а не просто чтением файла —
+    визуальные отступы в некоторых viewer'ах вводили в заблуждение.
+    """
+    if not context or not context.application:
+        return
+
+    from health import run_health_checks
+    from alerting import alert_admin
+
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    token = os.getenv("TELEGRAM_TOKEN", "")
+    if not webhook_url:
+        # В polling-режиме (WEBHOOK_URL не задан) проверка webhook
+        # бессмысленна — get_webhook_info() всегда покажет пустой url.
+        return
+
+    try:
+        ok, checks = await run_health_checks(context.application, webhook_url, token)
+    except Exception as e:
+        logger.warning("check_bot_health itself failed: %s", e)
+        return
+
+    if ok:
+        return
+
+    failed = [name for name, c in checks.items() if not c.get("ok")]
+    details = "\n".join(f"• {name}: {checks[name]}" for name in failed)
+    alert_admin(
+        "health_check_failed",
+        f"Проверка здоровья бота провалилась: {', '.join(failed)}\n\n{details}",
+    )
