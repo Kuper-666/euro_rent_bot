@@ -46,6 +46,14 @@ KEYWORDS = [
 
 SEEN_POSTS = {}
 
+# Записи о просмотренных постах старше этого срока удаляются при каждом
+# save_seen() — без этого reddit_seen.json растёт неограниченно на
+# протяжении всего времени жизни бота (13 subreddit'ов × 25 постов каждые
+# 6 часов), раздувая файл и память на каждый load_seen(). 30 дней с запасом
+# покрывает любой реалистичный интервал, за который пост мог бы повторно
+# попасться (Reddit API отдаёт .new() — самые свежие посты, не архив).
+SEEN_POST_TTL_SECONDS = 30 * 86400
+
 
 def load_seen():
     global SEEN_POSTS
@@ -58,6 +66,13 @@ def load_seen():
 
 
 def save_seen():
+    now = time.time()
+    global SEEN_POSTS
+    SEEN_POSTS = {
+        post_id: entry
+        for post_id, entry in SEEN_POSTS.items()
+        if now - entry.get("seen_at", now) < SEEN_POST_TTL_SECONDS
+    }
     with open(SEEN_FILE, "w") as f:
         json.dump(SEEN_POSTS, f, indent=2)
 
@@ -149,6 +164,16 @@ def monitor():
         f.write(report)
 
     logger.info(f"Report saved to {REPORT_FILE}")
+
+    try:
+        from alerting import alert_admin
+        top = matches[:5]
+        alert_lines = [f"🔍 Reddit: найдено {len(matches)} релевантных постов\n"]
+        for m in top:
+            alert_lines.append(f"[r/{m['subreddit']}] (score={m['score']}) {m['title'][:80]}\n{m['url']}")
+        alert_admin("reddit_matches", "\n\n".join(alert_lines))
+    except Exception as e:
+        logger.warning(f"Failed to alert admin about Reddit matches: {e}")
 
 
 if __name__ == "__main__":
