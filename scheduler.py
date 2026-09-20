@@ -517,6 +517,29 @@ async def check_bot_health(context=None):
         logger.warning("check_bot_health itself failed: %s", e)
         return
 
+    # Auto-fix: if webhook URL mismatch detected, try to re-set it.
+    # This handles the case where set_webhook failed at startup (network
+    # blip on Render) or a different instance previously set a different URL.
+    webhook_check = checks.get("webhook", {})
+    if not webhook_check.get("ok") and not webhook_check.get("url_matches_expected"):
+        try:
+            full_url = webhook_url + f"/{token}"
+            await context.application.bot.set_webhook(
+                full_url,
+                allowed_updates=["message", "callback_query", "chat_member",
+                                  "my_chat_member", "pre_checkout_query"],
+                drop_pending_updates=False,
+            )
+            info = await context.application.bot.get_webhook_info()
+            logger.info(
+                "Auto-repaired webhook: url=%s pending=%s last_error=%s",
+                info.url, info.pending_update_count, info.last_error_message,
+            )
+            # Re-check after repair
+            ok, checks = await run_health_checks(context.application, webhook_url, token)
+        except Exception as e:
+            logger.warning("Failed to auto-repair webhook: %s", e)
+
     if ok:
         return
 

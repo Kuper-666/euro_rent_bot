@@ -36,13 +36,21 @@ async def run_health_checks(application, webhook_url: str, telegram_token: str) 
     try:
         info = await application.bot.get_webhook_info()
         expected_url = f"{webhook_url}/{telegram_token}"
+        url_matches = info.url == expected_url
         checks["webhook"] = {
-            "ok": not info.last_error_message and info.url == expected_url,
-            "url_matches_expected": info.url == expected_url,
+            "ok": not info.last_error_message and url_matches,
+            "url_matches_expected": url_matches,
+            "actual_url": info.url or "(empty)",
+            "expected_url": expected_url,
             "pending_update_count": info.pending_update_count,
             "last_error_message": info.last_error_message,
             "last_error_date": info.last_error_date.isoformat() if info.last_error_date else None,
         }
+        if not url_matches:
+            import logging
+            logging.warning(
+                "Webhook URL mismatch: actual=%s expected=%s", info.url, expected_url
+            )
     except Exception as e:
         checks["webhook"] = {"ok": False, "error": str(e)[:200]}
 
