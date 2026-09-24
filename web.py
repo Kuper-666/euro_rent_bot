@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import hmac
 import logging
 from flask import Flask, request, jsonify
 
@@ -31,11 +32,17 @@ def b2b():
 # ── Mobile app API (EuroRent Lens) ──────────────────────────────────
 
 def _check_api_key():
-    """Verify X-Api-Key header matches MOBILE_API_KEY."""
+    """Verify X-Api-Key header matches MOBILE_API_KEY.
+
+    Использует hmac.compare_digest вместо == — обычное сравнение строк
+    в Python завершается на первом несовпадающем символе, что теоретически
+    позволяет восстановить секрет по времени ответа (timing attack),
+    измеряя, на каком символе сравнение начинает занимать больше времени.
+    Низкий риск для одного общего мобильного ключа, но защита бесплатна."""
     if not MOBILE_API_KEY:
         return False
     api_key = request.headers.get("X-Api-Key", "")
-    return api_key == MOBILE_API_KEY
+    return hmac.compare_digest(api_key, MOBILE_API_KEY)
 
 
 @app.post("/api/analyze")
